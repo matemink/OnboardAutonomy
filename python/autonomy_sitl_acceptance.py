@@ -7,10 +7,12 @@ import argparse
 from dataclasses import asdict, dataclass
 from datetime import datetime
 import json
+import math
 import os
 from pathlib import Path
 import selectors
 import socket
+import statistics
 import subprocess
 import time
 from typing import TextIO
@@ -20,7 +22,8 @@ from sitl_harness import ProcessSupervisor, require_available_port
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LANDING_POSITION_TOLERANCE_M = 0.75
+LANDING_POSITION_TOLERANCE_M = 0.25
+LARGE_CENTER_EXCURSION_M = 0.25
 GAZEBO_WORLD = (
     PROJECT_ROOT / "simulation" / "worlds" / "apriltag_landing.sdf"
 )
@@ -44,6 +47,7 @@ class AutonomyFlightEvidence:
     final_local_position_ne_m: tuple[float, float] | None
     final_horizontal_error_m: float | None
     precision_statuses: tuple[str, ...]
+    large_center_crossings: int = 0
 
 
 @dataclass(frozen=True)
@@ -51,6 +55,14 @@ class AutonomyAcceptanceResult:
     final_snapshot: dict[str, object]
     evidence: AutonomyFlightEvidence
     artifacts: Path
+
+
+@dataclass(frozen=True)
+class LandingAccuracyStatistics:
+    runs: int
+    median_error_m: float
+    worst_error_m: float
+    population_stddev_m: float
 
 
 def snapshot_completed_autonomy(snapshot: dict[str, object]) -> bool:
@@ -83,14 +95,68 @@ def expected_landing_position_ne_m() -> tuple[float, float]:
         for include in world.findall(".//world/include")
     }
     pad_east_m, pad_north_m = poses["model://apriltag_landing_pad"]
-    vehicle_east_m, vehicle_north_m = poses[
-        "model://iris_with_landing_camera"
-    ]
 
-    # Gazebo world XY is East/North; MAVLink LOCAL_POSITION_NED is North/East.
-    return (
-        pad_north_m - vehicle_north_m,
-        pad_east_m - vehicle_east_m,
+    # SITL LOCAL_POSITION_NED shares the Gazebo world origin. The vehicle's
+    # initial offset is already visible in telemetry and must not be subtracted.
+    return (pad_north_m, pad_east_m)
+
+
+def count_large_center_crossings(
+    positions_ne_m: list[tuple[float, float]],
+    center_ne_m: tuple[float, float],
+) -> int:
+    if not positions_ne_m:
+        return 0
+
+    initial_offset = next(
+        (
+            (north_m - center_ne_m[0], east_m - center_ne_m[1])
+            for north_m, east_m in positions_ne_m
+            if math.hypot(
+                north_m - center_ne_m[0],
+                east_m - center_ne_m[1],
+            ) >= LARGE_CENTER_EXCURSION_M
+        ),
+        None,
+    )
+    if initial_offset is None:
+        return 0
+    initial_north, initial_east = initial_offset
+    initial_distance = math.hypot(initial_north, initial_east)
+
+    axis_north = initial_north / initial_distance
+    axis_east = initial_east / initial_distance
+    previous_sign = 1
+    crossings = 0
+    for north_m, east_m in positions_ne_m:
+        along_track_m = (
+            (north_m - center_ne_m[0]) * axis_north
+            + (east_m - center_ne_m[1]) * axis_east
+        )
+        if abs(along_track_m) < LARGE_CENTER_EXCURSION_M:
+            continue
+        sign = 1 if along_track_m > 0.0 else -1
+        if sign != previous_sign:
+            crossings += 1
+            previous_sign = sign
+    return crossings
+
+
+def landing_accuracy_statistics(
+    evidence: list[AutonomyFlightEvidence],
+) -> LandingAccuracyStatistics:
+    errors = [
+        item.final_horizontal_error_m
+        for item in evidence
+        if item.final_horizontal_error_m is not None
+    ]
+    if len(errors) != len(evidence) or not errors:
+        raise ValueError("all runs require a final horizontal error")
+    return LandingAccuracyStatistics(
+        runs=len(errors),
+        median_error_m=statistics.median(errors),
+        worst_error_m=max(errors),
+        population_stddev_m=statistics.pstdev(errors),
     )
 
 
@@ -116,6 +182,7 @@ def inspect_autonomy_tlog(path: Path) -> AutonomyFlightEvidence:
     landing_target_frames: set[int] = set()
     position_valid_values: set[int] = set()
     final_local_position: tuple[float, float] | None = None
+    local_positions: list[tuple[float, float]] = []
     precision_statuses: list[str] = []
 
     connection = mavutil.mavlink_connection(str(path))
@@ -145,6 +212,7 @@ def inspect_autonomy_tlog(path: Path) -> AutonomyFlightEvidence:
                     float(message.x),
                     float(message.y),
                 )
+                local_positions.append(final_local_position)
             elif message_type == "LANDING_TARGET":
                 landing_target_count += 1
                 landing_target_frames.add(int(message.frame))
@@ -196,6 +264,10 @@ def inspect_autonomy_tlog(path: Path) -> AutonomyFlightEvidence:
         final_local_position_ne_m=final_local_position,
         final_horizontal_error_m=horizontal_error,
         precision_statuses=tuple(dict.fromkeys(precision_statuses)),
+        large_center_crossings=count_large_center_crossings(
+            local_positions,
+            expected_landing_position_ne_m(),
+        ),
     )
 
 
@@ -247,6 +319,21 @@ def validate_autonomy_evidence(evidence: AutonomyFlightEvidence) -> None:
         )
     if "PrecLand: Target Found" not in evidence.precision_statuses:
         raise RuntimeError("ArduPilot did not report precision target lock")
+    if evidence.large_center_crossings > 1:
+        raise RuntimeError(
+            "Sustained center-crossing oscillation observed: "
+            f"{evidence.large_center_crossings} large crossings"
+        )
+
+
+def validate_terminal_handoff(snapshot: dict[str, object]) -> None:
+    autonomy = snapshot.get("autonomy")
+    if not isinstance(autonomy, dict) or (
+        autonomy.get("terminal_descent_active") is not True
+    ):
+        raise RuntimeError(
+            "Landing completed without the verified terminal descent handoff"
+        )
 
 
 def wait_for_gazebo_camera(
@@ -436,12 +523,13 @@ def run_acceptance(
             )
         # The runtime receives DISARMED through MAVProxy before MAVProxy's
         # buffered tlog writer is guaranteed to persist that last frame.
-        time.sleep(1.0)
+        time.sleep(2.0)
     finally:
         supervisor.stop_all(timeout=5.0)
 
     evidence = inspect_autonomy_tlog(tlog)
     validate_autonomy_evidence(evidence)
+    validate_terminal_handoff(final_snapshot)
     result = AutonomyAcceptanceResult(
         final_snapshot=final_snapshot,
         evidence=evidence,
@@ -474,26 +562,64 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "artifacts/autonomy-sitl",
     )
     parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--runs", type=int, default=1)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.runs <= 0:
+        raise SystemExit("--runs must be positive")
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-    artifacts = args.artifacts_root / f"{run_id}-{os.getpid()}"
+    artifacts_root = args.artifacts_root / f"{run_id}-{os.getpid()}"
+    if args.runs > 1:
+        artifacts_root.mkdir(parents=True, exist_ok=False)
 
     print("OnboardAutonomy production SITL acceptance")
-    print(f"Artifacts: {artifacts}")
+    print(f"Artifacts: {artifacts_root}")
+    results: list[AutonomyAcceptanceResult] = []
     try:
-        result = run_acceptance(
-            args.companion.expanduser().resolve(),
-            artifacts,
-            args.timeout,
-        )
+        for index in range(args.runs):
+            artifacts = (
+                artifacts_root
+                if args.runs == 1
+                else artifacts_root / f"run-{index + 1:02d}"
+            )
+            print(f"Run {index + 1}/{args.runs}")
+            results.append(
+                run_acceptance(
+                    args.companion.expanduser().resolve(),
+                    artifacts,
+                    args.timeout,
+                )
+            )
     except Exception as error:
         print(f"FAILED: {error}")
         return 1
 
+    accuracy = landing_accuracy_statistics(
+        [result.evidence for result in results]
+    )
+    if args.runs > 1:
+        (artifacts_root / "batch-summary.json").write_text(
+            json.dumps(
+                {
+                    "accuracy": asdict(accuracy),
+                    "runs": [
+                        {
+                            "artifacts": str(result.artifacts),
+                            "evidence": asdict(result.evidence),
+                        }
+                        for result in results
+                    ],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    result = results[-1]
     print("PASSED")
     print("Path: readiness -> GUIDED -> ARM -> TAKEOFF -> vision LAND")
     print(
@@ -501,6 +627,12 @@ def main() -> int:
         f"{result.evidence.landing_target_count} LANDING_TARGET, "
         f"{result.evidence.maximum_relative_altitude_m:.2f} m max, "
         f"{result.evidence.final_horizontal_error_m:.3f} m error"
+    )
+    print(
+        "Accuracy: "
+        f"median {accuracy.median_error_m:.3f} m, "
+        f"worst {accuracy.worst_error_m:.3f} m, "
+        f"stddev {accuracy.population_stddev_m:.3f} m"
     )
     return 0
 

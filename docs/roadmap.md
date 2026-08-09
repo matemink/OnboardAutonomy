@@ -131,7 +131,8 @@ Gazebo producer restarted. See `docs/evidence/camera-recovery.md`.
   target and camera-to-target distance.
 - [x] Transform camera coordinates into the MAVLink/body coordinate
   frame and validate axes, signs, units, and timestamps with tests.
-- [x] Filter noisy measurements without hiding stale or lost targets.
+- [x] Reject invalid, low-confidence, and stale measurements without adding
+  moving-frame translation lag to the default guidance path.
 - [x] Replace the synthetic SITL target provider with real AprilTag
   `LANDING_TARGET` observations.
 - [x] Verify simulated AprilTag acquisition and metric pose after takeoff
@@ -143,10 +144,14 @@ Gazebo producer restarted. See `docs/evidence/camera-recovery.md`.
   startup, and continuous runtime into tested application components.
 - [x] Stop stale target guidance immediately and request a bounded fallback
   LAND when vision remains unavailable.
+- [x] Latch vision guidance off for terminal descent only after stable
+  low-altitude alignment, and verify the handoff in runtime telemetry.
 
-Production simulation acceptance evidence: 78 valid body-FRD
-`LANDING_TARGET` messages, accepted GUIDED/ARM/TAKEOFF/LAND, automatic
-DISARMED, and 0.000 m final horizontal error in the recorded run. See
+Production simulation acceptance evidence: ten consecutive 3 m offset
+flights, 174-177 valid body-FRD `LANDING_TARGET` messages per run, accepted
+GUIDED/ARM/TAKEOFF/LAND, automatic DISARMED, zero large center crossings,
+and 0.000 m median/worst/population-standard-deviation horizontal error at
+MAVLink telemetry resolution. See
 `docs/evidence/precision-landing-sitl.md`.
 
 Independent safety acceptance evidence: ArduPilot entered LAND 3.237 seconds

@@ -19,7 +19,7 @@ enum class TargetTrackPhase {
 struct TargetTrackerConfig {
     std::uint32_t required_consecutive_observations{3};
     std::chrono::milliseconds loss_timeout{500};
-    double position_smoothing_factor{0.35};
+    double position_smoothing_factor{1.0};
     double minimum_decision_margin{20.0};
 };
 

@@ -29,6 +29,11 @@ struct AutonomyRuntimeConfig {
     std::chrono::milliseconds target_loss_land_after{
         std::chrono::seconds(5)
     };
+    double terminal_descent_altitude_m{1.5};
+    double terminal_alignment_radius_m{0.25};
+    std::chrono::milliseconds terminal_alignment_duration{
+        std::chrono::milliseconds(500)
+    };
 };
 
 struct AutonomyRuntimeSnapshot {
@@ -38,6 +43,7 @@ struct AutonomyRuntimeSnapshot {
         MotionSafetyStatus::no_intent
     };
     bool vision_landing_target_active{false};
+    bool terminal_descent_active{false};
     std::size_t land_attempt{0};
     std::optional<std::uint8_t> failure_result;
 };
@@ -78,7 +84,7 @@ private:
     void fail(std::string detail);
 
     static constexpr auto kLandingTargetInterval =
-        std::chrono::milliseconds(200);
+        std::chrono::milliseconds(100);
     static constexpr auto kLandingTargetWarmup =
         std::chrono::seconds(1);
     static constexpr auto kAcknowledgementTimeout =
@@ -99,12 +105,15 @@ private:
     std::optional<std::uint8_t> vehicle_system_id_;
     std::optional<domain::TimePoint> land_command_after_;
     std::optional<domain::TimePoint> target_missing_since_;
+    std::optional<domain::TimePoint> terminal_alignment_since_;
     domain::TimePoint next_landing_target_{};
     domain::TimePoint acknowledgement_deadline_{};
     domain::TimePoint landing_deadline_{};
     std::size_t land_attempt_{0};
     bool awaiting_land_ack_{false};
     bool vision_landing_target_active_{false};
+    bool terminal_alignment_confirmed_{false};
+    bool terminal_descent_active_{false};
     std::optional<std::uint8_t> failure_result_;
 };
 

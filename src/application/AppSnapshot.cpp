@@ -359,6 +359,8 @@ std::string AppSnapshot::to_json() const {
            << json_escape(autonomy.detail) << '\"';
     output << ",\"vision_landing_target_active\":"
            << autonomy.vision_landing_target_active;
+    output << ",\"terminal_descent_active\":"
+           << autonomy.terminal_descent_active;
     output << ",\"land_attempt\":" << autonomy.land_attempt;
     output << '}';
     output << ",\"motion_commands_allowed\":"

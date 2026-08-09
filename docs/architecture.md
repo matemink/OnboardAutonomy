@@ -132,9 +132,11 @@ the corners and estimates metric camera-optical pose.
 
 The application-owned `TargetTracker` accepts only finite, forward-facing,
 uncorrected poses above the decision-margin threshold. It requires three
-consecutive observations before declaring a lock, applies exponential
-smoothing to translation, exposes observation age, and expires the track
-after 500 ms. A confirmed track keeps one tag identity until expiry
+consecutive observations before declaring a lock, supports optional EMA
+translation smoothing, exposes observation age, and expires the track after
+500 ms. Production guidance uses the current translation without EMA because
+the measurement is relative to a moving body frame. A confirmed track keeps
+one tag identity until expiry
 instead of jumping between visible markers. Rotation remains raw because
 averaging rotation matrices component by component would be mathematically
 invalid.
@@ -220,7 +222,7 @@ After startup, `WorldState` is the immutable input for one decision cycle.
 `DecisionEngine` may create a short-lived `DesiredMotion`, but it never sends
 MAVLink. `SafetySupervisor` independently rejects disconnected, disarmed,
 expired, or invalid motion. `AutonomyRuntime` converts only an approved
-intent into `LANDING_TARGET` output at 5 Hz and requests LAND after one
+intent into `LANDING_TARGET` output at 10 Hz and requests LAND after one
 second of continuously valid target data.
 
 A missing or stale target stops vision setpoints immediately and resets the
