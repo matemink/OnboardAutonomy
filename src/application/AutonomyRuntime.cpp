@@ -103,7 +103,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
         terminal_descent_active_) {
         vision_landing_target_active_ = false;
         detail_ =
-            "Terminal descent; vision corrections are latched off";
+            "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
         return actions;
     }
 
@@ -169,7 +169,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
                 terminal_alignment_confirmed_) {
                 terminal_descent_active_ = true;
                 detail_ =
-                    "Terminal descent; vision corrections are latched off";
+                    "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
             } else {
                 terminal_alignment_since_.reset();
                 terminal_alignment_confirmed_ = false;

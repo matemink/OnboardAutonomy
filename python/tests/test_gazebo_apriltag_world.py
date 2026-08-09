@@ -47,6 +47,27 @@ TEXTURE = (
     / "textures"
     / "tagStandard41h12-id0-quiet-zone.png"
 )
+WEATHER_DEFAULTS = (
+    PROJECT_ROOT / "config" / "onboard_autonomy-gazebo-weather.parm"
+)
+WEATHER_APP_SCRIPT = (
+    PROJECT_ROOT
+    / "scripts"
+    / "run_onboard_autonomy_gazebo_weather_vision.sh"
+)
+WEATHER_GAZEBO_SCRIPT = (
+    PROJECT_ROOT / "scripts" / "run_gazebo_apriltag_weather.sh"
+)
+WEATHER_PROFILE_LOADER = (
+    PROJECT_ROOT / "scripts" / "weather_profile.sh"
+)
+GAZEBO_GUI_CONFIG = (
+    PROJECT_ROOT / "simulation" / "gui" / "onboard_autonomy.config"
+)
+WIND_INDICATOR_QML = (
+    PROJECT_ROOT / "simulation" / "gui" / "WindIndicator.qml"
+)
+GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
 
 
 class GazeboAprilTagWorldTests(unittest.TestCase):
@@ -167,6 +188,161 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
                 "Raspberry_Pi_Camera_Module_3_Wide",
             }.issubset(component_links)
         )
+
+    def test_weather_system_is_opt_in_and_gust_capable(self) -> None:
+        world = element_tree.parse(WORLD).getroot().find("world")
+        self.assertIsNotNone(world)
+
+        plugins = {
+            plugin.attrib["name"]: plugin
+            for plugin in world.findall("plugin")
+        }
+        wind = plugins["gz::sim::systems::WindEffects"]
+
+        self.assertEqual(
+            world.findtext("wind/linear_velocity"),
+            "0 0 0",
+        )
+        self.assertIn("gz::sim::systems::AirPressure", plugins)
+        self.assertEqual(
+            wind.findtext("horizontal/magnitude/sin/amplitude_percent"),
+            "0.15",
+        )
+        self.assertEqual(
+            wind.findtext("horizontal/direction/sin/amplitude"),
+            "8",
+        )
+        self.assertIsNotNone(wind.find("vertical/noise"))
+
+    def test_pixhawk_exposes_air_pressure_telemetry(self) -> None:
+        model = element_tree.parse(CAMERA_MODEL).getroot()
+        self.assertEqual(model.findtext("model/enable_wind"), "true")
+
+        sensor = model.find(
+            ".//sensor[@name='Pixhawk_6C_barometer']"
+        )
+        self.assertIsNotNone(sensor)
+        self.assertEqual(sensor.attrib["type"], "air_pressure")
+        self.assertEqual(sensor.findtext("update_rate"), "50")
+        self.assertEqual(
+            sensor.findtext("topic"),
+            "/onboard_autonomy/sensors/pixhawk_6c/air_pressure",
+        )
+        self.assertEqual(
+            sensor.findtext("air_pressure/reference_altitude"),
+            "584",
+        )
+
+    def test_sitl_weather_matches_the_gazebo_wind_seed(self) -> None:
+        parameters = {}
+        for line in WEATHER_DEFAULTS.read_text(encoding="utf-8").splitlines():
+            content = line.partition("#")[0].strip()
+            if not content:
+                continue
+            name, value = content.split(maxsplit=1)
+            parameters[name] = value
+
+        self.assertEqual(parameters["SIM_WIND_SPD"], "3")
+        self.assertEqual(parameters["SIM_WIND_DIR"], "270")
+        self.assertGreater(float(parameters["SIM_WIND_TURB"]), 0.0)
+        self.assertEqual(parameters["SIM_WIND_T"], "1")
+        self.assertEqual(parameters["SIM_BARO_RND"], "0.2")
+
+        for script in (WEATHER_APP_SCRIPT, WEATHER_GAZEBO_SCRIPT):
+            self.assertIn(
+                'source "${script_dir}/weather_profile.sh"',
+                script.read_text(encoding="utf-8"),
+            )
+
+        loader = WEATHER_PROFILE_LOADER.read_text(encoding="utf-8")
+        for parameter in (
+            "SIM_WIND_SPD",
+            "SIM_WIND_DIR",
+            "SIM_WIND_TURB",
+        ):
+            self.assertIn(parameter, loader)
+
+        ardupilot_launcher = (
+            PROJECT_ROOT / "scripts" / "run_arducopter_gazebo_weather.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'source "${script_dir}/weather_profile.sh"',
+            ardupilot_launcher,
+        )
+        self.assertIn(
+            'ONBOARD_AUTONOMY_SITL_WEATHER_DEFAULTS="${weather_profile_file}"',
+            ardupilot_launcher,
+        )
+
+        windows_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'if not "%~1"=="" set "WEATHER_PROFILE=%~1"',
+            windows_launcher,
+        )
+        self.assertEqual(
+            windows_launcher.count("ONBOARD_AUTONOMY_WEATHER_PROFILE="),
+            4,
+        )
+
+    def test_gazebo_gui_owns_the_weather_indicator(self) -> None:
+        config_text = GAZEBO_GUI_CONFIG.read_text(encoding="utf-8")
+        config_text = config_text.replace(
+            '<?xml version="1.0"?>',
+            "",
+            1,
+        )
+        config = element_tree.fromstring(f"<config>{config_text}</config>")
+        plugins = {
+            plugin.attrib["filename"]: plugin
+            for plugin in config.findall("plugin")
+        }
+
+        self.assertIn("MinimalScene", plugins)
+        self.assertIn("WindIndicator", plugins)
+        self.assertTrue(
+            {
+                "ComponentInspector",
+                "CopyPaste",
+                "EntityTree",
+                "Lights",
+                "Screenshot",
+                "Shapes",
+                "Spawn",
+                "TransformControl",
+                "VisualizationCapabilities",
+            }.issubset(plugins),
+            "The custom GUI config must retain Gazebo's standard panels",
+        )
+
+        for side_panel in ("ComponentInspector", "EntityTree"):
+            properties = plugins[side_panel].find("gz-gui").findall(
+                "property"
+            )
+            state = next(
+                item.text for item in properties if item.attrib["key"] == "state"
+            )
+            self.assertEqual("docked", state)
+
+        wind_gui = plugins["WindIndicator"].find("gz-gui")
+        self.assertIsNotNone(wind_gui)
+        self.assertEqual(
+            wind_gui.find("anchors").attrib["target"],
+            "3D View",
+        )
+
+        qml = WIND_INDICATOR_QML.read_text(encoding="utf-8")
+        self.assertIn("WindIndicator.speedMetersPerSecond", qml)
+        self.assertIn("WindIndicator.directionFromDegrees", qml)
+        self.assertIn("WindIndicator.directionLabel", qml)
+        for cardinal in ('text: "N"', 'text: "E"', 'text: "S"', 'text: "W"'):
+            self.assertIn(cardinal, qml)
+
+        launcher = GAZEBO_GUI_LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn("build_gazebo_gui_plugins.sh", launcher)
+        self.assertIn('GZ_GUI_PLUGIN_PATH=', launcher)
+        self.assertIn('--gui-config "${gui_config}"', launcher)
 
 
 if __name__ == "__main__":

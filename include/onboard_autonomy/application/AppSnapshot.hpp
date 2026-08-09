@@ -3,6 +3,7 @@
 #include "onboard_autonomy/application/AutonomyRuntime.hpp"
 #include "onboard_autonomy/application/CameraMonitor.hpp"
 #include "onboard_autonomy/application/CompanionLinkFailsafe.hpp"
+#include "onboard_autonomy/application/EnvironmentProfile.hpp"
 #include "onboard_autonomy/application/FlightStartupController.hpp"
 #include "onboard_autonomy/domain/VehicleState.hpp"
 
@@ -67,6 +68,7 @@ struct AppSnapshot {
     bool companion_heartbeat_active{false};
     CompanionLinkFailsafeSnapshot companion_link_failsafe;
     TelemetryStatus telemetry;
+    std::optional<SimulatedWindProfile> simulated_wind;
     std::optional<CameraSnapshot> camera;
     std::optional<VisionSnapshot> vision;
     FlightStartupSnapshot flight_startup;

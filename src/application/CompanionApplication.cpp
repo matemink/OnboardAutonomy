@@ -291,6 +291,7 @@ public:
               options.flight_startup.enabled &&
               options.autonomy_runtime.enabled
           ),
+          simulated_wind_(options.simulated_wind),
           flight_startup_(options.flight_startup),
           autonomy_runtime_(options.autonomy_runtime),
           camera_extrinsics_(options.camera_extrinsics),
@@ -796,6 +797,7 @@ public:
                     .attempt = telemetry.attempt,
                     .failure_result = telemetry.failure_result,
             },
+            .simulated_wind = simulated_wind_,
             .camera = camera_monitor_.has_value()
                 ? std::optional{camera_monitor_->snapshot(now)}
                 : std::nullopt,
@@ -1023,6 +1025,7 @@ private:
     ports::Transport& transport_;
     bool motion_commands_allowed_{false};
     bool autonomy_scenario_configured_{false};
+    std::optional<SimulatedWindProfile> simulated_wind_;
     domain::VehicleState vehicle_state_;
     CompanionLinkFailsafe companion_link_failsafe_;
     adapters::mavlink::TelemetryStreamConfigurator telemetry_configurator_;

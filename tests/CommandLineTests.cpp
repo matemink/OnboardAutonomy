@@ -136,6 +136,32 @@ void camera_and_autonomy_dependencies_are_validated() {
     );
 }
 
+void simulated_wind_is_typed_and_sitl_only() {
+    const auto options = parse(
+        {"--sitl", "--sim-wind", "3.0", "270", "0.6"}
+    );
+    require(
+        options.simulated_wind.has_value() &&
+            options.simulated_wind->speed_m_s == 3.0 &&
+            options.simulated_wind->direction_from_deg == 270.0 &&
+            options.simulated_wind->turbulence_m_s == 0.6,
+        "simulation wind must map to a typed profile"
+    );
+
+    require_rejected(
+        {"--sim-wind", "3", "270", "0.6"},
+        "requires --sitl"
+    );
+    require_rejected(
+        {"--sitl", "--sim-wind", "-1", "270", "0.6"},
+        "speed must be finite and non-negative"
+    );
+    require_rejected(
+        {"--sitl", "--sim-wind", "3", "360", "0.6"},
+        "direction must be in [0, 360)"
+    );
+}
+
 void removed_options_provide_migration_guidance() {
     require_rejected(
         {"--serial", "/dev/ttyACM0"},
@@ -169,6 +195,7 @@ void run_command_line_tests() {
     defaults_are_documented_udp_observation_mode();
     transport_groups_are_explicit_and_exclusive();
     camera_and_autonomy_dependencies_are_validated();
+    simulated_wind_is_typed_and_sitl_only();
     removed_options_provide_migration_guidance();
     help_is_grouped_by_operator_concern();
 }

@@ -1032,7 +1032,6 @@ std::string render_console(
         vehicle.connected ? Tone::normal : Tone::dim,
         use_color
     );
-
     if (vehicle.warnings.empty()) {
         write_centered_line(
             output,
