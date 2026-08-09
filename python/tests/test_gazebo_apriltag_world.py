@@ -52,7 +52,9 @@ TEXTURE = (
 class GazeboAprilTagWorldTests(unittest.TestCase):
     def test_analytic_calibration_matches_camera_sdf(self) -> None:
         model = element_tree.parse(CAMERA_MODEL).getroot()
-        sensor = model.find(".//sensor[@name='landing_camera']")
+        sensor = model.find(
+            ".//sensor[@name='Raspberry_Pi_Camera_Module_3_Wide']"
+        )
         self.assertIsNotNone(sensor)
 
         width = int(sensor.findtext("camera/image/width"))
@@ -115,15 +117,55 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
     def test_world_uses_project_camera_and_pad_models(self) -> None:
         world = element_tree.parse(WORLD).getroot()
         includes = {
-            uri.text
-            for uri in world.findall(".//world/include/uri")
+            include.findtext("uri"): include
+            for include in world.findall(".//world/include")
         }
         self.assertEqual(
-            includes,
+            set(includes),
             {
                 "model://apriltag_landing_pad",
                 "model://iris_with_landing_camera",
             },
+        )
+
+        pad_pose = [
+            float(value)
+            for value in includes[
+                "model://apriltag_landing_pad"
+            ].findtext("pose").split()
+        ]
+        vehicle_pose = [
+            float(value)
+            for value in includes[
+                "model://iris_with_landing_camera"
+            ].findtext("pose").split()
+        ]
+        separation_m = math.hypot(
+            pad_pose[0] - vehicle_pose[0],
+            pad_pose[1] - vehicle_pose[1],
+        )
+
+        self.assertAlmostEqual(separation_m, 3.0)
+        self.assertEqual(
+            includes[
+                "model://iris_with_landing_camera"
+            ].findtext("name"),
+            "Holybro_S500",
+        )
+
+    def test_vehicle_exposes_the_real_development_rig_names(self) -> None:
+        model = element_tree.parse(CAMERA_MODEL).getroot()
+        component_links = {
+            link.attrib["name"]
+            for link in model.findall(".//model/link")
+        }
+
+        self.assertTrue(
+            {
+                "Pixhawk_6C",
+                "Raspberry_Pi_5",
+                "Raspberry_Pi_Camera_Module_3_Wide",
+            }.issubset(component_links)
         )
 
 

@@ -38,7 +38,7 @@ WSLg GUI client so camera processing does not depend on the GUI lifecycle.
 
 | Process | Responsibility |
 | --- | --- |
-| Gazebo Harmonic | Iris model, world physics, and simulated camera |
+| Gazebo Harmonic | Holybro S500 development-rig identity, world physics, and simulated camera |
 | ArduCopter SITL | Stabilization, navigation modes, arming, and landing |
 | MAVProxy | MAVLink routing and an optional flight console |
 | OnboardAutonomy | Flight startup, vision decisions, safety supervision, commands, and operator TUI |
@@ -50,8 +50,9 @@ scripted demonstration routes:
 
 1. Wait for a connected ArduPilot multicopter, complete telemetry setup,
    and pre-arm readiness.
-2. Request GUIDED, arm, and take off to 8 m, confirming each command with
-   `COMMAND_ACK` and the resulting vehicle state.
+2. Request GUIDED, arm, and take off to 8 m from a point 3 m horizontally
+   offset from the landing pad, confirming each command with `COMMAND_ACK`
+   and the resulting vehicle state.
 3. Convert the fresh AprilTag track to body-FRD, create a short-lived
    desired motion, and pass it through the independent safety supervisor.
 4. Stream approved `LANDING_TARGET` messages at 5 Hz and request LAND only
@@ -87,8 +88,8 @@ python python/autonomy_sitl_acceptance.py
 The harness never sends flight commands. It fails unless the production C++
 runtime reaches completed startup and autonomous landing, reports disarmed,
 and leaves independent evidence for all four accepted commands, sustained
-body-FRD `LANDING_TARGET`, expected modes, and at most 0.75 m horizontal
-landing error.
+body-FRD `LANDING_TARGET`, expected modes, and a final position within 0.75 m
+of the landing-pad center derived from the Gazebo world coordinates.
 
 ## Operator console
 
@@ -107,10 +108,18 @@ or domain behavior.
 
 ## Simulated landing camera
 
-The project world mounts a fixed downward camera under the Iris and places a
-`tagStandard41h12` landing pad at home. Gazebo sends `640x480` H.264 over RTP
-to UDP port `5601`; `GStreamerCameraSource` decodes it to I420 and publishes
-the same `CameraFrame` type used by Camera Module 3.
+The project world names the simulated vehicle and its onboard components
+after the physical development rig: `Holybro_S500`, `Pixhawk_6C`,
+`Raspberry_Pi_5`, and `Raspberry_Pi_Camera_Module_3_Wide`. It mounts the
+fixed downward camera under the airframe and places a `tagStandard41h12`
+landing pad 3 m from the vehicle's start. Gazebo sends `640x480` H.264 over
+RTP to UDP port `5601`; `GStreamerCameraSource` decodes it to I420 and
+publishes the same `CameraFrame` type used by Camera Module 3.
+
+The names map the virtual components to the real bench, but they do not claim
+hardware emulation: the current Gazebo geometry and flight dynamics remain
+the pinned official Iris model, Pixhawk behavior comes from ArduCopter SITL,
+and OnboardAutonomy runs as the Raspberry Pi 5 companion process.
 
 The simulator calibration is derived from the SDF field of view and stored
 in `config/gazebo-landing-camera-640x480.json`. The pad texture, two-metre

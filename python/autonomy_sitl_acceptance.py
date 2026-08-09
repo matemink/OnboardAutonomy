@@ -14,14 +14,20 @@ import socket
 import subprocess
 import time
 from typing import TextIO
+import xml.etree.ElementTree as element_tree
 
 from sitl_harness import ProcessSupervisor, require_available_port
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+LANDING_POSITION_TOLERANCE_M = 0.75
+GAZEBO_WORLD = (
+    PROJECT_ROOT / "simulation" / "worlds" / "apriltag_landing.sdf"
+)
 CAMERA_ENABLE_TOPIC = (
-    "/world/apriltag_landing/model/iris_with_landing_camera/link/"
-    "landing_camera_link/sensor/landing_camera/image/enable_streaming"
+    "/world/apriltag_landing/model/Holybro_S500/link/"
+    "Raspberry_Pi_Camera_Module_3_Wide/sensor/"
+    "Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming"
 )
 
 
@@ -35,6 +41,7 @@ class AutonomyFlightEvidence:
     landing_target_count: int
     landing_target_frames: tuple[int, ...]
     position_valid_values: tuple[int, ...]
+    final_local_position_ne_m: tuple[float, float] | None
     final_horizontal_error_m: float | None
     precision_statuses: tuple[str, ...]
 
@@ -63,6 +70,27 @@ def snapshot_failed_autonomy(snapshot: dict[str, object]) -> bool:
     return (
         isinstance(autonomy, dict)
         and autonomy.get("phase") == "failed"
+    )
+
+
+def expected_landing_position_ne_m() -> tuple[float, float]:
+    world = element_tree.parse(GAZEBO_WORLD).getroot()
+    poses = {
+        include.findtext("uri"): tuple(
+            float(value)
+            for value in include.findtext("pose").split()[:2]
+        )
+        for include in world.findall(".//world/include")
+    }
+    pad_east_m, pad_north_m = poses["model://apriltag_landing_pad"]
+    vehicle_east_m, vehicle_north_m = poses[
+        "model://iris_with_landing_camera"
+    ]
+
+    # Gazebo world XY is East/North; MAVLink LOCAL_POSITION_NED is North/East.
+    return (
+        pad_north_m - vehicle_north_m,
+        pad_east_m - vehicle_east_m,
     )
 
 
@@ -146,9 +174,12 @@ def inspect_autonomy_tlog(path: Path) -> AutonomyFlightEvidence:
 
     horizontal_error = None
     if final_local_position is not None:
+        expected_north_m, expected_east_m = (
+            expected_landing_position_ne_m()
+        )
         horizontal_error = (
-            final_local_position[0] ** 2
-            + final_local_position[1] ** 2
+            (final_local_position[0] - expected_north_m) ** 2
+            + (final_local_position[1] - expected_east_m) ** 2
         ) ** 0.5
 
     return AutonomyFlightEvidence(
@@ -162,6 +193,7 @@ def inspect_autonomy_tlog(path: Path) -> AutonomyFlightEvidence:
         landing_target_count=landing_target_count,
         landing_target_frames=tuple(sorted(landing_target_frames)),
         position_valid_values=tuple(sorted(position_valid_values)),
+        final_local_position_ne_m=final_local_position,
         final_horizontal_error_m=horizontal_error,
         precision_statuses=tuple(dict.fromkeys(precision_statuses)),
     )
@@ -206,10 +238,11 @@ def validate_autonomy_evidence(evidence: AutonomyFlightEvidence) -> None:
         raise RuntimeError("LANDING_TARGET position must be valid")
     if (
         evidence.final_horizontal_error_m is None
-        or evidence.final_horizontal_error_m > 0.75
+        or evidence.final_horizontal_error_m > LANDING_POSITION_TOLERANCE_M
     ):
         raise RuntimeError(
-            "Final horizontal error exceeds 0.75 m: "
+            "Final horizontal error from the offset landing pad exceeds "
+            f"{LANDING_POSITION_TOLERANCE_M} m: "
             f"{evidence.final_horizontal_error_m}"
         )
     if "PrecLand: Target Found" not in evidence.precision_statuses:

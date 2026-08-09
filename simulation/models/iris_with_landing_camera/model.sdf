@@ -1,12 +1,62 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
-  <model name="iris_with_landing_camera">
+  <model name="holybro_s500_development_rig">
     <include>
       <uri>model://iris_with_gimbal</uri>
       <name>vehicle</name>
     </include>
 
-    <link name="landing_camera_link">
+    <link name="Pixhawk_6C">
+      <pose relative_to="vehicle::iris_with_standoffs::base_link">
+        0 0 0.055 0 0 0
+      </pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00002</ixx>
+          <iyy>0.00003</iyy>
+          <izz>0.00004</izz>
+        </inertia>
+      </inertial>
+      <visual name="Pixhawk_6C_body">
+        <geometry>
+          <box>
+            <size>0.084 0.044 0.012</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.08 0.08 0.08 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <link name="Raspberry_Pi_5">
+      <pose relative_to="vehicle::iris_with_standoffs::base_link">
+        0.095 0 0.055 0 0 0
+      </pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00002</ixx>
+          <iyy>0.00003</iyy>
+          <izz>0.00004</izz>
+        </inertia>
+      </inertial>
+      <visual name="Raspberry_Pi_5_board">
+        <geometry>
+          <box>
+            <size>0.085 0.056 0.012</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.25 0.12 1</ambient>
+          <diffuse>0.07 0.42 0.20 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <link name="Raspberry_Pi_Camera_Module_3_Wide">
       <pose relative_to="vehicle::iris_with_standoffs::base_link">
         0 0 -0.14 0 0 0
       </pose>
@@ -18,7 +68,7 @@
           <izz>0.00001</izz>
         </inertia>
       </inertial>
-      <visual name="landing_camera_body">
+      <visual name="Raspberry_Pi_Camera_Module_3_Wide_body">
         <geometry>
           <box>
             <size>0.05 0.05 0.03</size>
@@ -31,7 +81,7 @@
       </visual>
 
       <!-- Gazebo cameras look along sensor +X; +90 deg pitch points it down. -->
-      <sensor name="landing_camera" type="camera">
+      <sensor name="Raspberry_Pi_Camera_Module_3_Wide" type="camera">
         <pose>0 0 -0.02 0 1.5707963267948966 0</pose>
         <camera>
           <horizontal_fov>2.0</horizontal_fov>
@@ -56,9 +106,19 @@
       </sensor>
     </link>
 
-    <joint name="landing_camera_joint" type="fixed">
+    <joint name="Pixhawk_6C_mount" type="fixed">
       <parent>vehicle::iris_with_standoffs::base_link</parent>
-      <child>landing_camera_link</child>
+      <child>Pixhawk_6C</child>
+    </joint>
+
+    <joint name="Raspberry_Pi_5_mount" type="fixed">
+      <parent>vehicle::iris_with_standoffs::base_link</parent>
+      <child>Raspberry_Pi_5</child>
+    </joint>
+
+    <joint name="Raspberry_Pi_Camera_Module_3_Wide_mount" type="fixed">
+      <parent>vehicle::iris_with_standoffs::base_link</parent>
+      <child>Raspberry_Pi_Camera_Module_3_Wide</child>
     </joint>
   </model>
 </sdf>
