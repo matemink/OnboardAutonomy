@@ -177,12 +177,14 @@ The production autonomy path separates startup from continuous operation.
 It verifies readiness, GUIDED mode, arming, and takeoff before consuming a
 fresh AprilTag track through `WorldState`, `DecisionEngine`, and
 `SafetySupervisor`. Approved body-FRD targets are streamed as MAVLink
-`LANDING_TARGET` at 5 Hz; stale targets stop guidance immediately and a
-bounded loss triggers an ordinary LAND. Physical printed-target scale
-validation remains required before enabling this path on a real aircraft.
-The automated Gazebo acceptance run reached 8.04 m, emitted 78 valid
-body-FRD targets, completed automatic disarm, and finished at the marker
-origin in the recorded run. A separate controlled link-cut run proved that
+`LANDING_TARGET` at 10 Hz; stale targets stop guidance immediately and a
+bounded loss triggers an ordinary LAND. After stable alignment below 1.5 m,
+close-range target loss latches vision guidance off for terminal descent.
+Physical printed-target scale validation remains required before enabling
+this path on a real aircraft. Ten consecutive offset Gazebo flights reached
+8.04 m, completed automatic disarm, and recorded 0.000 m median, worst, and
+population-standard-deviation landing error at MAVLink telemetry resolution.
+A separate controlled link-cut run proved that
 ArduPilot entered LAND 3.237 seconds after the final companion heartbeat,
 without a companion LAND command. See [docs/roadmap.md](docs/roadmap.md).
 

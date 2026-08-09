@@ -22,7 +22,7 @@ class AutonomySitlAcceptanceTests(unittest.TestCase):
     def test_expected_landing_position_comes_from_the_world(self) -> None:
         self.assertEqual(
             ACCEPTANCE.expected_landing_position_ne_m(),
-            (0.0, 3.0),
+            (0.0, 0.0),
         )
 
     def test_terminal_snapshot_requires_complete_startup_and_disarm(
@@ -45,6 +45,74 @@ class AutonomySitlAcceptanceTests(unittest.TestCase):
                 key,
             )
 
+    def test_center_crossings_ignore_the_terminal_deadband(self) -> None:
+        positions = [
+            (0.0, 0.0),
+            (0.0, -3.0),
+            (0.0, -0.1),
+            (0.0, 0.2),
+            (0.0, -0.2),
+            (0.0, 0.0),
+        ]
+        self.assertEqual(
+            ACCEPTANCE.count_large_center_crossings(
+                positions,
+                (0.0, 0.0),
+            ),
+            0,
+        )
+
+    def test_center_crossings_detect_sustained_oscillation(self) -> None:
+        positions = [
+            (0.0, -3.0),
+            (0.0, 0.5),
+            (0.0, -0.6),
+            (0.0, 0.4),
+        ]
+        self.assertEqual(
+            ACCEPTANCE.count_large_center_crossings(
+                positions,
+                (0.0, 0.0),
+            ),
+            3,
+        )
+
+    def test_accuracy_statistics_cover_all_runs(self) -> None:
+        evidence = []
+        for error in (0.1, 0.2, 0.3):
+            evidence.append(
+                ACCEPTANCE.AutonomyFlightEvidence(
+                    commands=(),
+                    accepted_acknowledgements=(),
+                    maximum_relative_altitude_m=None,
+                    armed_transitions=(),
+                    modes=(),
+                    landing_target_count=0,
+                    landing_target_frames=(),
+                    position_valid_values=(),
+                    final_local_position_ne_m=None,
+                    final_horizontal_error_m=error,
+                    precision_statuses=(),
+                )
+            )
+        result = ACCEPTANCE.landing_accuracy_statistics(evidence)
+        self.assertEqual(result.runs, 3)
+        self.assertAlmostEqual(result.median_error_m, 0.2)
+        self.assertAlmostEqual(result.worst_error_m, 0.3)
+        self.assertAlmostEqual(
+            result.population_stddev_m,
+            0.0816496580927726,
+        )
+
+    def test_terminal_handoff_must_be_explicit(self) -> None:
+        ACCEPTANCE.validate_terminal_handoff(
+            {"autonomy": {"terminal_descent_active": True}}
+        )
+        with self.assertRaisesRegex(RuntimeError, "terminal descent"):
+            ACCEPTANCE.validate_terminal_handoff(
+                {"autonomy": {"terminal_descent_active": False}}
+            )
+
     def test_evidence_accepts_the_production_flight_contract(self) -> None:
         evidence = ACCEPTANCE.AutonomyFlightEvidence(
             commands=("ARM", "LAND", "SET_GUIDED", "TAKEOFF"),
@@ -60,7 +128,7 @@ class AutonomySitlAcceptanceTests(unittest.TestCase):
             landing_target_count=50,
             landing_target_frames=(12,),
             position_valid_values=(1,),
-            final_local_position_ne_m=(0.1, 3.0),
+            final_local_position_ne_m=(0.1, 0.0),
             final_horizontal_error_m=0.1,
             precision_statuses=("PrecLand: Target Found",),
         )
@@ -82,7 +150,7 @@ class AutonomySitlAcceptanceTests(unittest.TestCase):
             landing_target_count=0,
             landing_target_frames=(),
             position_valid_values=(),
-            final_local_position_ne_m=(0.1, 3.0),
+            final_local_position_ne_m=(0.1, 0.0),
             final_horizontal_error_m=0.1,
             precision_statuses=("PrecLand: Target Found",),
         )

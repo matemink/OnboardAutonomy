@@ -25,6 +25,7 @@ void snapshot_keeps_runtime_state_without_camera_data() {
         onboard_autonomy::application::AutonomyRuntimePhase::active;
     snapshot.autonomy.detail = "Autonomy active";
     snapshot.autonomy.vision_landing_target_active = true;
+    snapshot.autonomy.terminal_descent_active = true;
     snapshot.motion_commands_allowed = true;
     snapshot.companion_heartbeat_active = true;
     snapshot.companion_link_failsafe.phase =
@@ -48,7 +49,9 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     require(
         json.at("autonomy").at("phase") == "active" &&
             json.at("autonomy")
-                .at("vision_landing_target_active") == true,
+                .at("vision_landing_target_active") == true &&
+            json.at("autonomy")
+                .at("terminal_descent_active") == true,
         "autonomy state must remain in a camera-free snapshot"
     );
     require(

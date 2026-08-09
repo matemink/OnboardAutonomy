@@ -55,11 +55,14 @@ scripted demonstration routes:
    and the resulting vehicle state.
 3. Convert the fresh AprilTag track to body-FRD, create a short-lived
    desired motion, and pass it through the independent safety supervisor.
-4. Stream approved `LANDING_TARGET` messages at 5 Hz and request LAND only
+4. Stream approved `LANDING_TARGET` messages at 10 Hz and request LAND only
    after one second of continuous target availability.
 5. Stop stale target output immediately. Before LAND, five seconds without
    a target triggers an ordinary fallback LAND instead of indefinite hover.
-6. Finish only when ArduPilot reports the vehicle disarmed.
+6. Below 1.5 m, require 0.5 seconds of alignment within 0.25 m. If the full
+   marker then leaves the camera view, latch vision corrections off and
+   complete the terminal descent without reacting to partial reacquisition.
+7. Finish only when ArduPilot reports the vehicle disarmed.
 
 After a completed or failed run, interactive mode lets `S` start the same
 guarded autonomy sequence again without restarting the simulator. The
@@ -83,13 +86,17 @@ and inspect MAVProxy's tlog independently:
 ```bash
 source ~/venv-ardupilot/bin/activate
 python python/autonomy_sitl_acceptance.py
+python python/autonomy_sitl_acceptance.py --runs 10
 ```
 
 The harness never sends flight commands. It fails unless the production C++
 runtime reaches completed startup and autonomous landing, reports disarmed,
 and leaves independent evidence for all four accepted commands, sustained
-body-FRD `LANDING_TARGET`, expected modes, and a final position within 0.75 m
-of the landing-pad center derived from the Gazebo world coordinates.
+body-FRD `LANDING_TARGET`, expected modes, and a final position within 0.25 m
+of the landing-pad center derived from the Gazebo world coordinates. It also
+rejects sustained large center crossings and requires an explicit
+terminal-descent handoff. Batch mode
+stores each tlog and reports median, worst, and population standard deviation.
 
 ## Operator console
 
@@ -130,6 +137,13 @@ The camera mount is described independently in
 `config/gazebo-landing-camera-extrinsics.json`. It rotates OpenCV camera
 optical coordinates `[right, down, forward]` into MAVLink body FRD and adds
 the measured 0.16 m camera offset below the simulated body origin.
+
+The deterministic Gazebo profile uses ArduPilot's documented RawSensor
+precision-land estimator (`PLND_EST_TYPE=0`). The simulated pinhole camera is
+noise-free enough that combining companion-frame EMA with ArduPilot's Kalman
+estimator created a moving-frame lag and sustained overshoot. This setting is
+not a recommendation for the physical camera; real hardware requires measured
+noise and latency before selecting its estimator and tuning.
 
 Open the OnboardAutonomy preview at `http://localhost:8080/`. A complete tag
 is not expected while the vehicle rests directly on top of the pad because

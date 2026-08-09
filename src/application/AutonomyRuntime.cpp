@@ -3,6 +3,7 @@
 #include "onboard_autonomy/application/WorldState.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -17,6 +18,16 @@ AutonomyRuntime::AutonomyRuntime(AutonomyRuntimeConfig config)
         std::chrono::milliseconds::zero()) {
         throw std::invalid_argument(
             "target-loss LAND timeout must be positive"
+        );
+    }
+    if (!std::isfinite(config_.terminal_descent_altitude_m) ||
+        config_.terminal_descent_altitude_m <= 0.0 ||
+        !std::isfinite(config_.terminal_alignment_radius_m) ||
+        config_.terminal_alignment_radius_m <= 0.0 ||
+        config_.terminal_alignment_duration <=
+            std::chrono::milliseconds::zero()) {
+        throw std::invalid_argument(
+            "terminal-descent thresholds must be positive"
         );
     }
     if (config_.enabled) {
@@ -89,6 +100,39 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
         return actions;
     }
     if (phase_ == AutonomyRuntimePhase::landing &&
+        terminal_descent_active_) {
+        vision_landing_target_active_ = false;
+        detail_ =
+            "Terminal descent; vision corrections are latched off";
+        return actions;
+    }
+
+    if (phase_ == AutonomyRuntimePhase::landing &&
+        vehicle.relative_altitude_m.has_value() &&
+        *vehicle.relative_altitude_m <=
+            config_.terminal_descent_altitude_m &&
+        landing_target.has_value()) {
+        const double lateral_error_m = std::hypot(
+            landing_target->forward_m,
+            landing_target->right_m
+        );
+        if (lateral_error_m <=
+            config_.terminal_alignment_radius_m) {
+            if (!terminal_alignment_since_.has_value()) {
+                terminal_alignment_since_ = now;
+            }
+            terminal_alignment_confirmed_ =
+                now - *terminal_alignment_since_ >=
+                config_.terminal_alignment_duration;
+        } else {
+            terminal_alignment_since_.reset();
+            terminal_alignment_confirmed_ = false;
+        }
+    } else if (landing_target.has_value()) {
+        terminal_alignment_since_.reset();
+        terminal_alignment_confirmed_ = false;
+    }
+    if (phase_ == AutonomyRuntimePhase::landing &&
         vehicle.relative_altitude_m.has_value() &&
         *vehicle.relative_altitude_m <= kTargetStopAltitudeM) {
         vision_landing_target_active_ = false;
@@ -119,7 +163,19 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
         }
 
         if (phase_ == AutonomyRuntimePhase::landing) {
-            detail_ = "Landing without a fresh vision target";
+            if (vehicle.relative_altitude_m.has_value() &&
+                *vehicle.relative_altitude_m <=
+                    config_.terminal_descent_altitude_m &&
+                terminal_alignment_confirmed_) {
+                terminal_descent_active_ = true;
+                detail_ =
+                    "Terminal descent; vision corrections are latched off";
+            } else {
+                terminal_alignment_since_.reset();
+                terminal_alignment_confirmed_ = false;
+                detail_ =
+                    "Landing without a fresh vision target";
+            }
             return actions;
         }
 
@@ -248,12 +304,15 @@ void AutonomyRuntime::restart() {
     vehicle_system_id_.reset();
     land_command_after_.reset();
     target_missing_since_.reset();
+    terminal_alignment_since_.reset();
     next_landing_target_ = {};
     acknowledgement_deadline_ = {};
     landing_deadline_ = {};
     land_attempt_ = 0;
     awaiting_land_ack_ = false;
     vision_landing_target_active_ = false;
+    terminal_alignment_confirmed_ = false;
+    terminal_descent_active_ = false;
     failure_result_.reset();
 }
 
@@ -264,6 +323,7 @@ AutonomyRuntimeSnapshot AutonomyRuntime::snapshot() const {
         .motion_safety_status = motion_safety_status_,
         .vision_landing_target_active =
             vision_landing_target_active_,
+        .terminal_descent_active = terminal_descent_active_,
         .land_attempt = land_attempt_,
         .failure_result = failure_result_,
     };

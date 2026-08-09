@@ -64,6 +64,42 @@ FlightActionRequest only_action(
     return actions.front();
 }
 
+void enter_landing(
+    AutonomyRuntime& runtime,
+    const VehicleSnapshot& vehicle,
+    const FlightStartupSnapshot& startup,
+    const CompanionLinkFailsafeSnapshot& failsafe,
+    const TimePoint start,
+    const BodyFramePosition& target
+) {
+    static_cast<void>(
+        runtime.update(vehicle, startup, failsafe, start, target)
+    );
+    const auto warm_actions = runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::seconds(1),
+        target
+    );
+    const auto land = std::find_if(
+        warm_actions.begin(),
+        warm_actions.end(),
+        [](const FlightActionRequest& request) {
+            return request.action == FlightAction::land;
+        }
+    );
+    require(land != warm_actions.end(), "test setup must request LAND");
+    runtime.on_action_sent(*land, true, start + std::chrono::seconds(1));
+    runtime.on_command_ack(
+        FlightAction::land,
+        FlightCommandAckOutcome::accepted,
+        0,
+        1,
+        start + std::chrono::seconds(1)
+    );
+}
+
 void runtime_waits_for_startup() {
     AutonomyRuntime runtime{{.enabled = true}};
     auto startup = completed_startup();
@@ -202,6 +238,184 @@ void runtime_streams_fresh_target_and_lands() {
     );
 }
 
+void runtime_streams_target_at_ten_hz() {
+    AutonomyRuntime runtime{{.enabled = true}};
+    const auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+    const BodyFramePosition target{
+        .forward_m = 0.1,
+        .right_m = 0.2,
+        .down_m = 8.0,
+    };
+
+    only_action(
+        runtime.update(vehicle, startup, failsafe, start, target),
+        FlightAction::landing_target,
+        "fresh target must be sent immediately"
+    );
+    require(
+        runtime.update(
+            vehicle,
+            startup,
+            failsafe,
+            start + std::chrono::milliseconds(99),
+            target
+        ).empty(),
+        "target stream must not exceed ten hertz"
+    );
+    only_action(
+        runtime.update(
+            vehicle,
+            startup,
+            failsafe,
+            start + std::chrono::milliseconds(100),
+            target
+        ),
+        FlightAction::landing_target,
+        "target stream must emit at ten hertz"
+    );
+}
+
+void terminal_descent_requires_stable_low_alignment() {
+    AutonomyRuntime runtime{{.enabled = true}};
+    auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+    const BodyFramePosition centered_target{
+        .forward_m = 0.05,
+        .right_m = -0.05,
+        .down_m = 1.5,
+    };
+
+    enter_landing(
+        runtime,
+        vehicle,
+        startup,
+        failsafe,
+        start,
+        centered_target
+    );
+
+    vehicle.relative_altitude_m = 1.4;
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(1100),
+        centered_target
+    ));
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(1600),
+        centered_target
+    ));
+    require(
+        runtime.update(
+            vehicle,
+            startup,
+            failsafe,
+            start + std::chrono::milliseconds(1700)
+        ).empty(),
+        "confirmed low alignment must hand off without another command"
+    );
+    require(
+        runtime.snapshot().terminal_descent_active,
+        "terminal descent handoff must be observable"
+    );
+    require(
+        runtime.update(
+            vehicle,
+            startup,
+            failsafe,
+            start + std::chrono::milliseconds(1800),
+            centered_target
+        ).empty(),
+        "terminal descent must ignore close-range target reacquisition"
+    );
+}
+
+void target_loss_without_alignment_is_not_terminal_handoff() {
+    AutonomyRuntime runtime{{.enabled = true}};
+    auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+    const BodyFramePosition off_center_target{
+        .forward_m = 0.5,
+        .right_m = 0.0,
+        .down_m = 1.5,
+    };
+
+    enter_landing(
+        runtime,
+        vehicle,
+        startup,
+        failsafe,
+        start,
+        off_center_target
+    );
+
+    vehicle.relative_altitude_m = 1.4;
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(1600),
+        off_center_target
+    ));
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(1700)
+    ));
+    require(
+        !runtime.snapshot().terminal_descent_active,
+        "off-center target loss must not claim a safe terminal handoff"
+    );
+
+    const BodyFramePosition centered_target{
+        .forward_m = 0.05,
+        .right_m = 0.0,
+        .down_m = 1.5,
+    };
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(1800),
+        centered_target
+    ));
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(2000)
+    ));
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(2100),
+        centered_target
+    ));
+    static_cast<void>(runtime.update(
+        vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(2500)
+    ));
+    require(
+        !runtime.snapshot().terminal_descent_active,
+        "an interrupted alignment window must restart its dwell timer"
+    );
+}
+
 void prolonged_target_loss_requests_fallback_land() {
     AutonomyRuntime runtime{
         {
@@ -313,6 +527,9 @@ void restart_clears_terminal_autonomy_state() {
 void run_autonomy_runtime_tests() {
     runtime_waits_for_startup();
     runtime_streams_fresh_target_and_lands();
+    runtime_streams_target_at_ten_hz();
+    terminal_descent_requires_stable_low_alignment();
+    target_loss_without_alignment_is_not_terminal_handoff();
     prolonged_target_loss_requests_fallback_land();
     link_loss_stops_runtime_output();
     rejected_link_failsafe_stops_runtime_output();

@@ -1,6 +1,6 @@
 # Precision landing SITL evidence
 
-Verified on 2026-08-08 with ArduCopter 4.6.3, Gazebo Sim 8.14.0, and the
+Verified on 2026-08-09 with ArduCopter 4.6.3, Gazebo Sim 8.14.0, and the
 project-owned `apriltag_landing` world.
 
 ## Acceptance path
@@ -12,7 +12,7 @@ Gazebo landing camera
   -> AprilTag pose in camera-optical coordinates
   -> freshness-aware confirmed track
   -> configured camera-to-body-FRD transform
-  -> MAVLink LANDING_TARGET at 5 Hz
+  -> MAVLink LANDING_TARGET at 10 Hz
   -> ArduCopter precision-land backend
   -> touchdown and DISARMED
 ```
@@ -33,29 +33,36 @@ The MAVProxy tlog was inspected with `python/inspect_tlog.py`:
 | Arm state | `DISARMED -> ARMED -> DISARMED` |
 | Modes | `STABILIZE (0), GUIDED (4), LAND (9)` |
 | Flight command ACKs | GUIDED, ARM, TAKEOFF, and LAND accepted |
-| `LANDING_TARGET` count | 78 |
+| Consecutive flights | 10/10 |
+| `LANDING_TARGET` count | 174-177 per flight |
 | MAVLink frame | 12, `MAV_FRAME_BODY_FRD` |
 | `position_valid` | 1 |
 | Maximum relative altitude | `8.04 m` |
-| First target F/R/D | `-0.013 / 0.003 / 7.622 m` |
-| Last target F/R/D | `0.000 / -0.001 / 1.562 m` |
 | Final local N/E/D | `0.000 / 0.000 / -0.200 m` |
-| Final horizontal error | `0.000 m` |
+| Final horizontal error | median `0.000 m`, worst `0.000 m` |
+| Population standard deviation | `0.000 m` |
+| Large center crossings | 0 in every flight |
+| Terminal handoff | Confirmed in every flight |
 
 ## Target loss behavior
 
-The live run exercised the expected close-range target loss. OnboardAutonomy
-stopped sending observations older than 250 ms immediately; because LAND was
-already accepted, ArduPilot continued the ordinary final descent. Unit tests
-separately verify interrupted warmup, reacquisition, smoothing, expiry,
-confidence rejection, corrected-bit rejection, and protection against
-switching between tag IDs. A production-runtime test also verifies the
-five-second fallback LAND when vision is unavailable before LAND starts.
+Every live run exercised the expected close-range target loss.
+OnboardAutonomy first observed at least 0.5 seconds of alignment within 0.25 m
+below 1.5 m. When the target disappeared, it latched terminal descent, stopped
+all further vision corrections, and ignored any close-range reacquisition.
+Unit tests separately verify interrupted warmup, reacquisition, optional
+smoothing, expiry, confidence rejection, corrected-bit rejection, protection
+against switching between tag IDs, and unsafe target loss without alignment.
+A production-runtime test also verifies the five-second fallback LAND when
+vision is unavailable before LAND starts.
 
 The two-metre marker no longer fits fully in the 640x480 image below roughly
 2 m. With the simulation profile's `PLND_STRICT=0`, ArduPilot completed the
-remaining vertical descent as a normal landing. This is an explicit v1.0
-simulation limitation, not evidence that the physical camera geometry has
+remaining vertical descent as a normal landing. The profile also selects the
+documented RawSensor estimator with `PLND_EST_TYPE=0`: the synthetic pinhole
+camera is deterministic, while the previous companion EMA plus ArduPilot
+Kalman estimator introduced moving-frame lag and repeated overshoot. Neither
+parameter is evidence that the physical camera geometry, latency, or noise has
 been validated.
 
 ## Remaining hardware gate
@@ -73,6 +80,7 @@ are automated by:
 ```bash
 source ~/venv-ardupilot/bin/activate
 python python/autonomy_sitl_acceptance.py
+python python/autonomy_sitl_acceptance.py --runs 10
 ```
 
 The recorded acceptance summary was:
@@ -80,5 +88,6 @@ The recorded acceptance summary was:
 ```text
 PASSED
 Path: readiness -> GUIDED -> ARM -> TAKEOFF -> vision LAND
-Evidence: 78 LANDING_TARGET, 8.04 m max, 0.000 m error
+Evidence: 177 LANDING_TARGET, 8.04 m max, 0.000 m error
+Accuracy: median 0.000 m, worst 0.000 m, stddev 0.000 m
 ```
