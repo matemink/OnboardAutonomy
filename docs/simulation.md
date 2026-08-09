@@ -39,7 +39,7 @@ client so camera processing does not depend on the GUI lifecycle.
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to
 wind-enabled vehicle links. ArduPilot receives matching `SIM_WIND_*` defaults.
-To change the profile, edit one file:
+To change the default profile, edit one file:
 
 ```text
 config/onboard_autonomy-gazebo-weather.parm
@@ -49,6 +49,17 @@ config/onboard_autonomy-gazebo-weather.parm
 wind comes from in degrees (`0` north, `90` east, `180` south, `270` west),
 and `SIM_WIND_TURB` is ArduPilot's turbulence amount in m/s. Gazebo, ArduPilot,
 and the wind-vane HUD read these same values on the next launch.
+For a temporary strong-wind experiment, copy that file under another name,
+change the three `SIM_WIND_*` values, and pass the copy to the Windows launcher:
+
+```powershell
+Copy-Item config/onboard_autonomy-gazebo-weather.parm config/local-strong-wind.parm
+StartOnboardAutonomyGazeboDemo.cmd config/local-strong-wind.parm
+```
+
+This keeps the checked-in moderate profile unchanged while the selected file
+is shared by Gazebo, ArduPilot, the companion runtime, and the wind-vane HUD.
+
 Run the same profile manually with:
 
 ```bash

@@ -6,7 +6,7 @@ readonly weather_profile_script_dir="$(
 readonly weather_profile_project_dir="$(
     cd -- "${weather_profile_script_dir}/.." && pwd
 )"
-readonly weather_profile_file="${ONBOARD_AUTONOMY_WEATHER_PROFILE:-${weather_profile_project_dir}/config/onboard_autonomy-gazebo-weather.parm}"
+weather_profile_file="${ONBOARD_AUTONOMY_WEATHER_PROFILE:-${weather_profile_project_dir}/config/onboard_autonomy-gazebo-weather.parm}"
 
 read_weather_parameter() {
     local readonly name="$1"
@@ -20,6 +20,11 @@ if [[ ! -f "${weather_profile_file}" ]]; then
     printf 'Weather profile not found: %s\n' "${weather_profile_file}" >&2
     exit 1
 fi
+
+weather_profile_file="$(
+    cd -- "$(dirname -- "${weather_profile_file}")" && pwd
+)/$(basename -- "${weather_profile_file}")"
+readonly weather_profile_file
 
 ONBOARD_AUTONOMY_WIND_SPEED_M_S="$(read_weather_parameter SIM_WIND_SPD)"
 ONBOARD_AUTONOMY_WIND_FROM_DEG="$(read_weather_parameter SIM_WIND_DIR)"

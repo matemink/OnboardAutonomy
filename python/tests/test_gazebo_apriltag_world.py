@@ -262,6 +262,30 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         ):
             self.assertIn(parameter, loader)
 
+        ardupilot_launcher = (
+            PROJECT_ROOT / "scripts" / "run_arducopter_gazebo_weather.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'source "${script_dir}/weather_profile.sh"',
+            ardupilot_launcher,
+        )
+        self.assertIn(
+            'ONBOARD_AUTONOMY_SITL_WEATHER_DEFAULTS="${weather_profile_file}"',
+            ardupilot_launcher,
+        )
+
+        windows_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'if not "%~1"=="" set "WEATHER_PROFILE=%~1"',
+            windows_launcher,
+        )
+        self.assertEqual(
+            windows_launcher.count("ONBOARD_AUTONOMY_WEATHER_PROFILE="),
+            4,
+        )
+
     def test_gazebo_gui_owns_the_weather_indicator(self) -> None:
         config_text = GAZEBO_GUI_CONFIG.read_text(encoding="utf-8")
         config_text = config_text.replace(

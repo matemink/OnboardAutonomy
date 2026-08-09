@@ -3,7 +3,8 @@
 set -euo pipefail
 
 readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
 
-export ONBOARD_AUTONOMY_SITL_WEATHER_DEFAULTS="${project_dir}/config/onboard_autonomy-gazebo-weather.parm"
+source "${script_dir}/weather_profile.sh"
+
+export ONBOARD_AUTONOMY_SITL_WEATHER_DEFAULTS="${weather_profile_file}"
 exec "${script_dir}/run_arducopter_gazebo.sh" "$@"

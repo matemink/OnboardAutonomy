@@ -15,3 +15,4 @@ tools/provisioning/*.log
 tools/provisioning/*-status.json
 OnboardAutonomyLocal.cmd
 CompanionLabLocal.cmd
+config/local-*.parm
