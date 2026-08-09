@@ -106,9 +106,14 @@ camera preview with:
 StartOnboardAutonomyGazeboDemo.cmd
 ```
 
-The first guarded precision-landing run starts automatically. After it
-finishes and the simulated vehicle disarms, press `S` in the console to run
-the same scenario again or `Q` to exit OnboardAutonomy.
+The first guarded precision-landing run starts automatically under a moderate
+gusty-wind profile. After it finishes and the simulated vehicle disarms, press
+`S` in the console to run the same scenario again or `Q` to exit
+OnboardAutonomy. Automated acceptance uses the separate calm profile so
+regression results remain repeatable. The Gazebo window shows the selected
+wind profile in a compact wind-vane HUD instead of adding simulation detail
+to the companion flight console. The HUD does not present the configured
+profile as a physical wind measurement.
 
 For a development build and fast generated-telemetry check:
 

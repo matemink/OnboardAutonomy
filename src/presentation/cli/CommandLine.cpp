@@ -201,6 +201,33 @@ void validate_options(
             "--interactive cannot be combined with --json"
         );
     }
+    if (options.simulated_wind.has_value()) {
+        const auto& wind = *options.simulated_wind;
+        if (!options.sitl_mode) {
+            throw std::invalid_argument(
+                "--sim-wind requires --sitl"
+            );
+        }
+        if (!std::isfinite(wind.speed_m_s) ||
+            wind.speed_m_s < 0.0) {
+            throw std::invalid_argument(
+                "--sim-wind speed must be finite and non-negative"
+            );
+        }
+        if (!std::isfinite(wind.direction_from_deg) ||
+            wind.direction_from_deg < 0.0 ||
+            wind.direction_from_deg >= 360.0) {
+            throw std::invalid_argument(
+                "--sim-wind direction must be in [0, 360)"
+            );
+        }
+        if (!std::isfinite(wind.turbulence_m_s) ||
+            wind.turbulence_m_s < 0.0) {
+            throw std::invalid_argument(
+                "--sim-wind turbulence must be finite and non-negative"
+            );
+        }
+    }
     validate_transport(options, explicit_options);
     validate_camera(options, explicit_options);
 }
@@ -320,6 +347,22 @@ CommandLineOptions parse_command_line(
             options.json_output = true;
         } else if (argument == "--sitl") {
             options.sitl_mode = true;
+        } else if (argument == "--sim-wind") {
+            options.simulated_wind =
+                application::SimulatedWindProfile{
+                    .speed_m_s = parse_number<double>(
+                        require_value(),
+                        argument
+                    ),
+                    .direction_from_deg = parse_number<double>(
+                        require_value(),
+                        argument
+                    ),
+                    .turbulence_m_s = parse_number<double>(
+                        require_value(),
+                        argument
+                    ),
+                };
         } else if (argument == "--autonomous") {
             options.autonomous = true;
         } else if (argument == "--exit-after-autonomy") {
@@ -378,6 +421,7 @@ std::string command_line_help() {
         "  --camera-preview-port N      HTTP port, default 8080\n\n"
         "Autonomy and safety:\n"
         "  --sitl                       Assert UDP peer is SITL\n"
+        "  --sim-wind MPS DEG GUST      Show configured SITL wind profile\n"
         "  --autonomous                 Run startup and vision autonomy\n"
         "  --exit-after-autonomy        Exit after completion or failure\n\n"
         "Output and interaction:\n"

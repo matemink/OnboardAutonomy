@@ -30,11 +30,56 @@ ONBOARD_AUTONOMY_AUTONOMOUS=1 \
     bash scripts/run_onboard_autonomy_gazebo_vision.sh
 ```
 
-On Windows, `StartOnboardAutonomyGazeboDemo.cmd` launches the same stack
-in visible WSL/WSLg windows, enables interactive console input, waits for
-the first simulated camera frame, and opens the preview in the default
-browser. The launcher keeps the rendering-sensor server separate from the
-WSLg GUI client so camera processing does not depend on the GUI lifecycle.
+On Windows, `StartOnboardAutonomyGazeboDemo.cmd` launches the interactive
+weather profile in visible WSL/WSLg windows, enables console input, waits for
+the first simulated camera frame, and opens the preview in the default browser.
+The launcher keeps the rendering-sensor server separate from the WSLg GUI
+client so camera processing does not depend on the GUI lifecycle.
+
+The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
+and direction, adds vertical turbulence, and applies the resulting force to
+wind-enabled vehicle links. ArduPilot receives matching `SIM_WIND_*` defaults.
+To change the profile, edit one file:
+
+```text
+config/onboard_autonomy-gazebo-weather.parm
+```
+
+`SIM_WIND_SPD` is the base speed in m/s, `SIM_WIND_DIR` is the direction the
+wind comes from in degrees (`0` north, `90` east, `180` south, `270` west),
+and `SIM_WIND_TURB` is ArduPilot's turbulence amount in m/s. Gazebo, ArduPilot,
+and the wind-vane HUD read these same values on the next launch.
+Run the same profile manually with:
+
+```bash
+bash scripts/run_gazebo_apriltag_weather.sh
+bash scripts/run_arducopter_gazebo_weather.sh
+ONBOARD_AUTONOMY_INTERACTIVE=1 \
+ONBOARD_AUTONOMY_AUTONOMOUS=1 \
+    bash scripts/run_onboard_autonomy_gazebo_weather_vision.sh
+```
+
+The Gazebo 3D window shows a compact wind-vane HUD with the configured speed,
+source-to-destination direction, and turbulence. The companion console stays
+focused on flight state. The HUD is configuration evidence, not a live
+anemometer reading: Gazebo applies time-varying turbulence inside its physics
+system but does not publish that instantaneous noisy vector to the GUI.
+
+For a manual weather GUI launch, use:
+
+```bash
+ONBOARD_AUTONOMY_GAZEBO_WEATHER=1 bash scripts/run_gazebo_gui.sh
+```
+
+The launcher incrementally builds the project-owned `WindIndicator` plugin
+and loads `simulation/gui/onboard_autonomy.config`. A calm GUI launch omits the
+weather environment flag and displays `CALM` without a direction arrow.
+
+The `Pixhawk_6C_barometer` sensor publishes atmospheric pressure at 50 Hz on
+`/onboard_autonomy/sensors/pixhawk_6c/air_pressure`. This Gazebo topic is
+observable evidence, not the pressure input to ArduPilotPlugin 4.6.3. The
+flight controller's barometer remains ArduPilot's SITL backend, generated from
+simulated altitude with the noise configured in the weather parameter file.
 
 | Process | Responsibility |
 | --- | --- |
@@ -87,7 +132,12 @@ and inspect MAVProxy's tlog independently:
 source ~/venv-ardupilot/bin/activate
 python python/autonomy_sitl_acceptance.py
 python python/autonomy_sitl_acceptance.py --runs 10
+python python/autonomy_sitl_acceptance.py --weather
 ```
+
+The default command is the calm deterministic regression. `--weather` is the
+explicit gust stress test; its artifacts record the selected environment
+profile and the same independent landing-accuracy evidence.
 
 The harness never sends flight commands. It fails unless the production C++
 runtime reaches completed startup and autonomous landing, reports disarmed,

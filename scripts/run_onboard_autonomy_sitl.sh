@@ -20,6 +20,24 @@ arguments=(
     --snapshot-ms 1000
 )
 
+if [[ -n "${ONBOARD_AUTONOMY_SIM_WIND_PROFILE:-}" ]]; then
+    read -r wind_speed wind_direction wind_turbulence extra <<< \
+        "${ONBOARD_AUTONOMY_SIM_WIND_PROFILE}"
+    if [[ -z "${wind_speed:-}" || -z "${wind_direction:-}" ||
+          -z "${wind_turbulence:-}" || -n "${extra:-}" ]]; then
+        printf '%s\n' \
+            'ONBOARD_AUTONOMY_SIM_WIND_PROFILE requires: MPS FROM_DEG GUST' \
+            >&2
+        exit 1
+    fi
+    arguments+=(
+        --sim-wind
+        "${wind_speed}"
+        "${wind_direction}"
+        "${wind_turbulence}"
+    )
+fi
+
 if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
     arguments+=(
         --camera

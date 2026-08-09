@@ -391,6 +391,7 @@ void interactive_autonomy_restart_is_guarded() {
             .target_detector = &detector,
             .camera_preview_sink = nullptr,
             .camera_extrinsics = identity_extrinsics(),
+            .simulated_wind = std::nullopt,
         }
     };
     require(
@@ -455,6 +456,7 @@ void autonomy_runtime_requires_vision_guidance() {
                 .target_detector = nullptr,
                 .camera_preview_sink = nullptr,
                 .camera_extrinsics = std::nullopt,
+                .simulated_wind = std::nullopt,
             }
         };
         static_cast<void>(application);

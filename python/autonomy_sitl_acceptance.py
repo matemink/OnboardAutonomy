@@ -436,6 +436,7 @@ def run_acceptance(
     companion: Path,
     artifacts: Path,
     timeout: float,
+    weather: bool = False,
 ) -> AutonomyAcceptanceResult:
     if not companion.is_file() or not os.access(companion, os.X_OK):
         raise RuntimeError(f"OnboardAutonomy is not built: {companion}")
@@ -446,6 +447,21 @@ def run_acceptance(
     artifacts.mkdir(parents=True, exist_ok=False)
     tlog = artifacts / "autonomy.tlog"
     supervisor = ProcessSupervisor()
+    gazebo_script = (
+        "scripts/run_gazebo_apriltag_weather.sh"
+        if weather
+        else "scripts/run_gazebo_apriltag.sh"
+    )
+    sitl_script = (
+        "scripts/run_arducopter_gazebo_weather.sh"
+        if weather
+        else "scripts/run_arducopter_gazebo.sh"
+    )
+    app_script = (
+        "scripts/run_onboard_autonomy_gazebo_weather_vision.sh"
+        if weather
+        else "scripts/run_onboard_autonomy_gazebo_vision.sh"
+    )
 
     base_environment = os.environ.copy()
     try:
@@ -456,7 +472,7 @@ def run_acceptance(
             "w", encoding="utf-8"
         ) as gazebo_log:
             gazebo = subprocess.Popen(
-                ["bash", "scripts/run_gazebo_apriltag.sh"],
+                ["bash", gazebo_script],
                 cwd=PROJECT_ROOT,
                 stdout=gazebo_log,
                 stderr=subprocess.STDOUT,
@@ -477,7 +493,7 @@ def run_acceptance(
             "w", encoding="utf-8"
         ) as sitl_log:
             sitl = subprocess.Popen(
-                ["bash", "scripts/run_arducopter_gazebo.sh"],
+                ["bash", sitl_script],
                 cwd=PROJECT_ROOT,
                 stdout=sitl_log,
                 stderr=subprocess.STDOUT,
@@ -497,7 +513,7 @@ def run_acceptance(
             "w", encoding="utf-8"
         ) as companion_stderr:
             runtime = subprocess.Popen(
-                ["bash", "scripts/run_onboard_autonomy_gazebo_vision.sh"],
+                ["bash", app_script],
                 cwd=PROJECT_ROOT,
                 stdout=subprocess.PIPE,
                 stderr=companion_stderr,
@@ -538,6 +554,9 @@ def run_acceptance(
     (artifacts / "summary.json").write_text(
         json.dumps(
             {
+                "environment_profile": (
+                    "moderate-gusts" if weather else "calm"
+                ),
                 "final_snapshot": result.final_snapshot,
                 "evidence": asdict(result.evidence),
             },
@@ -563,6 +582,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument(
+        "--weather",
+        action="store_true",
+        help="run the opt-in moderate gust profile",
+    )
     return parser.parse_args()
 
 
@@ -576,6 +600,10 @@ def main() -> int:
         artifacts_root.mkdir(parents=True, exist_ok=False)
 
     print("OnboardAutonomy production SITL acceptance")
+    print(
+        "Environment: "
+        + ("moderate gusts" if args.weather else "calm deterministic")
+    )
     print(f"Artifacts: {artifacts_root}")
     results: list[AutonomyAcceptanceResult] = []
     try:
@@ -591,6 +619,7 @@ def main() -> int:
                     args.companion.expanduser().resolve(),
                     artifacts,
                     args.timeout,
+                    weather=args.weather,
                 )
             )
     except Exception as error:

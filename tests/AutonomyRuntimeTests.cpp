@@ -328,6 +328,11 @@ void terminal_descent_requires_stable_low_alignment() {
         "terminal descent handoff must be observable"
     );
     require(
+        runtime.snapshot().detail ==
+            "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES",
+        "terminal descent must explain expected target loss"
+    );
+    require(
         runtime.update(
             vehicle,
             startup,

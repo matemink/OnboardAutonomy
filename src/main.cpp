@@ -320,6 +320,7 @@ int main(const int argc, char** argv) {
                 .target_detector = target_detector.get(),
                 .camera_preview_sink = camera_preview.get(),
                 .camera_extrinsics = camera_extrinsics,
+                .simulated_wind = options.simulated_wind,
             }
         };
         auto next_snapshot = std::chrono::steady_clock::now();

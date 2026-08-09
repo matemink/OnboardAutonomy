@@ -27,6 +27,12 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     snapshot.autonomy.vision_landing_target_active = true;
     snapshot.autonomy.terminal_descent_active = true;
     snapshot.motion_commands_allowed = true;
+    snapshot.simulated_wind =
+        onboard_autonomy::application::SimulatedWindProfile{
+            .speed_m_s = 3.0,
+            .direction_from_deg = 270.0,
+            .turbulence_m_s = 0.6,
+        };
     snapshot.companion_heartbeat_active = true;
     snapshot.companion_link_failsafe.phase =
         onboard_autonomy::application::
@@ -57,6 +63,13 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     require(
         json.at("motion_commands_allowed") == true,
         "JSON booleans must not be encoded as integers"
+    );
+    require(
+        json.at("simulated_wind").at("speed_m_s") == 3.0 &&
+            json.at("simulated_wind").at("direction_from_deg") ==
+                270.0 &&
+            json.at("simulated_wind").at("turbulence_m_s") == 0.6,
+        "JSON must expose the configured simulation wind profile"
     );
     require(
         json.at("companion_heartbeat_active") == true &&

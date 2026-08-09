@@ -45,4 +45,5 @@ wait_for_camera
 set_camera_streaming true
 
 ONBOARD_AUTONOMY_GAZEBO_VISION=1 \
+ONBOARD_AUTONOMY_SIM_WIND_PROFILE="${ONBOARD_AUTONOMY_SIM_WIND_PROFILE:-0.0 0.0 0.0}" \
     "${script_dir}/run_onboard_autonomy_sitl.sh"

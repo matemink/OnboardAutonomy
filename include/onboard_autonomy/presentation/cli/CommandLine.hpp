@@ -1,5 +1,7 @@
 #pragma once
 
+#include "onboard_autonomy/application/EnvironmentProfile.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -40,6 +42,7 @@ struct CommandLineOptions {
     std::string board_types_file;
     bool json_output{false};
     bool sitl_mode{false};
+    std::optional<application::SimulatedWindProfile> simulated_wind;
     bool autonomous{false};
     bool exit_after_autonomy{false};
     bool interactive{false};

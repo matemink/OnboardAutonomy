@@ -61,6 +61,12 @@ void healthy_snapshot_is_human_readable() {
         onboard_autonomy::application::TelemetrySetupState::active;
     app_snapshot.telemetry.completed_requests = 6;
     app_snapshot.telemetry.total_requests = 6;
+    app_snapshot.simulated_wind =
+        onboard_autonomy::application::SimulatedWindProfile{
+            .speed_m_s = 3.0,
+            .direction_from_deg = 270.0,
+            .turbulence_m_s = 0.6,
+        };
 
     std::istringstream board_table{
         "Reserved \"PX4 [BL] FMU v6C.x\" 56\n"
@@ -86,6 +92,10 @@ void healthy_snapshot_is_human_readable() {
     require(
         output.find("BAT 12.60 V / 100%") != std::string::npos,
         "battery details must be readable"
+    );
+    require(
+        output.find("SIM WIND") == std::string::npos,
+        "simulation weather belongs to the Gazebo HUD"
     );
     require(
         output.find("TELEMETRY READY / 6 STREAMS") !=

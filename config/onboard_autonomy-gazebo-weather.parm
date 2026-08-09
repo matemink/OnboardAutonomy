@@ -1,0 +1,12 @@
+# Moderate west wind for the interactive Gazebo demo.
+# ArduPilot direction is where wind comes from; Gazebo +X points east.
+SIM_WIND_SPD 3
+SIM_WIND_DIR 270
+SIM_WIND_TURB 0.6
+SIM_WIND_TC 3
+SIM_WIND_T 1
+
+# Make the standard SITL barometer noise explicit for this profile. Gazebo's
+# pressure topic is observable but is not consumed by ArduPilotPlugin 4.6.3.
+SIM_BARO_RND 0.2
+SIM_BAR2_RND 0.2

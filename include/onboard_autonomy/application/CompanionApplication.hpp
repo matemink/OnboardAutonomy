@@ -18,6 +18,7 @@ struct CompanionApplicationOptions {
     ports::TargetDetector* target_detector{nullptr};
     ports::CameraPreviewSink* camera_preview_sink{nullptr};
     std::optional<domain::CameraExtrinsics> camera_extrinsics;
+    std::optional<SimulatedWindProfile> simulated_wind;
 };
 
 class CompanionApplication {

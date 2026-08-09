@@ -147,6 +147,20 @@ std::string AppSnapshot::to_json() const {
     output << vehicle_json;
     output << ",\"companion_heartbeat_active\":"
            << companion_heartbeat_active;
+    output << ",\"simulated_wind\":";
+    if (!simulated_wind.has_value()) {
+        output << "null";
+    } else {
+        output << '{';
+        output << "\"speed_m_s\":" << std::fixed
+               << std::setprecision(3)
+               << simulated_wind->speed_m_s;
+        output << ",\"direction_from_deg\":"
+               << simulated_wind->direction_from_deg;
+        output << ",\"turbulence_m_s\":"
+               << simulated_wind->turbulence_m_s;
+        output << '}';
+    }
     output << ",\"companion_link_failsafe\":{";
     output << "\"phase\":\""
            << companion_link_failsafe_phase_name(

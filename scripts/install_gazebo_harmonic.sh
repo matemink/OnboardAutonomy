@@ -52,6 +52,8 @@ install_gazebo_packages() {
     sudo apt-get install -y \
         gz-harmonic \
         libgz-sim8-dev \
+        qtdeclarative5-dev \
+        qtquickcontrols2-5-dev \
         rapidjson-dev \
         libopencv-dev \
         libgstreamer1.0-dev \
