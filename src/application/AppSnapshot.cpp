@@ -40,6 +40,22 @@ std::string_view target_track_phase_name(
     return "searching";
 }
 
+std::string_view telemetry_setup_state_name(
+    const TelemetrySetupState state
+) {
+    switch (state) {
+        case TelemetrySetupState::waiting_for_vehicle:
+            return "waiting_for_vehicle";
+        case TelemetrySetupState::configuring:
+            return "configuring";
+        case TelemetrySetupState::active:
+            return "active";
+        case TelemetrySetupState::failed:
+            return "failed";
+    }
+    return "failed";
+}
+
 std::string_view flight_startup_phase_name(
     const FlightStartupPhase phase
 ) {
@@ -147,6 +163,19 @@ std::string AppSnapshot::to_json() const {
     output << vehicle_json;
     output << ",\"companion_heartbeat_active\":"
            << companion_heartbeat_active;
+    output << ",\"telemetry_setup\":{";
+    output << "\"state\":\""
+           << telemetry_setup_state_name(telemetry.state) << '"';
+    output << ",\"completed_requests\":"
+           << telemetry.completed_requests;
+    output << ",\"total_requests\":"
+           << telemetry.total_requests;
+    output << ",\"current_stream\":\""
+           << json_escape(telemetry.current_stream) << '"';
+    output << ",\"attempt\":" << telemetry.attempt;
+    output << ",\"failure_result\":";
+    write_optional_number(output, telemetry.failure_result);
+    output << '}';
     output << ",\"simulated_wind\":";
     if (!simulated_wind.has_value()) {
         output << "null";

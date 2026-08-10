@@ -4,7 +4,9 @@ from io import StringIO
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).parents[1] / "rotate_jsonl_logs.py"
@@ -145,6 +147,27 @@ class LogRotationTests(unittest.TestCase):
                 "new\n",
             )
             self.assertEqual(mirror.getvalue(), "new\n")
+
+    def test_main_handles_stream_interrupt_without_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            arguments = SimpleNamespace(
+                directory=Path(temporary),
+                max_files=20,
+                max_total_bytes=100,
+                max_file_bytes=10,
+                stream=True,
+                stem="telemetry-test",
+            )
+            with mock.patch.object(
+                LOG_ROTATION,
+                "parse_args",
+                return_value=arguments,
+            ), mock.patch.object(
+                LOG_ROTATION,
+                "stream_jsonl_logs",
+                side_effect=KeyboardInterrupt,
+            ):
+                self.assertEqual(LOG_ROTATION.main(), 130)
 
 
 if __name__ == "__main__":

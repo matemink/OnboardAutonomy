@@ -42,6 +42,10 @@ void snapshot_keeps_runtime_state_without_camera_data() {
             ArduPilotGcsFailsafeAction::land;
     snapshot.companion_link_failsafe.timeout_s = 3.0;
     snapshot.companion_link_failsafe.options = 0U;
+    snapshot.telemetry.state =
+        onboard_autonomy::application::TelemetrySetupState::active;
+    snapshot.telemetry.completed_requests = 6;
+    snapshot.telemetry.total_requests = 6;
 
     const auto json = nlohmann::json::parse(snapshot.to_json());
 
@@ -80,6 +84,13 @@ void snapshot_keeps_runtime_state_without_camera_data() {
             json.at("companion_link_failsafe").at("timeout_s") ==
                 3.0,
         "JSON must expose the independently enforced link-loss policy"
+    );
+    require(
+        json.at("telemetry_setup").at("state") == "active" &&
+            json.at("telemetry_setup").at("completed_requests") == 6 &&
+            json.at("telemetry_setup").at("total_requests") == 6 &&
+            json.at("telemetry_setup").at("failure_result").is_null(),
+        "JSON must expose acknowledged telemetry setup progress"
     );
 }
 

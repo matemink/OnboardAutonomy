@@ -136,28 +136,31 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     directory = args.directory.expanduser()
-    if args.stream:
-        stem = args.stem or (
-            "telemetry-"
-            + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            + f"-{os.getpid()}"
-        )
-        stream_jsonl_logs(
-            sys.stdin,
-            sys.stdout,
-            directory,
-            stem,
-            args.max_files,
-            args.max_total_bytes,
-            args.max_file_bytes,
-        )
-    else:
-        result = rotate_jsonl_logs(
-            directory,
-            args.max_files,
-            args.max_total_bytes,
-        )
-        print(json.dumps(asdict(result), sort_keys=True))
+    try:
+        if args.stream:
+            stem = args.stem or (
+                "telemetry-"
+                + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                + f"-{os.getpid()}"
+            )
+            stream_jsonl_logs(
+                sys.stdin,
+                sys.stdout,
+                directory,
+                stem,
+                args.max_files,
+                args.max_total_bytes,
+                args.max_file_bytes,
+            )
+        else:
+            result = rotate_jsonl_logs(
+                directory,
+                args.max_files,
+                args.max_total_bytes,
+            )
+            print(json.dumps(asdict(result), sort_keys=True))
+    except KeyboardInterrupt:
+        return 130
     return 0
 
 
