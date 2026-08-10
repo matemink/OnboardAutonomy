@@ -305,9 +305,28 @@ The launcher lets the Pi auto-detect one serial device when
 transition; this compatibility path is not part of the public runtime
 configuration.
 
-## UART milestone
+## Verified Pixhawk 6C TELEM2 UART
 
-The Pixhawk TELEM port uses serial signaling and requires correct voltage,
-ground, TX/RX crossing, port configuration, and connector pinout. Do not
-guess the wiring. We will use the Pixhawk 6C and Raspberry Pi 5 hardware
-documentation before enabling this stage.
+The physical Raspberry Pi 5/Pixhawk 6C path is verified at 57600 baud. Power
+both computers off before changing any wire, remove propellers, and keep the
+Pi and Pixhawk on their normal independent power paths.
+
+| Pixhawk 6C TELEM2 | Raspberry Pi 5 |
+| --- | --- |
+| Pin 6, GND | Physical pin 6, GND |
+| Pin 3, UART5 RX | Physical pin 8, GPIO14 TX |
+| Pin 2, UART5 TX | Physical pin 10, GPIO15 RX |
+
+Do not connect TELEM2 `+5 V`; CTS and RTS are unused by this three-wire path.
+After applying `bin/configure_pi5_uart.sh` and rebooting the Pi, run:
+
+```bash
+ONBOARD_AUTONOMY_SERIAL=/dev/ttyAMA0 \
+ONBOARD_AUTONOMY_BAUD=57600 \
+  bin/run_onboard_autonomy_pi.sh
+```
+
+The baud rate must match the ArduPilot `SERIAL2_BAUD` configuration. The
+recorded controller used 57600; do not assume this value for a different
+aircraft. See `docs/evidence/uart-hardware.md` for the physical acceptance
+result and its safety limitations.

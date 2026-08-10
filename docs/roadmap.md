@@ -127,8 +127,6 @@ Gazebo producer restarted. See `docs/evidence/camera-recovery.md`.
   `config/camera-module-3-wide-640x480.json`.
 - [x] Estimate the AprilTag 3D pose and expose position, orientation,
   confidence, and observation freshness through typed state models.
-- [ ] Validate metric pose scale against a physically measured printed
-  target and camera-to-target distance.
 - [x] Transform camera coordinates into the MAVLink/body coordinate
   frame and validate axes, signs, units, and timestamps with tests.
 - [x] Reject invalid, low-confidence, and stale measurements without adding
@@ -178,7 +176,6 @@ Engineering focus: computer vision, guidance integration, algorithms.
   full official table while preserving ambiguous aliases.
 - [x] Visualize actual complete TX/RX MAVLink frames with bounded
   freshness and a tested live activity pulse.
-- [ ] Build natively on Raspberry Pi 5 as a toolchain comparison.
 - [x] Connect and identify Camera Module 3 Wide (Sony IMX708).
 - [x] Deploy the C++ camera receiver and verify 30.013 FPS, zero
   processing drops, and approximately 10 ms latency on Raspberry Pi 5.
@@ -188,23 +185,135 @@ Engineering focus: computer vision, guidance integration, algorithms.
   JSONL log rotation while preserving live output in `journald`.
 - [x] Add a bounded whole-process-group ARM profiler with CPU, RSS,
   temperature, throttling, and machine-readable reports.
-- [ ] Run the profiler on Raspberry Pi 5, establish an evidence-backed
-  baseline, and optimize only measured bottlenecks.
 - [x] Recover camera processes/streams and Linux serial sessions without
   restarting the companion process; validate serial recovery with a real PTY
   replacement and repeat telemetry setup after heartbeat recovery.
-- [ ] Repeat the established-link USB unplug/replug acceptance test with the
-  physical Raspberry Pi 5 and Pixhawk 6C.
 
 Engineering focus: Embedded Linux, ARM Cortex, target deployment.
 
-## Milestone 6: Hardware interfaces and delivery
+## Milestone 6: Version 1.0 release gate
 
-- [ ] Move from USB to the documented Pixhawk TELEM/UART connection.
-- [ ] Add one documented I2C or GPIO peripheral if useful.
-- [ ] Add a reproducible deployment image or Yocto proof of concept.
+- [x] Validate metric pose scale against a physically measured printed
+  target and camera-to-target distance. See
+  `docs/evidence/physical-apriltag-scale.md`.
+- [x] Run the complete-runtime profiler on Raspberry Pi 5, publish an
+  evidence-backed baseline, and optimize only measured bottlenecks. See
+  `docs/evidence/raspberry-pi-runtime-profile.md`.
+- [x] Repeat the established-link USB unplug/replug acceptance test with the
+  physical Raspberry Pi 5 and Pixhawk 6C. See
+  `docs/evidence/serial-recovery.md`.
+- [x] Move from USB to the documented Pixhawk TELEM/UART connection. See
+  `docs/evidence/uart-hardware.md`.
 - [ ] Record a short architecture and demonstration video.
-- [ ] Publish diagrams, test evidence, performance numbers, and
-  limitations.
+- [x] Publish diagrams, test evidence, performance numbers, and
+  explicit simulation-versus-hardware limitations.
 
-Engineering focus: UART, I2C/GPIO, deployment, technical communication.
+Version 1.0 is complete only when all six checks above have evidence. The
+physical bench validates Raspberry Pi, camera, Pixhawk, and transport
+integration without propellers; complete autonomous flight remains validated
+in SITL/Gazebo until a legal and safe physical flight test is possible.
+
+Engineering focus: physical acceptance, UART, performance evidence,
+delivery, and technical communication.
+
+## Version 1.1: Autonomous visual course
+
+The next autonomy increment is a camera-guided course followed by the
+existing precision-landing sequence. A forward-facing camera observes
+directional course markers, while the downward-facing camera remains
+responsible for the final AprilTag landing target.
+
+The first marker vocabulary is deliberately small: `LEFT`, `RIGHT`,
+`STRAIGHT`, and `FINISH`. Altitude changes and U-turns are deferred until
+the horizontal course is repeatable. Each course marker has a known physical
+size and a unique identity so the system can estimate range, reject duplicate
+instructions, and record deterministic progress. The nominal one-metre
+approach distance is a configurable target to be validated in simulation,
+not a hard-coded assumption.
+
+### Phase 1: Multi-camera foundation
+
+- [ ] Add explicit forward-navigation and downward-landing camera roles.
+- [ ] Add a forward-facing Camera Module 3 Wide model to the simulated
+  Holybro S500 without changing the proven landing-camera path.
+- [ ] Route both camera streams through the same application-level camera
+  contract and expose their independent health, latency, and preview state.
+- [ ] Verify that losing either stream does not block telemetry processing or
+  silently substitute one camera for the other.
+
+### Phase 2: Directional-marker perception
+
+- [ ] Define a project-owned, high-contrast course-marker specification with
+  known dimensions, direction, and identity.
+- [ ] Detect the marker board, rectify its perspective, classify its arrow,
+  and estimate relative pose from calibrated camera geometry.
+- [ ] Introduce a typed `CourseMarkerObservation` containing marker ID,
+  direction, relative position, confidence, and capture time.
+- [ ] Require stable agreement across multiple fresh frames before accepting
+  an instruction; a single frame must never command motion.
+- [ ] Build generated and recorded test cases for distance, perspective,
+  partial visibility, blur, lighting variation, and incorrect arrows.
+
+### Phase 3: Safe visual approach
+
+- [ ] Promote local-NED movement from the existing MAVLink encoder into a
+  typed application intent, runtime action, and safety-supervised command.
+- [ ] Add bounded position, velocity, altitude, freshness, and course-area
+  limits before any navigation command reaches the flight controller.
+- [ ] Implement `search -> acquire -> approach -> hold` for one marker without
+  executing its arrow.
+- [ ] Hold position when the marker is lost or ambiguous; never guess the
+  direction, and fall back to LAND after a bounded unrecoverable timeout.
+- [ ] Validate approach distance and lateral alignment in SITL and Gazebo,
+  then tune the nominal standoff towards one metre.
+
+### Phase 4: Marker manoeuvres and course state
+
+- [ ] Execute `LEFT`, `RIGHT`, and `STRAIGHT` as bounded relative manoeuvres
+  only after a stable marker and verified approach hold.
+- [ ] Mark each instruction as consumed before searching for the next marker
+  so one sign cannot be executed twice.
+- [ ] Add a course state machine covering takeoff, search, approach, hold,
+  manoeuvre, reacquisition, finish transition, landing, completion, and
+  failsafe states.
+- [ ] Run a deterministic three-marker course before increasing track length
+  or adding altitude-changing instructions.
+- [ ] Add `UP`, `DOWN`, and `U_TURN` only after horizontal-course acceptance;
+  each requires its own altitude, clearance, and reacquisition constraints.
+
+### Phase 5: Finish and precision landing
+
+- [ ] Use a distinct `FINISH` marker to transition from forward navigation to
+  the proven downward-camera landing mode.
+- [ ] Acquire the final AprilTag pad, stream `LANDING_TARGET`, and reuse the
+  existing terminal-descent handoff rather than duplicating landing logic.
+- [ ] Fail safely if the finish marker is reached but the landing target is
+  not acquired within the configured search window.
+
+### Phase 6: Acceptance and transfer
+
+- [ ] Add a repeatable Gazebo course runner, timer, persistent result report,
+  and camera previews for both navigation and landing.
+- [ ] Measure completion rate, wrong-instruction rate, marker standoff error,
+  course time, and final landing error across repeated runs.
+- [ ] Inject marker loss, stale frames, camera failure, MAVLink loss, wind,
+  and misleading detections in automated acceptance tests.
+- [ ] Preserve replayable frames, telemetry, decisions, and command evidence
+  for every failed run.
+- [ ] Validate the forward-camera path on Raspberry Pi 5 before claiming
+  physical two-camera support; real hardware requires a second compatible
+  camera and mounting/calibration evidence.
+
+Engineering focus: multi-camera systems, visual perception, visual guidance,
+state-machine design, safety supervision, simulation, and measurable autonomy.
+
+## Optional engineering backlog
+
+These investigations are useful but do not block version 1.0 or the visual
+course vertical slice:
+
+- [ ] Build natively on Raspberry Pi 5 as a toolchain comparison with the
+  established ARM64 cross-build.
+- [ ] Add a documented I2C or GPIO peripheral only when it serves a concrete
+  system function.
+- [ ] Add a reproducible deployment image or a bounded Yocto proof of concept.

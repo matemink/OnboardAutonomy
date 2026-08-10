@@ -65,12 +65,14 @@ Kalman estimator introduced moving-frame lag and repeated overshoot. Neither
 parameter is evidence that the physical camera geometry, latency, or noise has
 been validated.
 
-## Remaining hardware gate
+## Hardware scale follow-up
 
-Before real-aircraft guidance is enabled, repeat the metric scale check with
-the printed marker at measured distances, record the physical camera mount
-extrinsics, and review the ArduPilot precision-landing parameters. Serial
-hardware motion remains blocked by the application safety policy.
+The printed-marker scale check is now complete at physically measured 300 mm
+and 500 mm separations, with 1.62% worst median error. See
+`docs/evidence/physical-apriltag-scale.md`. Before real-aircraft guidance is
+enabled, record the physical camera mount extrinsics and review the ArduPilot
+precision-landing parameters. Serial hardware motion remains blocked by the
+application safety policy.
 
 ## Reproduction
 

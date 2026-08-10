@@ -200,9 +200,12 @@ Pi 5 UART software configuration уже підготовлена:
 dtoverlay=uart0-pi5
 ```
 
-Після наступного reboot очікується `/dev/ttyAMA0` на GPIO14/GPIO15.
-Фізичне TELEM2 wiring і `SERIAL2_*` parameters ще не перевірені, тому
-UART milestone не позначено завершеним.
+На момент першого USB bench фізичне TELEM2 wiring ще не було перевірене.
+Подальший hardware acceptance 2026-08-10 підтвердив `/dev/ttyAMA0` на
+GPIO14/GPIO15, перехресне TX/RX-з'єднання та двонаправлений MAVLink на
+57600 baud: OnboardAutonomy отримав heartbeat і завершив усі 6/6 запитів
+частоти телеметрії. Деталі та межі твердження записані в
+`docs/evidence/uart-hardware.md`.
 
 Офіційні джерела:
 
