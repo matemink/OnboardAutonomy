@@ -10,10 +10,10 @@ MAVLink command and telemetry flows, processes onboard camera frames,
 and exposes vehicle state through an operator console and JSON snapshots.
 
 The project implements vision-guided precision landing in ArduCopter SITL
-and Gazebo and is progressing toward the same path on a Raspberry Pi 5 and
-Pixhawk 6C. Development remains reproducible without real flight: motion is
-verified in simulation, while hardware work is performed on a propeller-free
-bench.
+and Gazebo and deploys the same telemetry, camera, and perception runtime to
+a Raspberry Pi 5 and Pixhawk 6C. Development remains reproducible without
+real flight: motion is verified in simulation, while hardware integration is
+verified on a propeller-free bench.
 
 ## System overview
 
@@ -86,8 +86,8 @@ Pi.
 | --- | --- |
 | Ubuntu 24.04 / WSL2 | Native C++ build, unit tests, ArduCopter SITL, and fault injection |
 | Gazebo Harmonic | Automated takeoff, vision-guided landing, target-loss fallback, and H.264 camera stream |
-| Raspberry Pi 5 | ARM64 runtime, Camera Module 3 Wide, and concurrent camera/MAVLink processing |
-| Pixhawk 6C | Real USB MAVLink telemetry, health state, metadata, and acknowledged stream requests |
+| Raspberry Pi 5 | ARM64 runtime, Camera Module 3 Wide, metric AprilTag pose, and profiled concurrent camera/MAVLink processing |
+| Pixhawk 6C | Real USB recovery and TELEM2/GPIO UART telemetry, health state, metadata, and acknowledged stream requests |
 
 The measured Raspberry Pi camera path sustained `30.013 FPS` with zero
 processing drops and approximately `10 ms` sensor-to-application latency
@@ -214,6 +214,10 @@ automatically. See the
 - [Development and SITL runbook](docs/development.md)
 - [Gazebo simulation runbook](docs/simulation.md)
 - [Raspberry Pi 5 and Pixhawk 6C bench](docs/raspberry-pi-5-bench.md)
+- [Physical AprilTag scale evidence](docs/evidence/physical-apriltag-scale.md)
+- [Pixhawk TELEM2 UART evidence](docs/evidence/uart-hardware.md)
+- [Raspberry Pi complete-runtime profile](docs/evidence/raspberry-pi-runtime-profile.md)
+- [USB and serial recovery evidence](docs/evidence/serial-recovery.md)
 - [Camera calibration workflow (Ukrainian)](docs/learning/29-camera-calibration.uk.md)
 - [AprilTag target tracking (Ukrainian)](docs/learning/30-apriltag-target-tracking.uk.md)
 - [Roadmap](docs/roadmap.md)

@@ -29,6 +29,12 @@ WORLD = (
     / "worlds"
     / "apriltag_landing.sdf"
 )
+SHOWCASE_WORLD = (
+    PROJECT_ROOT
+    / "simulation"
+    / "worlds"
+    / "apriltag_showcase.sdf"
+)
 CALIBRATION = (
     PROJECT_ROOT / "config" / "gazebo-landing-camera-640x480.json"
 )
@@ -173,6 +179,69 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             ].findtext("name"),
             "Holybro_S500",
         )
+
+    def test_showcase_world_is_opt_in_and_starts_clean(self) -> None:
+        deterministic = element_tree.parse(WORLD).getroot().find("world")
+        showcase = element_tree.parse(SHOWCASE_WORLD).getroot().find("world")
+        self.assertIsNotNone(deterministic)
+        self.assertIsNotNone(showcase)
+        self.assertEqual(showcase.attrib["name"], deterministic.attrib["name"])
+
+        self.assertIsNone(deterministic.find("model[@name='showcase_hangar']"))
+        self.assertIsNone(showcase.find("model[@name='showcase_probe_box']"))
+        self.assertIsNone(showcase.find("model[@name='showcase_hangar']"))
+
+        deterministic_uris = {
+            include.findtext("uri") for include in deterministic.findall("include")
+        }
+        showcase_uris = {
+            include.findtext("uri") for include in showcase.findall("include")
+        }
+        self.assertEqual(showcase_uris, deterministic_uris)
+
+        demo_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
+        showcase_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboShowcase.cmd"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "simulation/worlds/apriltag_landing.sdf",
+            demo_launcher,
+        )
+        self.assertIn(
+            'ONBOARD_AUTONOMY_GAZEBO_WORLD="%GAZEBO_WORLD%"',
+            demo_launcher,
+        )
+        self.assertIn(
+            "simulation/worlds/apriltag_showcase.sdf",
+            showcase_launcher,
+        )
+
+    def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
+        demo_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
+        stop_launcher = (
+            PROJECT_ROOT / "StopOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
+        cleanup_script = (
+            PROJECT_ROOT / "scripts" / "stop_onboard_autonomy_gazebo.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "bash scripts/stop_onboard_autonomy_gazebo.sh",
+            demo_launcher,
+        )
+        self.assertIn(
+            "bash scripts/stop_onboard_autonomy_gazebo.sh",
+            stop_launcher,
+        )
+        self.assertNotIn("wsl --shutdown", demo_launcher)
+        self.assertIn("pkill", cleanup_script)
+        self.assertIn("arducopter", cleanup_script)
+        self.assertIn("onboard_autonomy", cleanup_script)
+        self.assertIn("gz", cleanup_script)
 
     def test_vehicle_exposes_the_real_development_rig_names(self) -> None:
         model = element_tree.parse(CAMERA_MODEL).getroot()
