@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <!-- Keep the world name stable so camera, wind, and MAVLink topics match
+       the deterministic world while this file remains explicitly opt-in. -->
+  <world name="apriltag_landing">
+    <physics name="1ms" type="ignore">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands" />
+    <plugin filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster" />
+    <plugin filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu" />
+    <plugin filename="gz-sim-navsat-system"
+      name="gz::sim::systems::NavSat" />
+    <plugin filename="gz-sim-air-pressure-system"
+      name="gz::sim::systems::AirPressure" />
+
+    <plugin filename="gz-sim-wind-effects-system"
+      name="gz::sim::systems::WindEffects">
+      <force_approximation_scaling_factor>0.1</force_approximation_scaling_factor>
+      <horizontal>
+        <magnitude>
+          <time_for_rise>3</time_for_rise>
+          <sin>
+            <amplitude_percent>0.15</amplitude_percent>
+            <period>8</period>
+          </sin>
+          <noise type="gaussian">
+            <mean>0</mean>
+            <stddev>0.03</stddev>
+          </noise>
+        </magnitude>
+        <direction>
+          <time_for_rise>3</time_for_rise>
+          <sin>
+            <amplitude>8</amplitude>
+            <period>11</period>
+          </sin>
+          <noise type="gaussian">
+            <mean>0</mean>
+            <stddev>1</stddev>
+          </noise>
+        </direction>
+      </horizontal>
+      <vertical>
+        <time_for_rise>3</time_for_rise>
+        <noise type="gaussian">
+          <mean>0</mean>
+          <stddev>0.08</stddev>
+        </noise>
+      </vertical>
+    </plugin>
+
+    <scene>
+      <ambient>0.9 0.9 0.9</ambient>
+      <background>0.55 0.72 0.82</background>
+      <sky />
+    </scene>
+
+    <spherical_coordinates>
+      <latitude_deg>-35.363262</latitude_deg>
+      <longitude_deg>149.165237</longitude_deg>
+      <elevation>584</elevation>
+      <heading_deg>0</heading_deg>
+      <surface_model>EARTH_WGS84</surface_model>
+    </spherical_coordinates>
+
+    <wind>
+      <linear_velocity>0 0 0</linear_velocity>
+    </wind>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground">
+      <static>true</static>
+      <link name="ground_link">
+        <collision name="ground_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="ground_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.22 0.30 0.22 1</ambient>
+            <diffuse>0.30 0.40 0.30 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://apriltag_landing_pad</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://iris_with_landing_camera</uri>
+      <name>Holybro_S500</name>
+      <pose>-3 0 0.195 0 0 1.5707963267948966</pose>
+    </include>
+  </world>
+</sdf>
