@@ -14,10 +14,12 @@ the physical system is verified on a propeller-free hardware bench.
 
 ## Demo
 
-- [Vision-guided autonomous landing](https://www.youtube.com/watch?v=rsuRYYDfZZI)
-  (`39 s`) - takeoff, target tracking, guidance, and precision landing.
-- [Hurricane-force wind stress test](https://www.youtube.com/watch?v=eqdRw3oofTI)
-  (`36 s`) - the same autonomy flow under severe simulated gusts.
+- **Vision-guided autonomous landing** (`39 s`) - takeoff, target tracking,
+  guidance, and precision landing.
+  [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=rsuRYYDfZZI)
+- **Hurricane-force wind stress test** (`36 s`) - the same autonomy flow under
+  severe simulated gusts.
+  [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=eqdRw3oofTI)
 
 ## System overview
 
