@@ -4,13 +4,9 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg)](https://isocpp.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20ARM64-FCC624.svg)](https://www.raspberrypi.com/)
 
-OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs.
-It combines MAVLink telemetry and commands, camera ingestion, AprilTag
-tracking, safety supervision, and vision-guided precision landing.
-
-The same application runs with ArduCopter SITL in Gazebo or on a Raspberry
-Pi 5 connected to a Pixhawk 6C. Flight behavior is verified in simulation;
-the physical system is verified on a propeller-free hardware bench.
+OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs. It
+combines MAVLink, onboard vision, safety supervision, and precision landing.
+The same application runs in Gazebo or on a Raspberry Pi 5 with a Pixhawk 6C.
 
 ## Demo
 
@@ -48,74 +44,30 @@ flowchart LR
     style FC fill:#FFF8DE,stroke:#B7791F,stroke-width:2px,color:#3D2C00
 ```
 
-ArduPilot owns stabilization and flight control. OnboardAutonomy owns
-companion-computer concerns: perception, telemetry, startup orchestration,
-landing guidance, safety supervision, diagnostics, and recovery.
+ArduPilot owns stabilization and flight control. OnboardAutonomy turns camera
+and telemetry data into supervised guidance for either SITL or a real Pixhawk.
 
 ## Highlights
 
-- MAVLink 2 telemetry, command encoding, `COMMAND_ACK` handling, and stream
-  configuration over SITL UDP or Linux USB/UART serial transport.
-- Readiness-gated takeoff and AprilTag precision landing with stale-target,
-  target-loss, and companion-link fallback behavior.
-- Raspberry Pi Camera Module 3 and Gazebo RTP/H.264 input through the same
-  YUV420 perception pipeline, with a read-only browser preview.
-- Non-blocking serial and camera recovery after disconnects, process exits,
-  or bounded frame stalls.
-- Packaged non-root `systemd` service, bounded JSONL logs, and Raspberry Pi
-  CPU, memory, temperature, and latency profiling.
-- Native C++ tests, Python integration and fault-injection tests, and an ARM64
-  cross-build quality gate in GitHub Actions.
+- MAVLink 2 telemetry and acknowledged commands over SITL UDP or Linux
+  USB/UART serial transport.
+- Readiness-gated takeoff and AprilTag landing with target-loss and link-loss
+  fallbacks.
+- One YUV420/OpenCV pipeline for Gazebo H.264 and Raspberry Pi Camera Module 3.
+- Automatic serial and camera recovery after disconnects or process stalls.
+- Motion is SITL-gated; physical endpoints remain observation-only. CI covers
+  C++ tests, Python integration and fault injection, plus an ARM64 cross-build.
 
-## Verified hardware
+## Built and tested with
 
-| Environment | Verification |
-| --- | --- |
-| Gazebo Harmonic / ArduCopter SITL | Automated takeoff, target tracking, landing, wind stress, and link-loss behavior |
-| Raspberry Pi 5 / Camera Module 3 Wide | ARM64 runtime, calibrated AprilTag pose, camera recovery, and concurrent runtime profiling |
-| Pixhawk 6C | USB recovery, TELEM2/GPIO UART, live health and metadata, and acknowledged MAVLink requests |
+- **Simulation:** ArduCopter SITL, Gazebo Harmonic, OpenCV, and GStreamer.
+- **Hardware:** Raspberry Pi 5, Camera Module 3 Wide, and Pixhawk 6C over USB
+  and TELEM2 UART.
+- **Evidence:** repeatable precision-landing runs, companion-link failsafe
+  injection, camera and serial recovery, and ARM runtime profiling.
 
-The documented Raspberry Pi camera run sustained `30.013 FPS`, zero
-processing drops, and approximately `10 ms` sensor-to-application latency.
-Ten offset Gazebo flights completed automatic disarm with `0.000 m` worst
-landing error at MAVLink telemetry resolution. Reproduction details and raw
-limitations are linked below.
-
-## Run locally
-
-After completing the [Gazebo setup](docs/simulation.md), Windows users can
-start the showcase, SITL, camera preview, and operator console with:
-
-```text
-StartOnboardAutonomyGazeboShowcase.cmd
-```
-
-The first run starts automatically. After disarm, press `S` to repeat or `Q`
-to exit. For a native development build:
-
-```bash
-sudo bash scripts/bootstrap_ubuntu.sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-python3 -m unittest discover -s python/tests -v
-```
-
-## Safety
-
-Normal startup is observation-only. Motion requires an explicit `--sitl`
-assertion; serial and unknown or real UDP endpoints remain observation-only.
-Before autonomous startup, the runtime validates the configured ArduPilot
-companion-heartbeat failsafe and never changes flight-controller parameters
-automatically. Real bench work is performed without propellers.
-
-## Documentation
+## Explore
 
 - [Architecture](docs/architecture.md)
-- [Development and SITL](docs/development.md)
-- [Gazebo simulation](docs/simulation.md)
-- [Raspberry Pi 5 and Pixhawk 6C bench](docs/raspberry-pi-5-bench.md)
-- [Precision-landing evidence](docs/evidence/precision-landing-sitl.md)
-- [Companion-link failsafe evidence](docs/evidence/companion-link-failsafe-sitl.md)
-- [Raspberry Pi runtime profile](docs/evidence/raspberry-pi-runtime-profile.md)
-- [Roadmap](docs/roadmap.md)
+- [Run the Gazebo demo](docs/simulation.md)
+- [Hardware bench and evidence](docs/raspberry-pi-5-bench.md)
