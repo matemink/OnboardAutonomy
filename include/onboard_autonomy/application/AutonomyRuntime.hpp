@@ -50,7 +50,9 @@ struct AutonomyRuntimeSnapshot {
 
 class AutonomyRuntime {
 public:
-    explicit AutonomyRuntime(AutonomyRuntimeConfig config = {});
+    explicit AutonomyRuntime(
+        const AutonomyRuntimeConfig& config = {}
+    );
 
     [[nodiscard]] std::vector<FlightActionRequest> update(
         const domain::VehicleSnapshot& vehicle,

@@ -36,7 +36,7 @@ struct TargetTrackSnapshot {
 
 class TargetTracker {
 public:
-    explicit TargetTracker(TargetTrackerConfig config = {});
+    explicit TargetTracker(const TargetTrackerConfig& config = {});
 
     void update(
         std::span<const domain::TargetObservation> observations,

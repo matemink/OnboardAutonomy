@@ -12,7 +12,7 @@
 
 namespace onboard_autonomy::application {
 
-AutonomyRuntime::AutonomyRuntime(AutonomyRuntimeConfig config)
+AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
     : config_(config) {
     if (config_.target_loss_land_after <=
         std::chrono::milliseconds::zero()) {

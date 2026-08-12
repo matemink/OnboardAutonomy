@@ -45,7 +45,7 @@ domain::CameraFramePosition smooth_position(
 
 }  // namespace
 
-TargetTracker::TargetTracker(TargetTrackerConfig config)
+TargetTracker::TargetTracker(const TargetTrackerConfig& config)
     : config_(config) {
     if (config_.required_consecutive_observations == 0U) {
         throw std::invalid_argument(
