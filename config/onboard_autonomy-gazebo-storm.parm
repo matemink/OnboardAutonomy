@@ -1,0 +1,12 @@
+# Hurricane-force stress profile for the opt-in Gazebo showcase.
+# ArduPilot direction is where wind comes from; 225 deg is south-west.
+# 30 m/s is 108 km/h; turbulence can add rapid 15 m/s variations.
+SIM_WIND_SPD 30
+SIM_WIND_DIR 225
+SIM_WIND_TURB 15
+SIM_WIND_TC 0.2
+SIM_WIND_T 1
+
+# Keep pressure noise realistic so this profile isolates wind response.
+SIM_BARO_RND 0.2
+SIM_BAR2_RND 0.2
