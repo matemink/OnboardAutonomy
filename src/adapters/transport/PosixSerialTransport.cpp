@@ -1,8 +1,9 @@
 #include "onboard_autonomy/adapters/transport/TransportFactory.hpp"
 
+#include "../PosixError.hpp"
+
 #include <cerrno>
 #include <chrono>
-#include <cstring>
 #include <stdexcept>
 #include <string>
 
@@ -49,13 +50,13 @@ int open_serial_device(
     if (file_descriptor < 0) {
         throw std::runtime_error(
             "Unable to open serial device " + device + ": " +
-            std::strerror(errno)
+            posix_error_message(errno)
         );
     }
 
     termios options{};
     if (tcgetattr(file_descriptor, &options) != 0) {
-        const std::string error = std::strerror(errno);
+        const std::string error = posix_error_message(errno);
         close(file_descriptor);
         throw std::runtime_error(
             "Unable to read serial settings for " + device + ": " +
@@ -79,7 +80,7 @@ int open_serial_device(
     options.c_cc[VTIME] = 0;
 
     if (tcsetattr(file_descriptor, TCSANOW, &options) != 0) {
-        const std::string error = std::strerror(errno);
+        const std::string error = posix_error_message(errno);
         close(file_descriptor);
         throw std::runtime_error(
             "Unable to configure serial device " + device + ": " +

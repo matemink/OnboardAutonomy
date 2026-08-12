@@ -341,7 +341,11 @@ public:
         targets.reserve(static_cast<std::size_t>(count));
         for (int index = 0; index < count; ++index) {
             apriltag_detection_t* detection = nullptr;
-            zarray_get(detections.get(), index, &detection);
+            zarray_get(
+                detections.get(),
+                index,
+                static_cast<void*>(&detection)
+            );
             if (detection == nullptr) {
                 continue;
             }
@@ -406,7 +410,7 @@ private:
 }  // namespace
 
 std::unique_ptr<application::ports::TargetDetector>
-make_apriltag_target_detector(AprilTagDetectorConfig config) {
+make_apriltag_target_detector(const AprilTagDetectorConfig& config) {
     return std::make_unique<AprilTagTargetDetector>(config);
 }
 

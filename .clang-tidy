@@ -1,0 +1,30 @@
+---
+Checks: >-
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  concurrency-*,
+  performance-*,
+  -performance-enum-size,
+  portability-*,
+  readability-function-cognitive-complexity,
+  readability-function-size,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: >-
+  clang-analyzer-*,
+  bugprone-*,
+  concurrency-*,
+  performance-*,
+  portability-*
+HeaderFilterRegex: '.*/(include/onboard_autonomy|src)/.*'
+SystemHeaders: false
+FormatStyle: none
+CheckOptions:
+  readability-function-cognitive-complexity.Threshold: '25'
+  readability-function-size.LineThreshold: '120'
+  readability-function-size.StatementThreshold: '80'
+  readability-function-size.BranchThreshold: '15'
+  readability-function-size.ParameterThreshold: '8'
+  readability-function-size.NestingThreshold: '4'
+  readability-function-size.VariableThreshold: '25'
+...

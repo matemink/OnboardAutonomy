@@ -1,8 +1,9 @@
 #include "onboard_autonomy/adapters/transport/TransportFactory.hpp"
 
+#include "../PosixError.hpp"
+
 #include <array>
 #include <cerrno>
-#include <cstring>
 #include <stdexcept>
 #include <string>
 
@@ -156,7 +157,7 @@ public:
             }
             throw std::runtime_error(
                 std::string("UDP receive failed: ") +
-                std::strerror(errno)
+                posix_error_message(errno)
             );
         }
 #endif
@@ -195,7 +196,7 @@ public:
         if (sent < 0) {
             throw std::runtime_error(
                 std::string("UDP send failed: ") +
-                std::strerror(errno)
+                posix_error_message(errno)
             );
         }
 #endif

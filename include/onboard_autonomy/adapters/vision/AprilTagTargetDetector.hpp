@@ -25,7 +25,7 @@ struct AprilTagDetectorConfig {
 [[nodiscard]] std::unique_ptr<
     application::ports::TargetDetector
 > make_apriltag_target_detector(
-    AprilTagDetectorConfig config = {}
+    const AprilTagDetectorConfig& config = {}
 );
 
 }  // namespace onboard_autonomy::adapters::vision

@@ -9,6 +9,7 @@ __pycache__/
 .vscode/
 compile_commands.json
 artifacts/
+docs/diagrams/generated/
 tools/images/
 tools/imager-v*.exe
 tools/gh/

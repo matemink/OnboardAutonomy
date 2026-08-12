@@ -767,13 +767,14 @@ std::string outbound_wire(
     const std::optional<application::LinkActivity>& activity,
     const std::chrono::milliseconds elapsed
 ) {
-    if (!activity_is_fresh(activity, elapsed)) {
+    if (!activity.has_value() ||
+        !activity_is_fresh(activity, elapsed)) {
         return std::string(kLinkWidth - 1, '-') + ">";
     }
 
     constexpr std::size_t decoration_width = 7;
     const std::string label = clipped(
-        activity_label(*activity),
+        activity_label(activity.value()),
         kLinkWidth - decoration_width
     );
     const std::string packet = "[ " + label + " ]";
@@ -787,13 +788,14 @@ std::string inbound_wire(
     const std::optional<application::LinkActivity>& activity,
     const std::chrono::milliseconds elapsed
 ) {
-    if (!activity_is_fresh(activity, elapsed)) {
+    if (!activity.has_value() ||
+        !activity_is_fresh(activity, elapsed)) {
         return "<" + std::string(kLinkWidth - 1, '-');
     }
 
     constexpr std::size_t decoration_width = 7;
     const std::string label = clipped(
-        activity_label(*activity),
+        activity_label(activity.value()),
         kLinkWidth - decoration_width
     );
     const std::string packet = "[ " + label + " ]";

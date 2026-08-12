@@ -299,7 +299,12 @@ target_link_libraries(
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_cli_presentation)
 
-add_executable(onboard_autonomy src/main.cpp)
+add_executable(
+    onboard_autonomy
+    src/main.cpp
+    src/bootstrap/Program.cpp
+    src/bootstrap/RuntimeAssembly.cpp
+)
 target_link_libraries(
     onboard_autonomy
     PRIVATE

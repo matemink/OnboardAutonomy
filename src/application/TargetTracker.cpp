@@ -46,7 +46,7 @@ domain::CameraFramePosition smooth_position(
 }  // namespace
 
 TargetTracker::TargetTracker(TargetTrackerConfig config)
-    : config_(std::move(config)) {
+    : config_(config) {
     if (config_.required_consecutive_observations == 0U) {
         throw std::invalid_argument(
             "target tracker requires at least one observation"
@@ -124,8 +124,11 @@ void TargetTracker::update(
     if (selected == nullptr) {
         return;
     }
+    if (!selected->pose.has_value()) {
+        return;
+    }
 
-    const auto& measurement = selected->pose->position;
+    const auto& measurement = selected->pose.value().position;
     if (!target_id_.has_value()) {
         target_id_ = selected->id;
         consecutive_observations_ = 1U;
@@ -138,7 +141,7 @@ void TargetTracker::update(
         }
         ++accepted_observations_;
         position_ = smooth_position(
-            *position_,
+            position_.value_or(measurement),
             measurement,
             config_.position_smoothing_factor
         );

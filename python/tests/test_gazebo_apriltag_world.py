@@ -197,7 +197,18 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         showcase_uris = {
             include.findtext("uri") for include in showcase.findall("include")
         }
-        self.assertEqual(showcase_uris, deterministic_uris)
+        decorative_uris = {
+            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+            "Oak%20tree",
+            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+            "FoodCourtBenchShort",
+            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+            "Hatchback%20red",
+        }
+        self.assertEqual(
+            showcase_uris,
+            deterministic_uris | decorative_uris,
+        )
 
         demo_launcher = (
             PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"

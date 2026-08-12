@@ -37,6 +37,35 @@ CMake downloads pinned generated MAVLink C headers and the other source
 dependencies into the build directory. MAVLink framing is not
 reimplemented by this project.
 
+## Static analysis and architecture diagrams
+
+Install the developer-only quality tools on Ubuntu 24.04 or WSL2:
+
+```bash
+sudo bash scripts/install_quality_tools.sh
+```
+
+Run the same `clang-tidy` checks used by CI:
+
+```bash
+bash scripts/run_static_analysis.sh
+```
+
+Correctness, concurrency, performance, and portability findings fail the
+command. Function-size and cognitive-complexity findings remain visible as
+architecture warnings while the existing large functions are refactored in
+small, behavior-preserving changes.
+
+Regenerate the Mermaid class and package diagrams from the C++ AST:
+
+```bash
+bash scripts/generate_diagrams.sh
+```
+
+The generated files are written to `docs/diagrams/generated/`. The diagrams
+use CMake's `compile_commands.json`, so they reflect actual compiled types and
+relationships rather than a hand-maintained architecture sketch.
+
 ## Generated MAVLink telemetry
 
 Start OnboardAutonomy:

@@ -5,6 +5,20 @@ on:
   pull_request:
 
 jobs:
+  static-analysis:
+    name: "C++ Static Analysis"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy-18 ninja-build
+      - name: Analyze project sources
+        env:
+          CLANG_TIDY_JOBS: "2"
+        run: bash scripts/run_static_analysis.sh "$RUNNER_TEMP/onboard-autonomy-tidy"
+
   native-linux:
     name: "Linux Build & Tests"
     runs-on: ubuntu-24.04

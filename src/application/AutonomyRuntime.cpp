@@ -13,7 +13,7 @@
 namespace onboard_autonomy::application {
 
 AutonomyRuntime::AutonomyRuntime(AutonomyRuntimeConfig config)
-    : config_(std::move(config)) {
+    : config_(config) {
     if (config_.target_loss_land_after <=
         std::chrono::milliseconds::zero()) {
         throw std::invalid_argument(
@@ -143,7 +143,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
 
     auto world = make_world_state(
         vehicle,
-        std::move(landing_target),
+        landing_target,
         now
     );
     const auto desired = decision_engine_.decide(world);
@@ -344,6 +344,10 @@ AutonomyRuntime::update_land_command(const domain::TimePoint now) {
         fail("No COMMAND_ACK for LAND after 3 attempts");
         return std::nullopt;
     }
+    if (!vehicle_system_id_.has_value()) {
+        fail("Cannot send LAND without a vehicle system ID");
+        return std::nullopt;
+    }
 
     const auto confirmation =
         static_cast<std::uint8_t>(land_attempt_);
@@ -352,7 +356,7 @@ AutonomyRuntime::update_land_command(const domain::TimePoint now) {
     acknowledgement_deadline_ = now + kAcknowledgementTimeout;
     return FlightActionRequest{
         .action = FlightAction::land,
-        .vehicle_system_id = *vehicle_system_id_,
+        .vehicle_system_id = vehicle_system_id_.value(),
         .confirmation = confirmation,
     };
 }

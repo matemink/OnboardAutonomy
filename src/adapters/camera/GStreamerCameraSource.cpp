@@ -1,5 +1,7 @@
 #include "onboard_autonomy/adapters/camera/GStreamerCameraSource.hpp"
 
+#include "../PosixError.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -17,7 +19,6 @@
 #if defined(__linux__)
 #include <cerrno>
 #include <csignal>
-#include <cstring>
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -131,7 +132,7 @@ private:
             ::pipe(error_pipe) != 0) {
             set_failure(
                 "unable to create GStreamer pipes: " +
-                std::string(std::strerror(errno))
+                posix_error_message(errno)
             );
             close_pipe(video_pipe);
             close_pipe(error_pipe);
@@ -150,7 +151,7 @@ private:
         if (child == -1) {
             set_failure(
                 "unable to fork GStreamer: " +
-                std::string(std::strerror(errno))
+                posix_error_message(errno)
             );
             close_pipe(video_pipe);
             close_pipe(error_pipe);

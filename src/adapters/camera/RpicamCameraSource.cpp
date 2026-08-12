@@ -1,5 +1,7 @@
 #include "onboard_autonomy/adapters/camera/RpicamCameraSource.hpp"
 
+#include "../PosixError.hpp"
+
 #include <atomic>
 #include <charconv>
 #include <chrono>
@@ -20,7 +22,6 @@
 #if defined(__linux__)
 #include <cerrno>
 #include <csignal>
-#include <cstring>
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -139,7 +140,7 @@ private:
             ::pipe(error_pipe) != 0) {
             set_failure(
                 "unable to create rpicam pipes: " +
-                std::string(std::strerror(errno))
+                posix_error_message(errno)
             );
             close_pipe(video_pipe);
             close_pipe(metadata_pipe);
@@ -162,7 +163,7 @@ private:
         if (child == -1) {
             set_failure(
                 "unable to fork rpicam-vid: " +
-                std::string(std::strerror(errno))
+                posix_error_message(errno)
             );
             close_pipe(video_pipe);
             close_pipe(metadata_pipe);
