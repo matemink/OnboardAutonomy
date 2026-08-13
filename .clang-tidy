@@ -10,14 +10,7 @@ Checks: >-
   readability-function-cognitive-complexity,
   readability-function-size,
   -bugprone-easily-swappable-parameters
-WarningsAsErrors: >-
-  clang-analyzer-*,
-  bugprone-*,
-  concurrency-*,
-  performance-*,
-  portability-*,
-  readability-function-cognitive-complexity,
-  readability-function-size
+WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/(include/onboard_autonomy|src)/.*'
 SystemHeaders: false
 FormatStyle: none
