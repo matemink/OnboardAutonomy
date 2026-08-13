@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass
 import json
 import math
-from pathlib import Path
 import statistics
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from itertools import pairwise
+from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -95,7 +97,7 @@ def build_summary(
         )
 
     interval_cpu_percent: list[float] = []
-    for previous, current in zip(samples, samples[1:]):
+    for previous, current in pairwise(samples):
         elapsed_seconds = (current.elapsed_ms - previous.elapsed_ms) / 1000.0
         tick_delta = (
             current.cumulative_cpu_ticks - previous.cumulative_cpu_ticks

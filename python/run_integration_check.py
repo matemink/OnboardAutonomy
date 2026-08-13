@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import selectors
 import subprocess
 import time
+from pathlib import Path
 
 from pymavlink import mavutil
-
 from scenario_runner import SCENARIOS, send_observation
 
 

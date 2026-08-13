@@ -3,7 +3,6 @@ import unittest
 import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).parents[2]
 TARGET_PATH = (
     PROJECT_ROOT

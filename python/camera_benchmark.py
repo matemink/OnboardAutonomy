@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import json
 import math
-from pathlib import Path
 import statistics
-from typing import Any, Iterable
+from collections import Counter
+from collections.abc import Iterable
+from itertools import pairwise
+from pathlib import Path
+from typing import Any
 
 
 def percentile(values: Iterable[float], fraction: float) -> float | None:
@@ -103,10 +105,7 @@ def build_summary(
 ) -> dict[str, Any]:
     intervals_ms = [
         current - previous
-        for previous, current in zip(
-            timestamps_ms,
-            timestamps_ms[1:],
-        )
+        for previous, current in pairwise(timestamps_ms)
         if current > previous
     ]
     duration_seconds = (

@@ -4,22 +4,21 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass
-from datetime import datetime
 import json
 import math
 import os
-from pathlib import Path
 import selectors
 import socket
 import statistics
 import subprocess
 import time
-from typing import TextIO
 import xml.etree.ElementTree as element_tree
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import TextIO
 
 from sitl_harness import ProcessSupervisor, require_available_port
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LANDING_POSITION_TOLERANCE_M = 0.25
@@ -594,7 +593,7 @@ def main() -> int:
     args = parse_args()
     if args.runs <= 0:
         raise SystemExit("--runs must be positive")
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     artifacts_root = args.artifacts_root / f"{run_id}-{os.getpid()}"
     if args.runs > 1:
         artifacts_root.mkdir(parents=True, exist_ok=False)
@@ -622,7 +621,7 @@ def main() -> int:
                     weather=args.weather,
                 )
             )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - CLI reports scenario failures.
         print(f"FAILED: {error}")
         return 1
 

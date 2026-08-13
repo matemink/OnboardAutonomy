@@ -28,9 +28,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: python/requirements.txt
+          cache-dependency-path: |
+            python/requirements.txt
+            python/requirements-dev.txt
       - name: Install Python dependencies
-        run: python -m pip install -r python/requirements.txt
+        run: python -m pip install -r python/requirements-dev.txt
+      - name: Analyze Python sources
+        run: ruff check python scripts
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build

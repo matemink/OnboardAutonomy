@@ -1,8 +1,7 @@
 import importlib.util
-from pathlib import Path
 import sys
 import unittest
-
+from pathlib import Path
 
 MODULE_PATH = Path(__file__).parents[1] / "sitl_harness.py"
 SPEC = importlib.util.spec_from_file_location("sitl_harness", MODULE_PATH)

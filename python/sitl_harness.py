@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import json
 import math
 import os
-from pathlib import Path
 import selectors
 import signal
 import socket
 import subprocess
 import time
-from typing import Callable, TextIO
-
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import TextIO
 
 EXPECTED_INTERVALS = {
     (1, 1_000_000),

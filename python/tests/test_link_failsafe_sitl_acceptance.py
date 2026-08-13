@@ -1,5 +1,5 @@
-from dataclasses import replace
 import unittest
+from dataclasses import replace
 
 from link_failsafe_sitl_acceptance import (
     IndependentMonitorEvidence,

@@ -1,13 +1,12 @@
 import importlib.util
 import os
-from io import StringIO
-from pathlib import Path
 import sys
 import tempfile
-from types import SimpleNamespace
 import unittest
+from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
-
 
 MODULE_PATH = Path(__file__).parents[1] / "rotate_jsonl_logs.py"
 SPEC = importlib.util.spec_from_file_location("rotate_jsonl_logs", MODULE_PATH)
@@ -106,17 +105,19 @@ class LogRotationTests(unittest.TestCase):
             self.assertEqual(result.retained_bytes, 10)
 
     def test_stream_rejects_invalid_file_limit(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(ValueError, "max_file_bytes"):
-                LOG_ROTATION.stream_jsonl_logs(
-                    StringIO(),
-                    StringIO(),
-                    Path(temporary),
-                    "telemetry-test",
-                    max_files=1,
-                    max_total_bytes=1,
-                    max_file_bytes=0,
-                )
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            self.assertRaisesRegex(ValueError, "max_file_bytes"),
+        ):
+            LOG_ROTATION.stream_jsonl_logs(
+                StringIO(),
+                StringIO(),
+                Path(temporary),
+                "telemetry-test",
+                max_files=1,
+                max_total_bytes=1,
+                max_file_bytes=0,
+            )
 
     def test_stream_uses_next_suffix_when_stem_already_exists(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

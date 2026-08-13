@@ -1,8 +1,7 @@
 import importlib.util
-from pathlib import Path
 import sys
 import unittest
-
+from pathlib import Path
 
 PYTHON_ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(PYTHON_ROOT))
@@ -78,23 +77,22 @@ class AutonomySitlAcceptanceTests(unittest.TestCase):
         )
 
     def test_accuracy_statistics_cover_all_runs(self) -> None:
-        evidence = []
-        for error in (0.1, 0.2, 0.3):
-            evidence.append(
-                ACCEPTANCE.AutonomyFlightEvidence(
-                    commands=(),
-                    accepted_acknowledgements=(),
-                    maximum_relative_altitude_m=None,
-                    armed_transitions=(),
-                    modes=(),
-                    landing_target_count=0,
-                    landing_target_frames=(),
-                    position_valid_values=(),
-                    final_local_position_ne_m=None,
-                    final_horizontal_error_m=error,
-                    precision_statuses=(),
-                )
+        evidence = [
+            ACCEPTANCE.AutonomyFlightEvidence(
+                commands=(),
+                accepted_acknowledgements=(),
+                maximum_relative_altitude_m=None,
+                armed_transitions=(),
+                modes=(),
+                landing_target_count=0,
+                landing_target_frames=(),
+                position_valid_values=(),
+                final_local_position_ne_m=None,
+                final_horizontal_error_m=error,
+                precision_statuses=(),
             )
+            for error in (0.1, 0.2, 0.3)
+        ]
         result = ACCEPTANCE.landing_accuracy_statistics(evidence)
         self.assertEqual(result.runs, 3)
         self.assertAlmostEqual(result.median_error_m, 0.2)

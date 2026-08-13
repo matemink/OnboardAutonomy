@@ -57,6 +57,17 @@ function-size, and cognitive-complexity checks. The enabled checks and limits
 are defined in `.clang-tidy`; changing them requires an explicit review rather
 than silently accepting a violation.
 
+Install the Python development dependencies and run the same Ruff analysis as
+CI:
+
+```bash
+python3 -m pip install -r python/requirements-dev.txt
+ruff check python scripts
+```
+
+Every Ruff finding is blocking. The enabled rules are defined in
+`pyproject.toml`.
+
 ## Generated MAVLink telemetry
 
 Start OnboardAutonomy:

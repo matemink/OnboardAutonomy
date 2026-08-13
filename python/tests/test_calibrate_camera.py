@@ -1,13 +1,12 @@
 import importlib.util
-from pathlib import Path
 import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import cv2 as cv
 import numpy as np
-
 
 MODULE_PATH = Path(__file__).parents[1] / "calibrate_camera.py"
 SPEC = importlib.util.spec_from_file_location("calibrate_camera", MODULE_PATH)

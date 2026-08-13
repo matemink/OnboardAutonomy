@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
-from datetime import datetime
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 
 from autonomy_sitl_acceptance import (
     CAMERA_ENABLE_TOPIC,
@@ -18,7 +18,6 @@ from autonomy_sitl_acceptance import (
 )
 from link_failsafe_sitl_acceptance import wait_for_snapshot
 from sitl_harness import ProcessSupervisor, require_available_port
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PORT = 14559
@@ -255,7 +254,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     artifacts = args.artifacts_root / f"{run_id}-{os.getpid()}"
 
     print("OnboardAutonomy camera recovery acceptance")
@@ -266,7 +265,7 @@ def main() -> int:
             artifacts,
             args.timeout,
         )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - CLI reports scenario failures.
         print(f"FAILED: {error}")
         return 1
 

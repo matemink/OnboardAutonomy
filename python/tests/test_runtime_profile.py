@@ -1,9 +1,8 @@
 import importlib.util
-from pathlib import Path
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 MODULE_PATH = Path(__file__).parents[1] / "runtime_profile.py"
 SPEC = importlib.util.spec_from_file_location("runtime_profile", MODULE_PATH)

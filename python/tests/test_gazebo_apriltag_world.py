@@ -7,7 +7,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-
 PROJECT_ROOT = Path(__file__).parents[2]
 CAMERA_MODEL = (
     PROJECT_ROOT
@@ -198,12 +197,18 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             include.findtext("uri") for include in showcase.findall("include")
         }
         decorative_uris = {
-            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
-            "Oak%20tree",
-            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
-            "FoodCourtBenchShort",
-            "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
-            "Hatchback%20red",
+            (
+                "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+                "Oak%20tree"
+            ),
+            (
+                "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+                "FoodCourtBenchShort"
+            ),
+            (
+                "https://fuel.gazebosim.org/1.0/OpenRobotics/models/"
+                "Hatchback%20red"
+            ),
         }
         self.assertEqual(
             showcase_uris,

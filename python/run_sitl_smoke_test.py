@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sitl_harness import (
@@ -13,7 +13,6 @@ from sitl_harness import (
     log_tails,
     run_smoke_test,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,7 +57,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     artifacts = args.artifacts_root / f"{run_id}-{os.getpid()}"
     paths = HarnessPaths(
         ardupilot_dir=args.ardupilot_dir.expanduser().resolve(),
@@ -77,7 +76,7 @@ def main() -> int:
             timeout=args.timeout,
             scenario=args.scenario,
         )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - CLI reports scenario failures.
         print(f"\nFAILED: {error}")
         if artifacts.exists():
             print(log_tails(artifacts))

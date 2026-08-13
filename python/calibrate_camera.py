@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
 import math
-from pathlib import Path
 import statistics
 import sys
-from typing import Any, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 import cv2 as cv
 import numpy as np
-
 
 DISTORTION_ORDER = ("k1", "k2", "p1", "p2", "k3")
 
@@ -170,6 +170,7 @@ def calibrate_points(
         image_points,
         rotations,
         translations,
+        strict=True,
     ):
         projected, _ = cv.projectPoints(
             world_points,
@@ -236,6 +237,7 @@ def build_document(
         for path, error in zip(
             views.accepted,
             solution.per_view_rms_error_px,
+            strict=True,
         )
     ]
     return {
