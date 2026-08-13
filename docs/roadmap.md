@@ -205,7 +205,7 @@ Engineering focus: Embedded Linux, ARM Cortex, target deployment.
 - [x] Move from USB to the documented Pixhawk TELEM/UART connection. See
   `docs/evidence/uart-hardware.md`.
 - [ ] Record a short architecture and demonstration video.
-- [x] Publish diagrams, test evidence, performance numbers, and
+- [x] Publish the architecture overview, test evidence, performance numbers, and
   explicit simulation-versus-hardware limitations.
 
 Version 1.0 is complete only when all six checks above have evidence. The

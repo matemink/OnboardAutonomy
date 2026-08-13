@@ -2,6 +2,7 @@ build/
 build-*/
 cmake-build-*/
 .cache/
+.local/
 .venv/
 __pycache__/
 *.py[cod]
@@ -9,7 +10,6 @@ __pycache__/
 .vscode/
 compile_commands.json
 artifacts/
-docs/diagrams/generated/
 tools/images/
 tools/imager-v*.exe
 tools/gh/
