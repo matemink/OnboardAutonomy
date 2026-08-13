@@ -28,52 +28,36 @@
 namespace onboard_autonomy::adapters::camera {
 namespace {
 
-std::size_t checked_frame_size(
-    const GStreamerCameraConfig& config
-) {
-    if (config.width == 0U || config.height == 0U ||
-        config.udp_port == 0U ||
-        config.frame_timeout_ms == 0U ||
-        config.restart_delay_ms == 0U ||
+std::size_t checked_frame_size(const GStreamerCameraConfig& config) {
+    if (config.width == 0U || config.height == 0U || config.udp_port == 0U ||
+        config.frame_timeout_ms == 0U || config.restart_delay_ms == 0U ||
         config.width % 2U != 0U || config.height % 2U != 0U) {
         throw std::invalid_argument(
             "GStreamer camera dimensions and UDP port must be "
             "positive, recovery timings must be non-zero; "
-            "I420 dimensions must be even"
-        );
+            "I420 dimensions must be even");
     }
 
-    const std::uint64_t pixels =
-        static_cast<std::uint64_t>(config.width) *
-        static_cast<std::uint64_t>(config.height);
+    const std::uint64_t pixels = static_cast<std::uint64_t>(config.width) *
+                                 static_cast<std::uint64_t>(config.height);
     const std::uint64_t bytes = pixels + pixels / 2U;
     if (bytes >
-        static_cast<std::uint64_t>(
-            std::numeric_limits<std::size_t>::max()
-        )) {
-        throw std::invalid_argument(
-            "GStreamer camera frame size is too large"
-        );
+        static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+        throw std::invalid_argument("GStreamer camera frame size is too large");
     }
     return static_cast<std::size_t>(bytes);
 }
 
 #if defined(__linux__)
 
-class GStreamerCameraSource final
-    : public application::ports::CameraSource {
-public:
+class GStreamerCameraSource final : public application::ports::CameraSource {
+  public:
     explicit GStreamerCameraSource(GStreamerCameraConfig config)
-        : config_(std::move(config)),
-          frame_size_(checked_frame_size(config_)) {
+        : config_(std::move(config)), frame_size_(checked_frame_size(config_)) {
         status_.description =
-            "GStreamer RTP/H.264 UDP " +
-            std::to_string(config_.udp_port);
+            "GStreamer RTP/H.264 UDP " + std::to_string(config_.udp_port);
         worker_ = std::jthread(
-            [this](const std::stop_token stop_token) {
-                run(stop_token);
-            }
-        );
+            [this](const std::stop_token& stop_token) { run(stop_token); });
     }
 
     ~GStreamerCameraSource() override {
@@ -81,9 +65,8 @@ public:
         stop_child();
     }
 
-    [[nodiscard]] std::optional<
-        application::ports::CameraFrame
-    > take_latest_frame() override {
+    [[nodiscard]] std::optional<application::ports::CameraFrame>
+    take_latest_frame() override {
         std::scoped_lock lock(state_mutex_);
         auto frame = std::move(latest_frame_);
         latest_frame_.reset();
@@ -96,7 +79,7 @@ public:
         return status_;
     }
 
-private:
+  private:
     enum class ReadResult {
         complete,
         stopped,
@@ -105,7 +88,7 @@ private:
         failed,
     };
 
-    void run(const std::stop_token stop_token) {
+    void run(const std::stop_token& stop_token) {
         while (!stop_token.stop_requested()) {
             prepare_attempt();
             run_once(stop_token);
@@ -125,15 +108,12 @@ private:
         set_stopped();
     }
 
-    void run_once(const std::stop_token stop_token) {
+    void run_once(const std::stop_token& stop_token) {
         int video_pipe[2]{-1, -1};
         int error_pipe[2]{-1, -1};
-        if (::pipe(video_pipe) != 0 ||
-            ::pipe(error_pipe) != 0) {
-            set_failure(
-                "unable to create GStreamer pipes: " +
-                posix_error_message(errno)
-            );
+        if (::pipe(video_pipe) != 0 || ::pipe(error_pipe) != 0) {
+            set_failure("unable to create GStreamer pipes: " +
+                        posix_error_message(errno));
             close_pipe(video_pipe);
             close_pipe(error_pipe);
             return;
@@ -150,9 +130,7 @@ private:
         const pid_t child = ::fork();
         if (child == -1) {
             set_failure(
-                "unable to fork GStreamer: " +
-                posix_error_message(errno)
-            );
+                "unable to fork GStreamer: " + posix_error_message(errno));
             close_pipe(video_pipe);
             close_pipe(error_pipe);
             return;
@@ -177,20 +155,15 @@ private:
         ::close(error_pipe[1]);
         error_pipe[1] = -1;
 
-        std::thread error_reader{
-            [this, fd = error_pipe[0]] {
-                read_lines(
-                    fd,
-                    [this](const std::string_view line) {
-                        if (line.empty()) {
-                            return;
-                        }
-                        std::scoped_lock lock(state_mutex_);
-                        last_process_message_ = std::string(line);
-                    }
-                );
-            }
-        };
+        std::thread error_reader{[this, fd = error_pipe[0]] {
+            read_lines(fd, [this](const std::string_view line) {
+                if (line.empty()) {
+                    return;
+                }
+                std::scoped_lock lock(state_mutex_);
+                last_process_message_ = std::string(line);
+            });
+        }};
 
         ReadResult read_result = ReadResult::complete;
         while (!stop_token.stop_requested()) {
@@ -202,14 +175,10 @@ private:
                 .captured_at = std::nullopt,
                 .received_at = {},
             };
-            read_result = read_exact(
-                video_pipe[0],
+            read_result = read_exact(video_pipe[0],
                 frame.yuv420,
                 stop_token,
-                std::chrono::milliseconds{
-                    config_.frame_timeout_ms
-                }
-            );
+                std::chrono::milliseconds{config_.frame_timeout_ms});
             if (read_result != ReadResult::complete) {
                 break;
             }
@@ -222,8 +191,7 @@ private:
             ::kill(child, SIGINT);
         }
         int child_status = 0;
-        while (::waitpid(child, &child_status, 0) == -1 &&
-               errno == EINTR) {
+        while (::waitpid(child, &child_status, 0) == -1 && errno == EINTR) {
         }
         child_pid_.store(-1);
 
@@ -234,8 +202,7 @@ private:
         if (stop_token.stop_requested()) {
             return;
         }
-        if (status().phase ==
-            application::ports::CameraSourcePhase::failed) {
+        if (status().phase == application::ports::CameraSourcePhase::failed) {
             return;
         }
 
@@ -245,23 +212,17 @@ private:
             detail = last_process_message_;
         }
         if (read_result == ReadResult::timed_out) {
-            set_failure(
-                "GStreamer frame stalled for " +
-                std::to_string(config_.frame_timeout_ms) + " ms"
-            );
+            set_failure("GStreamer frame stalled for " +
+                        std::to_string(config_.frame_timeout_ms) + " ms");
         } else if (read_result == ReadResult::failed) {
             set_failure("failed to read the GStreamer I420 stream");
         } else if (WIFEXITED(child_status)) {
-            set_failure(
-                "gst-launch-1.0 exited with status " +
-                std::to_string(WEXITSTATUS(child_status)) +
-                (detail.empty() ? "" : ": " + detail)
-            );
+            set_failure("gst-launch-1.0 exited with status " +
+                        std::to_string(WEXITSTATUS(child_status)) +
+                        (detail.empty() ? "" : ": " + detail));
         } else if (WIFSIGNALED(child_status)) {
-            set_failure(
-                "gst-launch-1.0 stopped by signal " +
-                std::to_string(WTERMSIG(child_status))
-            );
+            set_failure("gst-launch-1.0 stopped by signal " +
+                        std::to_string(WTERMSIG(child_status)));
         } else {
             set_failure("GStreamer I420 stream ended unexpectedly");
         }
@@ -281,8 +242,7 @@ private:
         std::string pending;
         std::vector<char> buffer(4096);
         while (true) {
-            const ssize_t count =
-                ::read(fd, buffer.data(), buffer.size());
+            const ssize_t count = ::read(fd, buffer.data(), buffer.size());
             if (count == 0) {
                 break;
             }
@@ -292,16 +252,10 @@ private:
                 }
                 break;
             }
-            pending.append(
-                buffer.data(),
-                static_cast<std::size_t>(count)
-            );
+            pending.append(buffer.data(), static_cast<std::size_t>(count));
             std::size_t newline = 0U;
-            while ((newline = pending.find('\n')) !=
-                   std::string::npos) {
-                consume(
-                    std::string_view{pending}.substr(0U, newline)
-                );
+            while ((newline = pending.find('\n')) != std::string::npos) {
+                consume(std::string_view{pending}.substr(0U, newline));
                 pending.erase(0U, newline + 1U);
             }
         }
@@ -310,12 +264,10 @@ private:
         }
     }
 
-    static ReadResult read_exact(
-        const int fd,
+    static ReadResult read_exact(const int fd,
         std::vector<std::uint8_t>& destination,
-        const std::stop_token stop_token,
-        const std::chrono::milliseconds frame_timeout
-    ) {
+        const std::stop_token& stop_token,
+        const std::chrono::milliseconds frame_timeout) {
         std::size_t offset = 0U;
         auto last_progress = std::chrono::steady_clock::now();
         while (offset < destination.size()) {
@@ -329,8 +281,7 @@ private:
             };
             const int ready = ::poll(&descriptor, 1, 100);
             if (ready == 0) {
-                if (std::chrono::steady_clock::now() -
-                        last_progress >=
+                if (std::chrono::steady_clock::now() - last_progress >=
                     frame_timeout) {
                     return ReadResult::timed_out;
                 }
@@ -342,11 +293,9 @@ private:
                 }
                 return ReadResult::failed;
             }
-            const ssize_t count = ::read(
-                fd,
+            const ssize_t count = ::read(fd,
                 destination.data() + offset,
-                destination.size() - offset
-            );
+                destination.size() - offset);
             if (count == 0) {
                 return ReadResult::end_of_file;
             }
@@ -369,8 +318,7 @@ private:
     }
 
     [[nodiscard]] bool wait_for_restart(
-        const std::stop_token stop_token
-    ) const {
+        const std::stop_token& stop_token) const {
         const auto deadline =
             std::chrono::steady_clock::now() +
             std::chrono::milliseconds{config_.restart_delay_ms};
@@ -378,9 +326,7 @@ private:
             if (stop_token.stop_requested()) {
                 return false;
             }
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds{25}
-            );
+            std::this_thread::sleep_for(std::chrono::milliseconds{25});
         }
         return !stop_token.stop_requested();
     }
@@ -392,31 +338,27 @@ private:
         }
         latest_frame_ = std::move(frame);
         ++status_.produced_frames;
-        status_.phase =
-            application::ports::CameraSourcePhase::streaming;
+        status_.phase = application::ports::CameraSourcePhase::streaming;
         status_.error.clear();
     }
 
     void set_failure(std::string error) {
         std::scoped_lock lock(state_mutex_);
-        status_.phase =
-            application::ports::CameraSourcePhase::failed;
+        status_.phase = application::ports::CameraSourcePhase::failed;
         status_.error = std::move(error);
     }
 
     void set_reconnecting(std::string error) {
         std::scoped_lock lock(state_mutex_);
         latest_frame_.reset();
-        status_.phase =
-            application::ports::CameraSourcePhase::reconnecting;
+        status_.phase = application::ports::CameraSourcePhase::reconnecting;
         status_.error = std::move(error);
         ++status_.restart_count;
     }
 
     void set_stopped() {
         std::scoped_lock lock(state_mutex_);
-        status_.phase =
-            application::ports::CameraSourcePhase::stopped;
+        status_.phase = application::ports::CameraSourcePhase::stopped;
     }
 
     void stop_child() {
@@ -439,11 +381,10 @@ private:
 
 #endif
 
-}  // namespace
+} // namespace
 
 std::vector<std::string> make_gstreamer_camera_arguments(
-    const GStreamerCameraConfig& config
-) {
+    const GStreamerCameraConfig& config) {
     static_cast<void>(checked_frame_size(config));
     return {
         config.command,
@@ -451,8 +392,8 @@ std::vector<std::string> make_gstreamer_camera_arguments(
         "-e",
         "udpsrc",
         "port=" + std::to_string(config.udp_port),
-        "caps=application/x-rtp,media=video,clock-rate=90000,"
-            "encoding-name=H264,payload=96",
+        std::string{"caps=application/x-rtp,media=video,clock-rate=90000,"
+                    "encoding-name=H264,payload=96"},
         "!",
         "rtpjitterbuffer",
         "latency=" + std::to_string(config.jitter_latency_ms),
@@ -466,8 +407,7 @@ std::vector<std::string> make_gstreamer_camera_arguments(
         "!",
         "videoconvert",
         "!",
-        "video/x-raw,format=I420,width=" +
-            std::to_string(config.width) +
+        "video/x-raw,format=I420,width=" + std::to_string(config.width) +
             ",height=" + std::to_string(config.height),
         "!",
         "fdsink",
@@ -476,18 +416,15 @@ std::vector<std::string> make_gstreamer_camera_arguments(
     };
 }
 
-std::unique_ptr<application::ports::CameraSource>
-make_gstreamer_camera_source(GStreamerCameraConfig config) {
+std::unique_ptr<application::ports::CameraSource> make_gstreamer_camera_source(
+    GStreamerCameraConfig config) {
     static_cast<void>(checked_frame_size(config));
 #if defined(__linux__)
-    return std::make_unique<GStreamerCameraSource>(
-        std::move(config)
-    );
+    return std::make_unique<GStreamerCameraSource>(std::move(config));
 #else
     throw std::runtime_error(
-        "GStreamer camera source is only available on Linux"
-    );
+        "GStreamer camera source is only available on Linux");
 #endif
 }
 
-}  // namespace onboard_autonomy::adapters::camera
+} // namespace onboard_autonomy::adapters::camera

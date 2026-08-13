@@ -53,14 +53,12 @@ constexpr std::array<StreamRequest, 6> kStreamRequests{{
 constexpr auto kAcknowledgementTimeout = std::chrono::seconds(2);
 constexpr std::size_t kMaximumAttempts = 3;
 
-}  // namespace
+} // namespace
 
-std::optional<std::vector<std::uint8_t>>
-TelemetryStreamConfigurator::update(
+std::optional<std::vector<std::uint8_t>> TelemetryStreamConfigurator::update(
     const bool connected,
     const std::optional<std::uint8_t> vehicle_system_id,
-    const domain::TimePoint now
-) {
+    const domain::TimePoint now) {
     if (!connected || !vehicle_system_id.has_value()) {
         reset();
         return std::nullopt;
@@ -93,20 +91,16 @@ TelemetryStreamConfigurator::update(
     awaiting_ack_ = true;
     acknowledgement_deadline_ = now + kAcknowledgementTimeout;
 
-    return encode_set_message_interval(
-        *vehicle_system_id_,
+    return encode_set_message_interval(vehicle_system_id_.value_or(0U),
         request.message_id,
         request.interval_microseconds,
-        confirmation
-    );
+        confirmation);
 }
 
 void TelemetryStreamConfigurator::on_command_ack(
     const CommandAck& acknowledgement,
-    const domain::TimePoint now
-) {
-    if (phase_ != TelemetrySetupPhase::configuring ||
-        !awaiting_ack_ ||
+    const domain::TimePoint now) {
+    if (phase_ != TelemetrySetupPhase::configuring || !awaiting_ack_ ||
         acknowledgement.command != MAV_CMD_SET_MESSAGE_INTERVAL ||
         !vehicle_system_id_.has_value() ||
         acknowledgement.source_system != *vehicle_system_id_) {
@@ -170,12 +164,10 @@ void TelemetryStreamConfigurator::reset() {
     failure_result_.reset();
 }
 
-void TelemetryStreamConfigurator::begin(
-    const std::uint8_t vehicle_system_id
-) {
+void TelemetryStreamConfigurator::begin(const std::uint8_t vehicle_system_id) {
     reset();
     phase_ = TelemetrySetupPhase::configuring;
     vehicle_system_id_ = vehicle_system_id;
 }
 
-}  // namespace onboard_autonomy::adapters::mavlink
+} // namespace onboard_autonomy::adapters::mavlink

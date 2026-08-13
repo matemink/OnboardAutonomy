@@ -1,7 +1,7 @@
 #pragma once
 
-#include "onboard_autonomy/application/DecisionEngine.hpp"
 #include "onboard_autonomy/application/CompanionLinkFailsafe.hpp"
+#include "onboard_autonomy/application/DecisionEngine.hpp"
 #include "onboard_autonomy/application/FlightCommand.hpp"
 #include "onboard_autonomy/application/FlightStartupController.hpp"
 #include "onboard_autonomy/application/SafetySupervisor.hpp"
@@ -26,22 +26,17 @@ enum class AutonomyRuntimePhase {
 
 struct AutonomyRuntimeConfig {
     bool enabled{false};
-    std::chrono::milliseconds target_loss_land_after{
-        std::chrono::seconds(5)
-    };
+    std::chrono::milliseconds target_loss_land_after{std::chrono::seconds(5)};
     double terminal_descent_altitude_m{1.5};
     double terminal_alignment_radius_m{0.25};
     std::chrono::milliseconds terminal_alignment_duration{
-        std::chrono::milliseconds(500)
-    };
+        std::chrono::milliseconds(500)};
 };
 
 struct AutonomyRuntimeSnapshot {
     AutonomyRuntimePhase phase{AutonomyRuntimePhase::disabled};
     std::string detail{"Autonomy runtime disabled"};
-    MotionSafetyStatus motion_safety_status{
-        MotionSafetyStatus::no_intent
-    };
+    MotionSafetyStatus motion_safety_status{MotionSafetyStatus::no_intent};
     bool vision_landing_target_active{false};
     bool terminal_descent_active{false};
     std::size_t land_attempt{0};
@@ -49,50 +44,58 @@ struct AutonomyRuntimeSnapshot {
 };
 
 class AutonomyRuntime {
-public:
-    explicit AutonomyRuntime(
-        const AutonomyRuntimeConfig& config = {}
-    );
+  public:
+    explicit AutonomyRuntime(const AutonomyRuntimeConfig& config = {});
 
     [[nodiscard]] std::vector<FlightActionRequest> update(
         const domain::VehicleSnapshot& vehicle,
         const FlightStartupSnapshot& startup,
         const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
         domain::TimePoint now,
-        std::optional<domain::BodyFramePosition> landing_target =
-            std::nullopt
-    );
+        std::optional<domain::BodyFramePosition> landing_target = std::nullopt);
 
-    void on_action_sent(
-        const FlightActionRequest& request,
+    void on_action_sent(const FlightActionRequest& request,
         bool sent,
-        domain::TimePoint now
-    );
+        domain::TimePoint now);
 
-    void on_command_ack(
-        FlightAction action,
+    void on_command_ack(FlightAction action,
         FlightCommandAckOutcome outcome,
         std::uint8_t raw_result,
         std::uint8_t source_system,
-        domain::TimePoint now
-    );
+        domain::TimePoint now);
 
     void restart();
     [[nodiscard]] AutonomyRuntimeSnapshot snapshot() const;
 
-private:
-    [[nodiscard]] std::optional<FlightActionRequest>
-    update_land_command(domain::TimePoint now);
+  private:
+    [[nodiscard]] bool prepare_active_runtime(
+        const FlightStartupSnapshot& startup,
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+        domain::TimePoint now);
+    [[nodiscard]] bool validate_runtime_context(
+        const domain::VehicleSnapshot& vehicle,
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe);
+    [[nodiscard]] bool continue_landing_update(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now,
+        const std::optional<domain::BodyFramePosition>& landing_target);
+    void update_terminal_alignment(const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now,
+        const std::optional<domain::BodyFramePosition>& landing_target);
+    [[nodiscard]] std::vector<FlightActionRequest> handle_missing_target(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now);
+    [[nodiscard]] std::vector<FlightActionRequest>
+    handle_approved_motion(const DesiredMotion& intent, domain::TimePoint now);
+    [[nodiscard]] std::optional<FlightActionRequest> update_land_command(
+        domain::TimePoint now);
     void fail(std::string detail);
 
     static constexpr auto kLandingTargetInterval =
         std::chrono::milliseconds(100);
-    static constexpr auto kLandingTargetWarmup =
-        std::chrono::seconds(1);
-    static constexpr auto kAcknowledgementTimeout =
-        std::chrono::seconds(2);
-    static constexpr auto kLandingTimeout =
-        std::chrono::seconds(90);
+    static constexpr auto kLandingTargetWarmup = std::chrono::seconds(1);
+    static constexpr auto kAcknowledgementTimeout = std::chrono::seconds(2);
+    static constexpr auto kLandingTimeout = std::chrono::seconds(90);
     static constexpr std::size_t kMaximumLandAttempts = 3;
     static constexpr double kTargetStopAltitudeM = 0.20;
 
@@ -101,9 +104,7 @@ private:
     std::string detail_{"Autonomy runtime disabled"};
     DecisionEngine decision_engine_;
     SafetySupervisor safety_supervisor_;
-    MotionSafetyStatus motion_safety_status_{
-        MotionSafetyStatus::no_intent
-    };
+    MotionSafetyStatus motion_safety_status_{MotionSafetyStatus::no_intent};
     std::optional<std::uint8_t> vehicle_system_id_;
     std::optional<domain::TimePoint> land_command_after_;
     std::optional<domain::TimePoint> target_missing_since_;
@@ -119,4 +120,4 @@ private:
     std::optional<std::uint8_t> failure_result_;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

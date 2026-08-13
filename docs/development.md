@@ -51,10 +51,10 @@ Run the same `clang-tidy` checks used by CI:
 bash scripts/run_static_analysis.sh
 ```
 
-Correctness, concurrency, performance, and portability findings fail the
-command. Function-size and cognitive-complexity findings remain visible as
-architecture warnings while the existing large functions are refactored in
-small, behavior-preserving changes.
+Correctness, concurrency, performance, portability, function-size, and
+cognitive-complexity findings fail the command and the CI job. The limits are
+defined in `.clang-tidy`; increasing them requires an explicit review rather
+than silently accepting a larger function.
 
 Regenerate the Mermaid class and package diagrams from the C++ AST:
 

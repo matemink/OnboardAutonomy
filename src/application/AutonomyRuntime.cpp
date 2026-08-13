@@ -14,11 +14,9 @@ namespace onboard_autonomy::application {
 
 AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
     : config_(config) {
-    if (config_.target_loss_land_after <=
-        std::chrono::milliseconds::zero()) {
+    if (config_.target_loss_land_after <= std::chrono::milliseconds::zero()) {
         throw std::invalid_argument(
-            "target-loss LAND timeout must be positive"
-        );
+            "target-loss LAND timeout must be positive");
     }
     if (!std::isfinite(config_.terminal_descent_altitude_m) ||
         config_.terminal_descent_altitude_m <= 0.0 ||
@@ -27,8 +25,7 @@ AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
         config_.terminal_alignment_duration <=
             std::chrono::milliseconds::zero()) {
         throw std::invalid_argument(
-            "terminal-descent thresholds must be positive"
-        );
+            "terminal-descent thresholds must be positive");
     }
     if (config_.enabled) {
         restart();
@@ -40,159 +37,180 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     const FlightStartupSnapshot& startup,
     const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
     const domain::TimePoint now,
-    std::optional<domain::BodyFramePosition> landing_target
-) {
-    std::vector<FlightActionRequest> actions;
+    std::optional<domain::BodyFramePosition> landing_target) {
     if (phase_ == AutonomyRuntimePhase::disabled ||
         phase_ == AutonomyRuntimePhase::completed ||
         phase_ == AutonomyRuntimePhase::failed) {
-        return actions;
+        return {};
+    }
+    if (!prepare_active_runtime(startup, companion_link_failsafe, now) ||
+        !validate_runtime_context(vehicle, companion_link_failsafe) ||
+        !continue_landing_update(vehicle, now, landing_target)) {
+        return {};
     }
 
-    if (phase_ == AutonomyRuntimePhase::waiting_for_startup) {
-        if (startup.phase == FlightStartupPhase::failed) {
-            fail("Flight startup failed: " + startup.detail);
-            return actions;
-        }
-        if (startup.phase != FlightStartupPhase::completed) {
-            detail_ = "Waiting for verified flight startup";
-            return actions;
-        }
-        if (!companion_link_failsafe.accepted()) {
-            fail(
-                "Companion-link failsafe is not valid: " +
-                companion_link_failsafe.detail
-            );
-            return actions;
-        }
-        phase_ = AutonomyRuntimePhase::active;
-        detail_ = "Autonomy active; waiting for vision target";
-        target_missing_since_ = now;
-        next_landing_target_ = now;
-    }
+    auto world = make_world_state(vehicle, landing_target, now);
+    const auto desired = decision_engine_.decide(world);
+    const auto supervised = safety_supervisor_.supervise(world, desired, now);
+    motion_safety_status_ = supervised.status;
 
-    if (!vehicle.connected || !vehicle.system_id.has_value()) {
-        fail("Flight-controller heartbeat was lost during autonomy");
-        return actions;
+    if (!supervised.approved.has_value()) {
+        return handle_missing_target(vehicle, now);
+    }
+    return handle_approved_motion(*supervised.approved, now);
+}
+
+bool AutonomyRuntime::prepare_active_runtime(
+    const FlightStartupSnapshot& startup,
+    const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+    const domain::TimePoint now) {
+    if (phase_ != AutonomyRuntimePhase::waiting_for_startup) {
+        return true;
+    }
+    if (startup.phase == FlightStartupPhase::failed) {
+        fail("Flight startup failed: " + startup.detail);
+        return false;
+    }
+    if (startup.phase != FlightStartupPhase::completed) {
+        detail_ = "Waiting for verified flight startup";
+        return false;
     }
     if (!companion_link_failsafe.accepted()) {
-        fail(
-            "Companion-link failsafe is no longer valid: " +
-            companion_link_failsafe.detail
-        );
-        return actions;
+        fail("Companion-link failsafe is not valid: " +
+             companion_link_failsafe.detail);
+        return false;
+    }
+
+    phase_ = AutonomyRuntimePhase::active;
+    detail_ = "Autonomy active; waiting for vision target";
+    target_missing_since_ = now;
+    next_landing_target_ = now;
+    return true;
+}
+
+bool AutonomyRuntime::validate_runtime_context(
+    const domain::VehicleSnapshot& vehicle,
+    const CompanionLinkFailsafeSnapshot& companion_link_failsafe) {
+    if (!vehicle.connected || !vehicle.system_id.has_value()) {
+        fail("Flight-controller heartbeat was lost during autonomy");
+        return false;
+    }
+    if (!companion_link_failsafe.accepted()) {
+        fail("Companion-link failsafe is no longer valid: " +
+             companion_link_failsafe.detail);
+        return false;
     }
     vehicle_system_id_ = vehicle.system_id;
+    return true;
+}
 
+bool AutonomyRuntime::continue_landing_update(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now,
+    const std::optional<domain::BodyFramePosition>& landing_target) {
     if (phase_ == AutonomyRuntimePhase::landing && !vehicle.armed) {
         phase_ = AutonomyRuntimePhase::completed;
         detail_ = "Landing complete; vehicle disarmed";
         vision_landing_target_active_ = false;
-        return actions;
+        return false;
     }
     if (phase_ == AutonomyRuntimePhase::active && !vehicle.armed) {
         fail("Vehicle disarmed while autonomy was active");
-        return actions;
+        return false;
     }
-    if (phase_ == AutonomyRuntimePhase::landing &&
-        now >= landing_deadline_) {
+    if (phase_ == AutonomyRuntimePhase::landing && now >= landing_deadline_) {
         fail("Vehicle did not complete landing");
-        return actions;
+        return false;
     }
-    if (phase_ == AutonomyRuntimePhase::landing &&
-        terminal_descent_active_) {
+    if (phase_ == AutonomyRuntimePhase::landing && terminal_descent_active_) {
         vision_landing_target_active_ = false;
-        detail_ =
-            "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
-        return actions;
+        detail_ = "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
+        return false;
     }
 
-    if (phase_ == AutonomyRuntimePhase::landing &&
-        vehicle.relative_altitude_m.has_value() &&
-        *vehicle.relative_altitude_m <=
-            config_.terminal_descent_altitude_m &&
-        landing_target.has_value()) {
-        const double lateral_error_m = std::hypot(
-            landing_target->forward_m,
-            landing_target->right_m
-        );
-        if (lateral_error_m <=
-            config_.terminal_alignment_radius_m) {
-            if (!terminal_alignment_since_.has_value()) {
-                terminal_alignment_since_ = now;
-            }
-            terminal_alignment_confirmed_ =
-                now - *terminal_alignment_since_ >=
-                config_.terminal_alignment_duration;
-        } else {
-            terminal_alignment_since_.reset();
-            terminal_alignment_confirmed_ = false;
-        }
-    } else if (landing_target.has_value()) {
-        terminal_alignment_since_.reset();
-        terminal_alignment_confirmed_ = false;
-    }
+    update_terminal_alignment(vehicle, now, landing_target);
     if (phase_ == AutonomyRuntimePhase::landing &&
         vehicle.relative_altitude_m.has_value() &&
         *vehicle.relative_altitude_m <= kTargetStopAltitudeM) {
         vision_landing_target_active_ = false;
-        detail_ =
-            "Touchdown detected; waiting for ArduPilot auto-disarm";
-        return actions;
+        detail_ = "Touchdown detected; waiting for ArduPilot auto-disarm";
+        return false;
+    }
+    return true;
+}
+
+void AutonomyRuntime::update_terminal_alignment(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now,
+    const std::optional<domain::BodyFramePosition>& landing_target) {
+    const bool can_measure_alignment =
+        phase_ == AutonomyRuntimePhase::landing &&
+        vehicle.relative_altitude_m.has_value() &&
+        *vehicle.relative_altitude_m <= config_.terminal_descent_altitude_m &&
+        landing_target.has_value();
+    if (!can_measure_alignment) {
+        if (landing_target.has_value()) {
+            terminal_alignment_since_.reset();
+            terminal_alignment_confirmed_ = false;
+        }
+        return;
     }
 
-    auto world = make_world_state(
-        vehicle,
-        landing_target,
-        now
-    );
-    const auto desired = decision_engine_.decide(world);
-    const auto supervised = safety_supervisor_.supervise(
-        world,
-        desired,
-        now
-    );
-    motion_safety_status_ = supervised.status;
+    const double lateral_error_m =
+        std::hypot(landing_target->forward_m, landing_target->right_m);
+    if (lateral_error_m > config_.terminal_alignment_radius_m) {
+        terminal_alignment_since_.reset();
+        terminal_alignment_confirmed_ = false;
+        return;
+    }
+    if (!terminal_alignment_since_.has_value()) {
+        terminal_alignment_since_ = now;
+    }
+    terminal_alignment_confirmed_ =
+        now - *terminal_alignment_since_ >= config_.terminal_alignment_duration;
+}
 
-    if (!supervised.approved.has_value()) {
-        vision_landing_target_active_ = false;
-        land_command_after_.reset();
-        next_landing_target_ = now;
-        if (!target_missing_since_.has_value()) {
-            target_missing_since_ = now;
-        }
+std::vector<FlightActionRequest> AutonomyRuntime::handle_missing_target(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now) {
+    vision_landing_target_active_ = false;
+    land_command_after_.reset();
+    next_landing_target_ = now;
+    if (!target_missing_since_.has_value()) {
+        target_missing_since_ = now;
+    }
 
-        if (phase_ == AutonomyRuntimePhase::landing) {
-            if (vehicle.relative_altitude_m.has_value() &&
-                *vehicle.relative_altitude_m <=
-                    config_.terminal_descent_altitude_m &&
-                terminal_alignment_confirmed_) {
-                terminal_descent_active_ = true;
-                detail_ =
-                    "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
-            } else {
-                terminal_alignment_since_.reset();
-                terminal_alignment_confirmed_ = false;
-                detail_ =
-                    "Landing without a fresh vision target";
-            }
-            return actions;
-        }
-
-        if (now - *target_missing_since_ >=
-            config_.target_loss_land_after) {
-            detail_ = "Vision unavailable; requesting fallback LAND";
-            if (auto land = update_land_command(now)) {
-                actions.push_back(*land);
-            }
+    if (phase_ == AutonomyRuntimePhase::landing) {
+        if (vehicle.relative_altitude_m.has_value() &&
+            *vehicle.relative_altitude_m <=
+                config_.terminal_descent_altitude_m &&
+            terminal_alignment_confirmed_) {
+            terminal_descent_active_ = true;
+            detail_ = "TARGET OUT OF VIEW - TERMINAL DESCENT CONTINUES";
         } else {
-            detail_ = "Waiting for a fresh confirmed vision target";
+            terminal_alignment_since_.reset();
+            terminal_alignment_confirmed_ = false;
+            detail_ = "Landing without a fresh vision target";
         }
-        return actions;
+        return {};
     }
 
+    if (now - *target_missing_since_ < config_.target_loss_land_after) {
+        detail_ = "Waiting for a fresh confirmed vision target";
+        return {};
+    }
+    detail_ = "Vision unavailable; requesting fallback LAND";
+    if (auto land = update_land_command(now)) {
+        return {*land};
+    }
+    return {};
+}
+
+std::vector<FlightActionRequest> AutonomyRuntime::handle_approved_motion(
+    const DesiredMotion& intent,
+    const domain::TimePoint now) {
+    std::vector<FlightActionRequest> actions;
     target_missing_since_.reset();
-    const auto& intent = *supervised.approved;
     if (!land_command_after_.has_value() &&
         phase_ == AutonomyRuntimePhase::active) {
         land_command_after_ = now + kLandingTargetWarmup;
@@ -200,34 +218,28 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     }
 
     if (now >= next_landing_target_) {
-        const auto elapsed = std::chrono::duration_cast<
-            std::chrono::microseconds
-        >(now.time_since_epoch());
-        actions.push_back(
-            FlightActionRequest{
-                .action = FlightAction::landing_target,
-                .vehicle_system_id = intent.vehicle_system_id,
-                .x_m = intent.landing_target.forward_m,
-                .y_m = intent.landing_target.right_m,
-                .z_m = intent.landing_target.down_m,
-                .time_usec =
-                    static_cast<std::uint64_t>(elapsed.count()),
-            }
-        );
+        const auto elapsed =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                now.time_since_epoch());
+        actions.push_back({
+            .action = FlightAction::landing_target,
+            .vehicle_system_id = intent.vehicle_system_id,
+            .x_m = intent.landing_target.forward_m,
+            .y_m = intent.landing_target.right_m,
+            .z_m = intent.landing_target.down_m,
+            .time_usec = static_cast<std::uint64_t>(elapsed.count()),
+        });
         next_landing_target_ = now + kLandingTargetInterval;
     }
-
     if (phase_ == AutonomyRuntimePhase::active &&
-        land_command_after_.has_value() &&
-        now >= *land_command_after_) {
+        land_command_after_.has_value() && now >= *land_command_after_) {
         if (auto land = update_land_command(now)) {
             actions.push_back(*land);
         }
     }
 
     std::ostringstream target;
-    target << "Vision target F/R/D "
-           << std::fixed << std::setprecision(1)
+    target << "Vision target F/R/D " << std::fixed << std::setprecision(1)
            << intent.landing_target.forward_m << "/"
            << intent.landing_target.right_m << "/"
            << intent.landing_target.down_m << " m";
@@ -235,11 +247,9 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     return actions;
 }
 
-void AutonomyRuntime::on_action_sent(
-    const FlightActionRequest& request,
+void AutonomyRuntime::on_action_sent(const FlightActionRequest& request,
     const bool sent,
-    const domain::TimePoint
-) {
+    const domain::TimePoint) {
     if (request.action == FlightAction::landing_target) {
         vision_landing_target_active_ = sent;
         if (!sent) {
@@ -257,13 +267,11 @@ void AutonomyRuntime::on_action_sent(
     }
 }
 
-void AutonomyRuntime::on_command_ack(
-    const FlightAction action,
+void AutonomyRuntime::on_command_ack(const FlightAction action,
     const FlightCommandAckOutcome outcome,
     const std::uint8_t raw_result,
     const std::uint8_t source_system,
-    const domain::TimePoint now
-) {
+    const domain::TimePoint now) {
     if (action != FlightAction::land || !awaiting_land_ack_ ||
         !vehicle_system_id_.has_value() ||
         source_system != *vehicle_system_id_) {
@@ -271,24 +279,20 @@ void AutonomyRuntime::on_command_ack(
     }
 
     switch (outcome) {
-        case FlightCommandAckOutcome::accepted:
-            awaiting_land_ack_ = false;
-            phase_ = AutonomyRuntimePhase::landing;
-            landing_deadline_ = now + kLandingTimeout;
-            detail_ = "LAND accepted; monitoring descent";
-            break;
-        case FlightCommandAckOutcome::in_progress:
-            acknowledgement_deadline_ =
-                now + kAcknowledgementTimeout;
-            detail_ = "LAND is in progress";
-            break;
-        case FlightCommandAckOutcome::rejected:
-            failure_result_ = raw_result;
-            fail(
-                "LAND was rejected with MAV_RESULT " +
-                std::to_string(raw_result)
-            );
-            break;
+    case FlightCommandAckOutcome::accepted:
+        awaiting_land_ack_ = false;
+        phase_ = AutonomyRuntimePhase::landing;
+        landing_deadline_ = now + kLandingTimeout;
+        detail_ = "LAND accepted; monitoring descent";
+        break;
+    case FlightCommandAckOutcome::in_progress:
+        acknowledgement_deadline_ = now + kAcknowledgementTimeout;
+        detail_ = "LAND is in progress";
+        break;
+    case FlightCommandAckOutcome::rejected:
+        failure_result_ = raw_result;
+        fail("LAND was rejected with MAV_RESULT " + std::to_string(raw_result));
+        break;
     }
 }
 
@@ -321,16 +325,15 @@ AutonomyRuntimeSnapshot AutonomyRuntime::snapshot() const {
         .phase = phase_,
         .detail = detail_,
         .motion_safety_status = motion_safety_status_,
-        .vision_landing_target_active =
-            vision_landing_target_active_,
+        .vision_landing_target_active = vision_landing_target_active_,
         .terminal_descent_active = terminal_descent_active_,
         .land_attempt = land_attempt_,
         .failure_result = failure_result_,
     };
 }
 
-std::optional<FlightActionRequest>
-AutonomyRuntime::update_land_command(const domain::TimePoint now) {
+std::optional<FlightActionRequest> AutonomyRuntime::update_land_command(
+    const domain::TimePoint now) {
     if (phase_ != AutonomyRuntimePhase::active) {
         return std::nullopt;
     }
@@ -349,8 +352,7 @@ AutonomyRuntime::update_land_command(const domain::TimePoint now) {
         return std::nullopt;
     }
 
-    const auto confirmation =
-        static_cast<std::uint8_t>(land_attempt_);
+    const auto confirmation = static_cast<std::uint8_t>(land_attempt_);
     ++land_attempt_;
     awaiting_land_ack_ = true;
     acknowledgement_deadline_ = now + kAcknowledgementTimeout;
@@ -368,4 +370,4 @@ void AutonomyRuntime::fail(std::string detail) {
     vision_landing_target_active_ = false;
 }
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

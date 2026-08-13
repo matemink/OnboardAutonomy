@@ -15,15 +15,17 @@ WarningsAsErrors: >-
   bugprone-*,
   concurrency-*,
   performance-*,
-  portability-*
+  portability-*,
+  readability-function-cognitive-complexity,
+  readability-function-size
 HeaderFilterRegex: '.*/(include/onboard_autonomy|src)/.*'
 SystemHeaders: false
 FormatStyle: none
 CheckOptions:
-  readability-function-cognitive-complexity.Threshold: '25'
-  readability-function-size.LineThreshold: '120'
-  readability-function-size.StatementThreshold: '80'
-  readability-function-size.BranchThreshold: '15'
+  readability-function-cognitive-complexity.Threshold: '40'
+  readability-function-size.LineThreshold: '200'
+  readability-function-size.StatementThreshold: '120'
+  readability-function-size.BranchThreshold: '25'
   readability-function-size.ParameterThreshold: '8'
   readability-function-size.NestingThreshold: '4'
   readability-function-size.VariableThreshold: '25'

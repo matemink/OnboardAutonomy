@@ -31,34 +31,24 @@
 namespace onboard_autonomy::adapters::camera {
 namespace {
 
-constexpr std::string_view kFrameWallClockKey{
-    "\"FrameWallClock\""
-};
+constexpr std::string_view kFrameWallClockKey{"\"FrameWallClock\""};
 
-std::size_t checked_frame_size(
-    const RpicamCameraConfig& config
-) {
+std::size_t checked_frame_size(const RpicamCameraConfig& config) {
     if (config.width == 0U || config.height == 0U ||
-        config.frames_per_second == 0U ||
-        config.frame_timeout_ms == 0U ||
-        config.restart_delay_ms == 0U ||
-        config.width % 2U != 0U ||
+        config.frames_per_second == 0U || config.frame_timeout_ms == 0U ||
+        config.restart_delay_ms == 0U || config.width % 2U != 0U ||
         config.height % 2U != 0U) {
         throw std::invalid_argument(
             "camera width, height and FPS must be positive; "
             "recovery timings must be non-zero; YUV420 dimensions "
-            "must be even"
-        );
+            "must be even");
     }
 
-    const std::uint64_t pixels =
-        static_cast<std::uint64_t>(config.width) *
-        static_cast<std::uint64_t>(config.height);
+    const std::uint64_t pixels = static_cast<std::uint64_t>(config.width) *
+                                 static_cast<std::uint64_t>(config.height);
     const std::uint64_t bytes = pixels + pixels / 2U;
     if (bytes >
-        static_cast<std::uint64_t>(
-            std::numeric_limits<std::size_t>::max()
-        )) {
+        static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
         throw std::invalid_argument("camera frame size is too large");
     }
     return static_cast<std::size_t>(bytes);
@@ -66,19 +56,15 @@ std::size_t checked_frame_size(
 
 #if defined(__linux__)
 
-class RpicamCameraSource final
-    : public application::ports::CameraSource {
-public:
+class RpicamCameraSource final : public application::ports::CameraSource {
+  public:
     explicit RpicamCameraSource(RpicamCameraConfig config)
-        : config_(std::move(config)),
-          frame_size_(checked_frame_size(config_)),
-          worker_([this](const std::stop_token stop_token) {
-              run(stop_token);
-          }) {
+        : config_(std::move(config)), frame_size_(checked_frame_size(config_)),
+          worker_(
+              [this](const std::stop_token& stop_token) { run(stop_token); }) {
         std::scoped_lock lock(state_mutex_);
         status_.description =
-            "rpicam-vid camera " +
-            std::to_string(config_.camera_index);
+            "rpicam-vid camera " + std::to_string(config_.camera_index);
     }
 
     ~RpicamCameraSource() override {
@@ -87,9 +73,8 @@ public:
         metadata_ready_.notify_all();
     }
 
-    [[nodiscard]] std::optional<
-        application::ports::CameraFrame
-    > take_latest_frame() override {
+    [[nodiscard]] std::optional<application::ports::CameraFrame>
+    take_latest_frame() override {
         std::scoped_lock lock(state_mutex_);
         auto frame = std::move(latest_frame_);
         latest_frame_.reset();
@@ -102,7 +87,7 @@ public:
         return status_;
     }
 
-private:
+  private:
     enum class ReadResult {
         complete,
         stopped,
@@ -111,7 +96,7 @@ private:
         failed,
     };
 
-    void run(const std::stop_token stop_token) {
+    void run(const std::stop_token& stop_token) {
         while (!stop_token.stop_requested()) {
             prepare_attempt();
             run_once(stop_token);
@@ -131,17 +116,14 @@ private:
         set_stopped();
     }
 
-    void run_once(const std::stop_token stop_token) {
+    void run_once(const std::stop_token& stop_token) {
         int video_pipe[2]{-1, -1};
         int metadata_pipe[2]{-1, -1};
         int error_pipe[2]{-1, -1};
-        if (::pipe(video_pipe) != 0 ||
-            ::pipe(metadata_pipe) != 0 ||
+        if (::pipe(video_pipe) != 0 || ::pipe(metadata_pipe) != 0 ||
             ::pipe(error_pipe) != 0) {
             set_failure(
-                "unable to create rpicam pipes: " +
-                posix_error_message(errno)
-            );
+                "unable to create rpicam pipes: " + posix_error_message(errno));
             close_pipe(video_pipe);
             close_pipe(metadata_pipe);
             close_pipe(error_pipe);
@@ -149,8 +131,7 @@ private:
         }
 
         const std::string metadata_path =
-            "/proc/self/fd/" +
-            std::to_string(metadata_pipe[1]);
+            "/proc/self/fd/" + std::to_string(metadata_pipe[1]);
         auto arguments = make_arguments(metadata_path);
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1U);
@@ -162,9 +143,7 @@ private:
         const pid_t child = ::fork();
         if (child == -1) {
             set_failure(
-                "unable to fork rpicam-vid: " +
-                posix_error_message(errno)
-            );
+                "unable to fork rpicam-vid: " + posix_error_message(errno));
             close_pipe(video_pipe);
             close_pipe(metadata_pipe);
             close_pipe(error_pipe);
@@ -193,41 +172,28 @@ private:
         ::close(error_pipe[1]);
         error_pipe[1] = -1;
 
-        std::thread metadata_reader{
-            [this, fd = metadata_pipe[0]] {
-                read_lines(
-                    fd,
-                    [this](const std::string_view line) {
-                        const auto timestamp =
-                            parse_rpicam_frame_wall_clock_ns(line);
-                        if (!timestamp.has_value()) {
-                            return;
-                        }
-                        {
-                            std::scoped_lock lock(metadata_mutex_);
-                            metadata_timestamps_.push_back(
-                                *timestamp
-                            );
-                        }
-                        metadata_ready_.notify_one();
-                    }
-                );
-            }
-        };
-        std::thread error_reader{
-            [this, fd = error_pipe[0]] {
-                read_lines(
-                    fd,
-                    [this](const std::string_view line) {
-                        if (line.empty()) {
-                            return;
-                        }
-                        std::scoped_lock lock(state_mutex_);
-                        last_process_message_ = std::string(line);
-                    }
-                );
-            }
-        };
+        std::thread metadata_reader{[this, fd = metadata_pipe[0]] {
+            read_lines(fd, [this](const std::string_view line) {
+                const auto timestamp = parse_rpicam_frame_wall_clock_ns(line);
+                if (!timestamp.has_value()) {
+                    return;
+                }
+                {
+                    std::scoped_lock lock(metadata_mutex_);
+                    metadata_timestamps_.push_back(*timestamp);
+                }
+                metadata_ready_.notify_one();
+            });
+        }};
+        std::thread error_reader{[this, fd = error_pipe[0]] {
+            read_lines(fd, [this](const std::string_view line) {
+                if (line.empty()) {
+                    return;
+                }
+                std::scoped_lock lock(state_mutex_);
+                last_process_message_ = std::string(line);
+            });
+        }};
 
         ReadResult read_result = ReadResult::complete;
         while (!stop_token.stop_requested()) {
@@ -239,36 +205,27 @@ private:
                 .captured_at = std::nullopt,
                 .received_at = {},
             };
-            read_result = read_exact(
-                video_pipe[0],
+            read_result = read_exact(video_pipe[0],
                 frame.yuv420,
                 stop_token,
-                std::chrono::milliseconds{
-                    config_.frame_timeout_ms
-                }
-            );
+                std::chrono::milliseconds{config_.frame_timeout_ms});
             if (read_result != ReadResult::complete) {
                 break;
             }
             frame.sequence = ++next_sequence_;
-            frame.received_at =
-                std::chrono::system_clock::now();
+            frame.received_at = std::chrono::system_clock::now();
 
-            const auto capture_timestamp =
-                wait_for_metadata(stop_token);
+            const auto capture_timestamp = wait_for_metadata(stop_token);
             if (!capture_timestamp.has_value()) {
                 if (!stop_token.stop_requested()) {
-                    set_failure(
-                        "camera frame arrived without FrameWallClock "
-                        "metadata"
-                    );
+                    set_failure("camera frame arrived without FrameWallClock "
+                                "metadata");
                 }
                 break;
             }
-            frame.captured_at =
-                std::chrono::system_clock::time_point{
-                    std::chrono::nanoseconds(*capture_timestamp),
-                };
+            frame.captured_at = std::chrono::system_clock::time_point{
+                std::chrono::nanoseconds(*capture_timestamp),
+            };
             publish(std::move(frame));
         }
 
@@ -276,8 +233,7 @@ private:
             ::kill(child, SIGINT);
         }
         int child_status = 0;
-        while (::waitpid(child, &child_status, 0) == -1 &&
-               errno == EINTR) {
+        while (::waitpid(child, &child_status, 0) == -1 && errno == EINTR) {
         }
         child_pid_.store(-1);
 
@@ -290,8 +246,7 @@ private:
         if (stop_token.stop_requested()) {
             return;
         }
-        if (status().phase ==
-            application::ports::CameraSourcePhase::failed) {
+        if (status().phase == application::ports::CameraSourcePhase::failed) {
             return;
         }
 
@@ -301,31 +256,24 @@ private:
             detail = last_process_message_;
         }
         if (read_result == ReadResult::timed_out) {
-            set_failure(
-                "rpicam frame stalled for " +
-                std::to_string(config_.frame_timeout_ms) + " ms"
-            );
+            set_failure("rpicam frame stalled for " +
+                        std::to_string(config_.frame_timeout_ms) + " ms");
         } else if (read_result == ReadResult::failed) {
             set_failure("failed to read the rpicam YUV stream");
         } else if (WIFEXITED(child_status)) {
-            set_failure(
-                "rpicam-vid exited with status " +
-                std::to_string(WEXITSTATUS(child_status)) +
-                (detail.empty() ? "" : ": " + detail)
-            );
+            set_failure("rpicam-vid exited with status " +
+                        std::to_string(WEXITSTATUS(child_status)) +
+                        (detail.empty() ? "" : ": " + detail));
         } else if (WIFSIGNALED(child_status)) {
-            set_failure(
-                "rpicam-vid stopped by signal " +
-                std::to_string(WTERMSIG(child_status))
-            );
+            set_failure("rpicam-vid stopped by signal " +
+                        std::to_string(WTERMSIG(child_status)));
         } else {
             set_failure("rpicam YUV stream ended unexpectedly");
         }
     }
 
     [[nodiscard]] std::vector<std::string> make_arguments(
-        const std::string& metadata_path
-    ) const {
+        const std::string& metadata_path) const {
         return {
             config_.command,
             "--camera",
@@ -369,8 +317,7 @@ private:
         std::string pending;
         std::vector<char> buffer(4096);
         while (true) {
-            const ssize_t count =
-                ::read(fd, buffer.data(), buffer.size());
+            const ssize_t count = ::read(fd, buffer.data(), buffer.size());
             if (count == 0) {
                 break;
             }
@@ -380,16 +327,10 @@ private:
                 }
                 break;
             }
-            pending.append(
-                buffer.data(),
-                static_cast<std::size_t>(count)
-            );
+            pending.append(buffer.data(), static_cast<std::size_t>(count));
             std::size_t newline = 0;
-            while ((newline = pending.find('\n')) !=
-                   std::string::npos) {
-                consume(
-                    std::string_view{pending}.substr(0, newline)
-                );
+            while ((newline = pending.find('\n')) != std::string::npos) {
+                consume(std::string_view{pending}.substr(0, newline));
                 pending.erase(0, newline + 1U);
             }
         }
@@ -398,12 +339,10 @@ private:
         }
     }
 
-    static ReadResult read_exact(
-        const int fd,
+    static ReadResult read_exact(const int fd,
         std::vector<std::uint8_t>& destination,
-        const std::stop_token stop_token,
-        const std::chrono::milliseconds frame_timeout
-    ) {
+        const std::stop_token& stop_token,
+        const std::chrono::milliseconds frame_timeout) {
         std::size_t offset = 0;
         auto last_progress = std::chrono::steady_clock::now();
         while (offset < destination.size()) {
@@ -417,8 +356,7 @@ private:
             };
             const int ready = ::poll(&descriptor, 1, 100);
             if (ready == 0) {
-                if (std::chrono::steady_clock::now() -
-                        last_progress >=
+                if (std::chrono::steady_clock::now() - last_progress >=
                     frame_timeout) {
                     return ReadResult::timed_out;
                 }
@@ -430,11 +368,9 @@ private:
                 }
                 return ReadResult::failed;
             }
-            const ssize_t count = ::read(
-                fd,
+            const ssize_t count = ::read(fd,
                 destination.data() + offset,
-                destination.size() - offset
-            );
+                destination.size() - offset);
             if (count == 0) {
                 return ReadResult::end_of_file;
             }
@@ -450,17 +386,15 @@ private:
         return ReadResult::complete;
     }
 
-    [[nodiscard]] std::optional<std::int64_t>
-    wait_for_metadata(const std::stop_token stop_token) {
+    [[nodiscard]] std::optional<std::int64_t> wait_for_metadata(
+        const std::stop_token& stop_token) {
         std::unique_lock lock(metadata_mutex_);
-        const bool ready = metadata_ready_.wait_for(
-            lock,
+        const bool ready = metadata_ready_.wait_for(lock,
             std::chrono::milliseconds{config_.frame_timeout_ms},
             [this, stop_token] {
                 return !metadata_timestamps_.empty() ||
                        stop_token.stop_requested();
-            }
-        );
+            });
         if (!ready || metadata_timestamps_.empty()) {
             return std::nullopt;
         }
@@ -482,8 +416,7 @@ private:
     }
 
     [[nodiscard]] bool wait_for_restart(
-        const std::stop_token stop_token
-    ) const {
+        const std::stop_token& stop_token) const {
         const auto deadline =
             std::chrono::steady_clock::now() +
             std::chrono::milliseconds{config_.restart_delay_ms};
@@ -491,9 +424,7 @@ private:
             if (stop_token.stop_requested()) {
                 return false;
             }
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds{25}
-            );
+            std::this_thread::sleep_for(std::chrono::milliseconds{25});
         }
         return !stop_token.stop_requested();
     }
@@ -505,31 +436,27 @@ private:
         }
         latest_frame_ = std::move(frame);
         ++status_.produced_frames;
-        status_.phase =
-            application::ports::CameraSourcePhase::streaming;
+        status_.phase = application::ports::CameraSourcePhase::streaming;
         status_.error.clear();
     }
 
     void set_failure(std::string error) {
         std::scoped_lock lock(state_mutex_);
-        status_.phase =
-            application::ports::CameraSourcePhase::failed;
+        status_.phase = application::ports::CameraSourcePhase::failed;
         status_.error = std::move(error);
     }
 
     void set_reconnecting(std::string error) {
         std::scoped_lock lock(state_mutex_);
         latest_frame_.reset();
-        status_.phase =
-            application::ports::CameraSourcePhase::reconnecting;
+        status_.phase = application::ports::CameraSourcePhase::reconnecting;
         status_.error = std::move(error);
         ++status_.restart_count;
     }
 
     void set_stopped() {
         std::scoped_lock lock(state_mutex_);
-        status_.phase =
-            application::ports::CameraSourcePhase::stopped;
+        status_.phase = application::ports::CameraSourcePhase::stopped;
     }
 
     void stop_child() {
@@ -555,10 +482,10 @@ private:
 
 #endif
 
-}  // namespace
+} // namespace
 
-std::optional<std::int64_t>
-parse_rpicam_frame_wall_clock_ns(const std::string_view line) {
+std::optional<std::int64_t> parse_rpicam_frame_wall_clock_ns(
+    const std::string_view line) {
     const auto key = line.find(kFrameWallClockKey);
     if (key == std::string_view::npos) {
         return std::nullopt;
@@ -568,44 +495,30 @@ parse_rpicam_frame_wall_clock_ns(const std::string_view line) {
         return std::nullopt;
     }
 
-    const auto first = line.find_first_of(
-        "0123456789",
-        colon + 1U
-    );
+    const auto first = line.find_first_of("0123456789", colon + 1U);
     if (first == std::string_view::npos) {
         return std::nullopt;
     }
-    const auto last = line.find_first_not_of(
-        "0123456789",
-        first
-    );
+    const auto last = line.find_first_not_of("0123456789", first);
     const auto value = line.substr(first, last - first);
 
     std::int64_t timestamp = 0;
-    const auto [end, error] = std::from_chars(
-        value.data(),
-        value.data() + value.size(),
-        timestamp
-    );
-    if (error != std::errc{} ||
-        end != value.data() + value.size()) {
+    const auto [end, error] =
+        std::from_chars(value.data(), value.data() + value.size(), timestamp);
+    if (error != std::errc{} || end != value.data() + value.size()) {
         return std::nullopt;
     }
     return timestamp;
 }
 
-std::unique_ptr<application::ports::CameraSource>
-make_rpicam_camera_source(RpicamCameraConfig config) {
+std::unique_ptr<application::ports::CameraSource> make_rpicam_camera_source(
+    RpicamCameraConfig config) {
     static_cast<void>(checked_frame_size(config));
 #if defined(__linux__)
-    return std::make_unique<RpicamCameraSource>(
-        std::move(config)
-    );
+    return std::make_unique<RpicamCameraSource>(std::move(config));
 #else
-    throw std::runtime_error(
-        "rpicam camera source is only available on Linux"
-    );
+    throw std::runtime_error("rpicam camera source is only available on Linux");
 #endif
 }
 
-}  // namespace onboard_autonomy::adapters::camera
+} // namespace onboard_autonomy::adapters::camera

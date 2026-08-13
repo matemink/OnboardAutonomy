@@ -27,44 +27,41 @@ bool is_multicopter(const std::optional<std::uint8_t> vehicle_type) {
     }
 
     switch (*vehicle_type) {
-        case 2:
-        case 3:
-        case 4:
-        case 13:
-        case 14:
-        case 15:
-            return true;
-        default:
-            return false;
+    case 2:
+    case 3:
+    case 4:
+    case 13:
+    case 14:
+    case 15:
+        return true;
+    default:
+        return false;
     }
 }
 
 std::string action_name(const FlightAction action) {
     switch (action) {
-        case FlightAction::set_guided_mode:
-            return "GUIDED mode";
-        case FlightAction::arm:
-            return "arm";
-        case FlightAction::takeoff:
-            return "takeoff";
-        case FlightAction::return_to_launch:
-            return "RTL";
-        case FlightAction::land:
-            return "land";
-        case FlightAction::landing_target:
-            return "landing target";
+    case FlightAction::set_guided_mode:
+        return "GUIDED mode";
+    case FlightAction::arm:
+        return "arm";
+    case FlightAction::takeoff:
+        return "takeoff";
+    case FlightAction::return_to_launch:
+        return "RTL";
+    case FlightAction::land:
+        return "land";
+    case FlightAction::landing_target:
+        return "landing target";
     }
     return "unknown action";
 }
 
-std::string altitude_detail(
-    const std::optional<double> altitude_m,
-    const double target_m
-) {
+std::string altitude_detail(const std::optional<double> altitude_m,
+    const double target_m) {
     std::ostringstream output;
     if (altitude_m.has_value()) {
-        output << std::fixed << std::setprecision(2)
-               << *altitude_m << " m";
+        output << std::fixed << std::setprecision(2) << *altitude_m << " m";
     } else {
         output << "waiting for altitude";
     }
@@ -72,16 +69,14 @@ std::string altitude_detail(
     return output.str();
 }
 
-}  // namespace
+} // namespace
 
-FlightStartupController::FlightStartupController(
-    FlightStartupConfig config
-) : config_(std::move(config)) {
+FlightStartupController::FlightStartupController(FlightStartupConfig config)
+    : config_(config) {
     if (!std::isfinite(config_.takeoff_altitude_m) ||
         config_.takeoff_altitude_m <= 0.0) {
         throw std::invalid_argument(
-            "takeoff altitude must be finite and positive"
-        );
+            "takeoff altitude must be finite and positive");
     }
     if (config_.enabled) {
         restart();
@@ -92,8 +87,7 @@ std::vector<FlightActionRequest> FlightStartupController::update(
     const domain::VehicleSnapshot& vehicle,
     const bool telemetry_ready,
     const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
-    const domain::TimePoint now
-) {
+    const domain::TimePoint now) {
     std::vector<FlightActionRequest> actions;
     if (phase_ == FlightStartupPhase::disabled ||
         phase_ == FlightStartupPhase::completed ||
@@ -101,141 +95,17 @@ std::vector<FlightActionRequest> FlightStartupController::update(
         return actions;
     }
 
-    if (phase_ != FlightStartupPhase::waiting_for_vehicle &&
-        !vehicle.connected) {
-        fail("Flight-controller heartbeat was lost during startup");
-        return actions;
-    }
-    if (phase_ != FlightStartupPhase::waiting_for_vehicle &&
-        phase_ != FlightStartupPhase::waiting_for_readiness &&
-        !companion_link_failsafe.accepted()) {
-        fail(
-            "Companion-link failsafe is no longer valid: " +
-            companion_link_failsafe.detail
-        );
+    if (!validate_active_context(vehicle, companion_link_failsafe)) {
         return actions;
     }
 
     for (int transition = 0; transition < 8; ++transition) {
-        switch (phase_) {
-            case FlightStartupPhase::waiting_for_vehicle:
-                if (!vehicle.connected ||
-                    !vehicle.system_id.has_value()) {
-                    return actions;
-                }
-                if (vehicle.autopilot_type !=
-                        kArduPilotAutopilotType ||
-                    !is_multicopter(vehicle.vehicle_type)) {
-                    fail(
-                        "Autonomy requires an ArduPilot multicopter"
-                    );
-                    return actions;
-                }
-                vehicle_system_id_ = vehicle.system_id;
-                enter_phase(
-                    FlightStartupPhase::waiting_for_readiness,
-                    now
-                );
-                continue;
-
-            case FlightStartupPhase::waiting_for_readiness:
-                if (now >= phase_deadline_) {
-                    fail(
-                        "Vehicle did not become ready within 90 seconds"
-                    );
-                    return actions;
-                }
-                if (telemetry_ready && vehicle.armable &&
-                    !vehicle.armed &&
-                    companion_link_failsafe.accepted() &&
-                    vehicle.relative_altitude_m.has_value()) {
-                    enter_phase(
-                        FlightStartupPhase::setting_guided,
-                        now
-                    );
-                    continue;
-                }
-                update_readiness_detail(
-                    vehicle,
-                    telemetry_ready,
-                    companion_link_failsafe
-                );
-                return actions;
-
-            case FlightStartupPhase::setting_guided:
-                if (command_accepted_ &&
-                    vehicle.flight_mode == kCopterGuidedMode) {
-                    enter_phase(FlightStartupPhase::arming, now);
-                    continue;
-                }
-                if (now >= phase_deadline_) {
-                    fail("ArduCopter did not enter GUIDED mode");
-                    return actions;
-                }
-                if (auto request = update_command(
-                        FlightAction::set_guided_mode,
-                        now
-                    )) {
-                    actions.push_back(*request);
-                }
-                return actions;
-
-            case FlightStartupPhase::arming:
-                if (command_accepted_ && vehicle.armed) {
-                    enter_phase(FlightStartupPhase::taking_off, now);
-                    continue;
-                }
-                if (now >= phase_deadline_) {
-                    fail("ArduCopter did not become armed");
-                    return actions;
-                }
-                if (auto request = update_command(
-                        FlightAction::arm,
-                        now
-                    )) {
-                    actions.push_back(*request);
-                }
-                return actions;
-
-            case FlightStartupPhase::taking_off:
-                if (!vehicle.armed && command_accepted_) {
-                    fail("Vehicle disarmed during takeoff");
-                    return actions;
-                }
-                if (command_accepted_ &&
-                    vehicle.relative_altitude_m.has_value() &&
-                    *vehicle.relative_altitude_m >=
-                        config_.takeoff_altitude_m -
-                            kAltitudeToleranceM) {
-                    phase_ = FlightStartupPhase::completed;
-                    detail_ = "Takeoff complete; autonomy may start";
-                    attempt_ = 0;
-                    awaiting_ack_ = false;
-                    return actions;
-                }
-                if (now >= phase_deadline_) {
-                    fail("Vehicle did not reach takeoff altitude");
-                    return actions;
-                }
-                if (command_accepted_) {
-                    detail_ = "Climbing: " + altitude_detail(
-                        vehicle.relative_altitude_m,
-                        config_.takeoff_altitude_m
-                    );
-                }
-                if (auto request = update_command(
-                        FlightAction::takeoff,
-                        now
-                    )) {
-                    request->altitude_m = config_.takeoff_altitude_m;
-                    actions.push_back(*request);
-                }
-                return actions;
-
-            case FlightStartupPhase::disabled:
-            case FlightStartupPhase::completed:
-            case FlightStartupPhase::failed:
-                return actions;
+        if (update_current_phase(vehicle,
+                telemetry_ready,
+                companion_link_failsafe,
+                now,
+                actions) == PhaseUpdate::stop) {
+            return actions;
         }
     }
 
@@ -243,11 +113,162 @@ std::vector<FlightActionRequest> FlightStartupController::update(
     return actions;
 }
 
-void FlightStartupController::on_action_sent(
-    const FlightActionRequest& request,
+bool FlightStartupController::validate_active_context(
+    const domain::VehicleSnapshot& vehicle,
+    const CompanionLinkFailsafeSnapshot& failsafe) {
+    if (phase_ != FlightStartupPhase::waiting_for_vehicle &&
+        !vehicle.connected) {
+        fail("Flight-controller heartbeat was lost during startup");
+        return false;
+    }
+    if (phase_ != FlightStartupPhase::waiting_for_vehicle &&
+        phase_ != FlightStartupPhase::waiting_for_readiness &&
+        !failsafe.accepted()) {
+        fail("Companion-link failsafe is no longer valid: " + failsafe.detail);
+        return false;
+    }
+    return true;
+}
+
+FlightStartupController::PhaseUpdate
+FlightStartupController::update_current_phase(
+    const domain::VehicleSnapshot& vehicle,
+    const bool telemetry_ready,
+    const CompanionLinkFailsafeSnapshot& failsafe,
+    const domain::TimePoint now,
+    std::vector<FlightActionRequest>& actions) {
+    switch (phase_) {
+    case FlightStartupPhase::waiting_for_vehicle:
+        return update_waiting_for_vehicle(vehicle, now);
+    case FlightStartupPhase::waiting_for_readiness:
+        return update_waiting_for_readiness(vehicle,
+            telemetry_ready,
+            failsafe,
+            now);
+    case FlightStartupPhase::setting_guided:
+        return update_setting_guided(vehicle, now, actions);
+    case FlightStartupPhase::arming:
+        return update_arming(vehicle, now, actions);
+    case FlightStartupPhase::taking_off:
+        return update_taking_off(vehicle, now, actions);
+    case FlightStartupPhase::disabled:
+    case FlightStartupPhase::completed:
+    case FlightStartupPhase::failed:
+        return PhaseUpdate::stop;
+    }
+    return PhaseUpdate::stop;
+}
+
+FlightStartupController::PhaseUpdate
+FlightStartupController::update_waiting_for_vehicle(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now) {
+    if (!vehicle.connected || !vehicle.system_id.has_value()) {
+        return PhaseUpdate::stop;
+    }
+    if (vehicle.autopilot_type != kArduPilotAutopilotType ||
+        !is_multicopter(vehicle.vehicle_type)) {
+        fail("Autonomy requires an ArduPilot multicopter");
+        return PhaseUpdate::stop;
+    }
+    vehicle_system_id_ = vehicle.system_id;
+    enter_phase(FlightStartupPhase::waiting_for_readiness, now);
+    return PhaseUpdate::advance;
+}
+
+FlightStartupController::PhaseUpdate
+FlightStartupController::update_waiting_for_readiness(
+    const domain::VehicleSnapshot& vehicle,
+    const bool telemetry_ready,
+    const CompanionLinkFailsafeSnapshot& failsafe,
+    const domain::TimePoint now) {
+    if (now >= phase_deadline_) {
+        fail("Vehicle did not become ready within 90 seconds");
+        return PhaseUpdate::stop;
+    }
+    if (telemetry_ready && vehicle.armable && !vehicle.armed &&
+        failsafe.accepted() && vehicle.relative_altitude_m.has_value()) {
+        enter_phase(FlightStartupPhase::setting_guided, now);
+        return PhaseUpdate::advance;
+    }
+    update_readiness_detail(vehicle, telemetry_ready, failsafe);
+    return PhaseUpdate::stop;
+}
+
+FlightStartupController::PhaseUpdate
+FlightStartupController::update_setting_guided(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now,
+    std::vector<FlightActionRequest>& actions) {
+    if (command_accepted_ && vehicle.flight_mode == kCopterGuidedMode) {
+        enter_phase(FlightStartupPhase::arming, now);
+        return PhaseUpdate::advance;
+    }
+    if (now >= phase_deadline_) {
+        fail("ArduCopter did not enter GUIDED mode");
+        return PhaseUpdate::stop;
+    }
+    if (auto request = update_command(FlightAction::set_guided_mode, now)) {
+        actions.push_back(*request);
+    }
+    return PhaseUpdate::stop;
+}
+
+FlightStartupController::PhaseUpdate FlightStartupController::update_arming(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now,
+    std::vector<FlightActionRequest>& actions) {
+    if (command_accepted_ && vehicle.armed) {
+        enter_phase(FlightStartupPhase::taking_off, now);
+        return PhaseUpdate::advance;
+    }
+    if (now >= phase_deadline_) {
+        fail("ArduCopter did not become armed");
+        return PhaseUpdate::stop;
+    }
+    if (auto request = update_command(FlightAction::arm, now)) {
+        actions.push_back(*request);
+    }
+    return PhaseUpdate::stop;
+}
+
+FlightStartupController::PhaseUpdate FlightStartupController::update_taking_off(
+    const domain::VehicleSnapshot& vehicle,
+    const domain::TimePoint now,
+    std::vector<FlightActionRequest>& actions) {
+    if (!vehicle.armed && command_accepted_) {
+        fail("Vehicle disarmed during takeoff");
+        return PhaseUpdate::stop;
+    }
+    const bool altitude_reached =
+        command_accepted_ && vehicle.relative_altitude_m.has_value() &&
+        vehicle.relative_altitude_m.value() >=
+            config_.takeoff_altitude_m - kAltitudeToleranceM;
+    if (altitude_reached) {
+        phase_ = FlightStartupPhase::completed;
+        detail_ = "Takeoff complete; autonomy may start";
+        attempt_ = 0;
+        awaiting_ack_ = false;
+        return PhaseUpdate::stop;
+    }
+    if (now >= phase_deadline_) {
+        fail("Vehicle did not reach takeoff altitude");
+        return PhaseUpdate::stop;
+    }
+    if (command_accepted_) {
+        detail_ = "Climbing: " + altitude_detail(vehicle.relative_altitude_m,
+                                     config_.takeoff_altitude_m);
+    }
+    if (auto request = update_command(FlightAction::takeoff, now)) {
+        request->altitude_m = config_.takeoff_altitude_m;
+        actions.push_back(*request);
+    }
+    return PhaseUpdate::stop;
+}
+
+void FlightStartupController::on_action_sent(const FlightActionRequest& request,
     const bool sent,
-    const domain::TimePoint
-) {
+    const domain::TimePoint) {
     const auto expected = expected_action();
     if (!expected.has_value() || request.action != *expected || sent) {
         return;
@@ -259,40 +280,33 @@ void FlightStartupController::on_action_sent(
     }
 }
 
-void FlightStartupController::on_command_ack(
-    const FlightAction action,
+void FlightStartupController::on_command_ack(const FlightAction action,
     const FlightCommandAckOutcome outcome,
     const std::uint8_t raw_result,
     const std::uint8_t source_system,
-    const domain::TimePoint now
-) {
+    const domain::TimePoint now) {
     const auto expected = expected_action();
-    if (!expected.has_value() || action != *expected ||
-        !awaiting_ack_ || !vehicle_system_id_.has_value() ||
+    if (!expected.has_value() || action != *expected || !awaiting_ack_ ||
+        !vehicle_system_id_.has_value() ||
         source_system != *vehicle_system_id_) {
         return;
     }
 
     switch (outcome) {
-        case FlightCommandAckOutcome::accepted:
-            awaiting_ack_ = false;
-            command_accepted_ = true;
-            detail_ = action_name(action) +
-                      " accepted; verifying vehicle state";
-            break;
-        case FlightCommandAckOutcome::in_progress:
-            acknowledgement_deadline_ =
-                now + kAcknowledgementTimeout;
-            detail_ = action_name(action) + " is in progress";
-            break;
-        case FlightCommandAckOutcome::rejected:
-            failure_result_ = raw_result;
-            fail(
-                action_name(action) +
-                " was rejected with MAV_RESULT " +
-                std::to_string(raw_result)
-            );
-            break;
+    case FlightCommandAckOutcome::accepted:
+        awaiting_ack_ = false;
+        command_accepted_ = true;
+        detail_ = action_name(action) + " accepted; verifying vehicle state";
+        break;
+    case FlightCommandAckOutcome::in_progress:
+        acknowledgement_deadline_ = now + kAcknowledgementTimeout;
+        detail_ = action_name(action) + " is in progress";
+        break;
+    case FlightCommandAckOutcome::rejected:
+        failure_result_ = raw_result;
+        fail(action_name(action) + " was rejected with MAV_RESULT " +
+             std::to_string(raw_result));
+        break;
     }
 }
 
@@ -323,37 +337,35 @@ FlightStartupSnapshot FlightStartupController::snapshot() const {
     };
 }
 
-void FlightStartupController::enter_phase(
-    const FlightStartupPhase phase,
-    const domain::TimePoint now
-) {
+void FlightStartupController::enter_phase(const FlightStartupPhase phase,
+    const domain::TimePoint now) {
     phase_ = phase;
     attempt_ = 0;
     awaiting_ack_ = false;
     command_accepted_ = false;
 
     switch (phase_) {
-        case FlightStartupPhase::waiting_for_readiness:
-            phase_deadline_ = now + kReadinessTimeout;
-            detail_ = "Waiting for telemetry and pre-arm readiness";
-            break;
-        case FlightStartupPhase::setting_guided:
-            phase_deadline_ = now + kModeChangeTimeout;
-            detail_ = "Preparing GUIDED mode";
-            break;
-        case FlightStartupPhase::arming:
-            phase_deadline_ = now + kArmingTimeout;
-            detail_ = "Preparing to arm";
-            break;
-        case FlightStartupPhase::taking_off:
-            phase_deadline_ = now + kTakeoffTimeout;
-            detail_ = "Preparing takeoff";
-            break;
-        case FlightStartupPhase::disabled:
-        case FlightStartupPhase::waiting_for_vehicle:
-        case FlightStartupPhase::completed:
-        case FlightStartupPhase::failed:
-            break;
+    case FlightStartupPhase::waiting_for_readiness:
+        phase_deadline_ = now + kReadinessTimeout;
+        detail_ = "Waiting for telemetry and pre-arm readiness";
+        break;
+    case FlightStartupPhase::setting_guided:
+        phase_deadline_ = now + kModeChangeTimeout;
+        detail_ = "Preparing GUIDED mode";
+        break;
+    case FlightStartupPhase::arming:
+        phase_deadline_ = now + kArmingTimeout;
+        detail_ = "Preparing to arm";
+        break;
+    case FlightStartupPhase::taking_off:
+        phase_deadline_ = now + kTakeoffTimeout;
+        detail_ = "Preparing takeoff";
+        break;
+    case FlightStartupPhase::disabled:
+    case FlightStartupPhase::waiting_for_vehicle:
+    case FlightStartupPhase::completed:
+    case FlightStartupPhase::failed:
+        break;
     }
 }
 
@@ -367,13 +379,11 @@ void FlightStartupController::fail(std::string detail) {
 void FlightStartupController::update_readiness_detail(
     const domain::VehicleSnapshot& vehicle,
     const bool telemetry_ready,
-    const CompanionLinkFailsafeSnapshot& companion_link_failsafe
-) {
+    const CompanionLinkFailsafeSnapshot& companion_link_failsafe) {
     if (!telemetry_ready) {
         detail_ = "Waiting for telemetry stream setup";
     } else if (!companion_link_failsafe.accepted()) {
-        detail_ = "Autonomy blocked: " +
-                  companion_link_failsafe.detail;
+        detail_ = "Autonomy blocked: " + companion_link_failsafe.detail;
     } else if (vehicle.armed) {
         detail_ = "Waiting for the vehicle to be disarmed";
     } else if (!vehicle.gps_ready) {
@@ -391,11 +401,9 @@ void FlightStartupController::update_readiness_detail(
     }
 }
 
-std::optional<FlightActionRequest>
-FlightStartupController::update_command(
+std::optional<FlightActionRequest> FlightStartupController::update_command(
     const FlightAction action,
-    const domain::TimePoint now
-) {
+    const domain::TimePoint now) {
     if (command_accepted_) {
         return std::nullopt;
     }
@@ -406,10 +414,7 @@ FlightStartupController::update_command(
         awaiting_ack_ = false;
     }
     if (attempt_ >= kMaximumActionAttempts) {
-        fail(
-            "No COMMAND_ACK for " + action_name(action) +
-            " after 3 attempts"
-        );
+        fail("No COMMAND_ACK for " + action_name(action) + " after 3 attempts");
         return std::nullopt;
     }
 
@@ -421,28 +426,27 @@ FlightStartupController::update_command(
               std::to_string(attempt_) + "/3";
     return FlightActionRequest{
         .action = action,
-        .vehicle_system_id = *vehicle_system_id_,
+        .vehicle_system_id = vehicle_system_id_.value_or(0U),
         .confirmation = confirmation,
     };
 }
 
-std::optional<FlightAction>
-FlightStartupController::expected_action() const {
+std::optional<FlightAction> FlightStartupController::expected_action() const {
     switch (phase_) {
-        case FlightStartupPhase::setting_guided:
-            return FlightAction::set_guided_mode;
-        case FlightStartupPhase::arming:
-            return FlightAction::arm;
-        case FlightStartupPhase::taking_off:
-            return FlightAction::takeoff;
-        case FlightStartupPhase::disabled:
-        case FlightStartupPhase::waiting_for_vehicle:
-        case FlightStartupPhase::waiting_for_readiness:
-        case FlightStartupPhase::completed:
-        case FlightStartupPhase::failed:
-            return std::nullopt;
+    case FlightStartupPhase::setting_guided:
+        return FlightAction::set_guided_mode;
+    case FlightStartupPhase::arming:
+        return FlightAction::arm;
+    case FlightStartupPhase::taking_off:
+        return FlightAction::takeoff;
+    case FlightStartupPhase::disabled:
+    case FlightStartupPhase::waiting_for_vehicle:
+    case FlightStartupPhase::waiting_for_readiness:
+    case FlightStartupPhase::completed:
+    case FlightStartupPhase::failed:
+        return std::nullopt;
     }
     return std::nullopt;
 }
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

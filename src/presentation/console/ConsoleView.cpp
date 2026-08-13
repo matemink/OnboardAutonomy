@@ -34,41 +34,34 @@ enum class Tone {
 
 std::string_view ansi_code(const Tone tone) {
     switch (tone) {
-        case Tone::normal:
-            return "\x1b[97m";
-        case Tone::good:
-            return "\x1b[92m";
-        case Tone::waiting:
-            return "\x1b[93m";
-        case Tone::bad:
-            return "\x1b[91m";
-        case Tone::accent:
-            return "\x1b[96m";
-        case Tone::controller:
-            return "\x1b[93m";
-        case Tone::chrome:
-            return "\x1b[94m";
-        case Tone::dim:
-            return "\x1b[90m";
+    case Tone::normal:
+        return "\x1b[97m";
+    case Tone::good:
+        return "\x1b[92m";
+    case Tone::waiting:
+        return "\x1b[93m";
+    case Tone::bad:
+        return "\x1b[91m";
+    case Tone::accent:
+        return "\x1b[96m";
+    case Tone::controller:
+        return "\x1b[93m";
+    case Tone::chrome:
+        return "\x1b[94m";
+    case Tone::dim:
+        return "\x1b[90m";
     }
     return "\x1b[0m";
 }
 
-std::string paint(
-    std::string value,
-    const Tone tone,
-    const bool use_color
-) {
+std::string paint(std::string value, const Tone tone, const bool use_color) {
     if (!use_color) {
         return value;
     }
     return std::string(ansi_code(tone)) + value + "\x1b[0m";
 }
 
-std::string clipped(
-    const std::string_view value,
-    const std::size_t width
-) {
+std::string clipped(const std::string_view value, const std::size_t width) {
     if (value.size() <= width) {
         return std::string(value);
     }
@@ -78,117 +71,86 @@ std::string clipped(
     return std::string(value.substr(0, width - 3)) + "...";
 }
 
-std::string fitted(
-    const std::string_view value,
-    const std::size_t width
-) {
+std::string fitted(const std::string_view value, const std::size_t width) {
     std::string result = clipped(value, width);
     result.append(width - result.size(), ' ');
     return result;
 }
 
-std::string centered(
-    const std::string_view value,
-    const std::size_t width
-) {
+std::string centered(const std::string_view value, const std::size_t width) {
     const std::string content = clipped(value, width);
     const auto left = (width - content.size()) / 2;
     const auto right = width - content.size() - left;
     return std::string(left, ' ') + content + std::string(right, ' ');
 }
 
-void write_border(
-    std::ostringstream& output,
+void write_border(std::ostringstream& output,
     const char fill,
-    const bool use_color
-) {
-    output << paint(
-        "+" + std::string(kInnerWidth, fill) + "+",
-        Tone::chrome,
-        use_color
-    ) << '\n';
+    const bool use_color) {
+    output << paint("+" + std::string(kInnerWidth, fill) + "+",
+                  Tone::chrome,
+                  use_color)
+           << '\n';
 }
 
-void write_line(
-    std::ostringstream& output,
+void write_line(std::ostringstream& output,
     const std::string_view value,
     const Tone tone,
-    const bool use_color
-) {
+    const bool use_color) {
     output << paint("|", Tone::chrome, use_color)
            << paint(fitted(value, kInnerWidth), tone, use_color)
-           << paint("|", Tone::chrome, use_color)
-           << '\n';
+           << paint("|", Tone::chrome, use_color) << '\n';
 }
 
-void write_centered_line(
-    std::ostringstream& output,
+void write_centered_line(std::ostringstream& output,
     const std::string_view value,
     const Tone tone,
-    const bool use_color
-) {
+    const bool use_color) {
     output << paint("|", Tone::chrome, use_color)
            << paint(centered(value, kInnerWidth), tone, use_color)
-           << paint("|", Tone::chrome, use_color)
-           << '\n';
+           << paint("|", Tone::chrome, use_color) << '\n';
 }
 
 std::string device_line(const std::string_view value) {
     return "|" + centered(value, kDeviceWidth - 2) + "|";
 }
 
-void write_topology_line(
-    std::ostringstream& output,
+void write_topology_line(std::ostringstream& output,
     const std::string_view companion,
     const Tone companion_tone,
     const std::string_view link,
     const Tone link_tone,
     const std::string_view controller,
     const Tone controller_tone,
-    const bool use_color
-) {
+    const bool use_color) {
     output << paint("| ", Tone::chrome, use_color)
-           << paint(
-                  fitted(companion, kDeviceWidth),
-                  companion_tone,
-                  use_color
-              )
+           << paint(fitted(companion, kDeviceWidth), companion_tone, use_color)
            << paint(fitted(link, kLinkWidth), link_tone, use_color)
-           << paint(
-                  fitted(controller, kDeviceWidth),
+           << paint(fitted(controller, kDeviceWidth),
                   controller_tone,
-                  use_color
-              )
-           << paint(" |", Tone::chrome, use_color)
-           << '\n';
+                  use_color)
+           << paint(" |", Tone::chrome, use_color) << '\n';
 }
 
-void write_header(
-    std::ostringstream& output,
+void write_header(std::ostringstream& output,
     const std::string_view link_status,
     const std::string_view transport_description,
     const bool connected,
-    const bool use_color
-) {
+    const bool use_color) {
     constexpr std::string_view title{" ONBOARD AUTONOMY   "};
     constexpr std::string_view link_label{"LINK: "};
-    const std::string transport =
-        "   " + std::string(transport_description);
+    const std::string transport = "   " + std::string(transport_description);
     const auto remaining =
-        kInnerWidth - title.size() - link_label.size() -
-        link_status.size();
+        kInnerWidth - title.size() - link_label.size() - link_status.size();
 
     output << paint("|", Tone::chrome, use_color)
            << paint(std::string(title), Tone::accent, use_color)
            << paint(std::string(link_label), Tone::normal, use_color)
-           << paint(
-                  std::string(link_status),
+           << paint(std::string(link_status),
                   connected ? Tone::good : Tone::dim,
-                  use_color
-              )
+                  use_color)
            << paint(fitted(transport, remaining), Tone::dim, use_color)
-           << paint("|", Tone::chrome, use_color)
-           << '\n';
+           << paint("|", Tone::chrome, use_color) << '\n';
 }
 
 std::string gps_fix_name(const std::optional<std::uint8_t> fix_type) {
@@ -197,53 +159,51 @@ std::string gps_fix_name(const std::optional<std::uint8_t> fix_type) {
     }
 
     switch (*fix_type) {
-        case 0:
-            return "UNAVAILABLE";
-        case 1:
-            return "NO FIX";
-        case 2:
-            return "2D";
-        case 3:
-            return "3D";
-        case 4:
-            return "DGPS";
-        case 5:
-            return "RTK FLOAT";
-        case 6:
-            return "RTK FIXED";
-        case 7:
-            return "STATIC FIXED";
-        case 8:
-            return "PPP";
-        default:
-            return "UNKNOWN";
+    case 0:
+        return "UNAVAILABLE";
+    case 1:
+        return "NO FIX";
+    case 2:
+        return "2D";
+    case 3:
+        return "3D";
+    case 4:
+        return "DGPS";
+    case 5:
+        return "RTK FLOAT";
+    case 6:
+        return "RTK FIXED";
+    case 7:
+        return "STATIC FIXED";
+    case 8:
+        return "PPP";
+    default:
+        return "UNKNOWN";
     }
 }
 
-std::string flight_mode_name(
-    const std::optional<std::uint32_t> mode
-) {
+std::string flight_mode_name(const std::optional<std::uint32_t> mode) {
     if (!mode.has_value()) {
         return "UNKNOWN";
     }
 
     switch (*mode) {
-        case 0:
-            return "STABILIZE";
-        case 3:
-            return "AUTO";
-        case 4:
-            return "GUIDED";
-        case 5:
-            return "LOITER";
-        case 6:
-            return "RTL";
-        case 9:
-            return "LAND";
-        case 16:
-            return "POSITION HOLD";
-        default:
-            return "MODE " + std::to_string(*mode);
+    case 0:
+        return "STABILIZE";
+    case 3:
+        return "AUTO";
+    case 4:
+        return "GUIDED";
+    case 5:
+        return "LOITER";
+    case 6:
+        return "RTL";
+    case 9:
+        return "LAND";
+    case 16:
+        return "POSITION HOLD";
+    default:
+        return "MODE " + std::to_string(*mode);
     }
 }
 
@@ -282,8 +242,7 @@ std::string firmware_detail(const domain::VehicleSnapshot& vehicle) {
     }
 
     const auto& metadata = *vehicle.autopilot_metadata;
-    return "FIRMWARE " +
-           std::to_string(metadata.firmware_major) + "." +
+    return "FIRMWARE " + std::to_string(metadata.firmware_major) + "." +
            std::to_string(metadata.firmware_minor) + "." +
            std::to_string(metadata.firmware_patch) + " " +
            firmware_release_name(metadata.firmware_release_type);
@@ -295,96 +254,73 @@ std::uint16_t board_type_id(const std::uint32_t board_version) {
 
 std::optional<BoardTypeMatch> resolve_board_type(
     const std::uint32_t board_version,
-    const BoardTypeResolver* resolver
-) {
+    const BoardTypeResolver* resolver) {
     if (resolver == nullptr) {
         return std::nullopt;
     }
     return resolver->resolve(board_type_id(board_version));
 }
 
-std::string board_type_name(
-    const std::uint32_t board_version,
-    const BoardTypeResolver* resolver
-) {
-    if (const auto match =
-            resolve_board_type(board_version, resolver);
+std::string board_type_name(const std::uint32_t board_version,
+    const BoardTypeResolver* resolver) {
+    if (const auto match = resolve_board_type(board_version, resolver);
         match.has_value()) {
         return match->preferred_name;
     }
-    return "BOARD TYPE " +
-           std::to_string(board_type_id(board_version));
+    return "BOARD TYPE " + std::to_string(board_type_id(board_version));
 }
 
-std::string controller_hardware_name(
-    const domain::VehicleSnapshot& vehicle,
-    const BoardTypeResolver* resolver
-) {
-    if (!vehicle.connected ||
-        !vehicle.autopilot_metadata.has_value() ||
+std::string controller_hardware_name(const domain::VehicleSnapshot& vehicle,
+    const BoardTypeResolver* resolver) {
+    if (!vehicle.connected || !vehicle.autopilot_metadata.has_value() ||
         vehicle.autopilot_metadata->board_version == 0U) {
         return "FLIGHT CONTROLLER";
     }
-    return board_type_name(
-        vehicle.autopilot_metadata->board_version,
-        resolver
-    );
+    return board_type_name(vehicle.autopilot_metadata->board_version, resolver);
 }
 
-std::string board_detail(
-    const domain::VehicleSnapshot& vehicle,
-    const BoardTypeResolver* resolver
-) {
-    if (!vehicle.connected ||
-        !vehicle.autopilot_metadata.has_value()) {
+std::string board_detail(const domain::VehicleSnapshot& vehicle,
+    const BoardTypeResolver* resolver) {
+    if (!vehicle.connected || !vehicle.autopilot_metadata.has_value()) {
         return "BOARD WAITING";
     }
 
-    const auto board_version =
-        vehicle.autopilot_metadata->board_version;
+    const auto board_version = vehicle.autopilot_metadata->board_version;
     if (board_version == 0U) {
         return "BOARD UNREPORTED";
     }
 
     const auto silicon_id = board_version & 0xFFU;
-    std::string result =
-        board_type_name(board_version, resolver) +
-        " / ID " + std::to_string(board_type_id(board_version)) +
-        " / SILICON " + std::to_string(silicon_id);
-    if (const auto match =
-            resolve_board_type(board_version, resolver);
+    std::string result = board_type_name(board_version, resolver) + " / ID " +
+                         std::to_string(board_type_id(board_version)) +
+                         " / SILICON " + std::to_string(silicon_id);
+    if (const auto match = resolve_board_type(board_version, resolver);
         match.has_value() && match->aliases.size() > 1) {
-        result += " / " + std::to_string(match->aliases.size()) +
-                  " ALIASES";
+        result += " / " + std::to_string(match->aliases.size()) + " ALIASES";
     }
     return result;
 }
 
-std::string telemetry_detail(
-    const application::TelemetryStatus& telemetry
-) {
-    const std::string progress =
-        std::to_string(telemetry.completed_requests) + "/" +
-        std::to_string(telemetry.total_requests);
+std::string telemetry_detail(const application::TelemetryStatus& telemetry) {
+    const std::string progress = std::to_string(telemetry.completed_requests) +
+                                 "/" + std::to_string(telemetry.total_requests);
 
     switch (telemetry.state) {
-        case application::TelemetrySetupState::waiting_for_vehicle:
-            return "TELEMETRY WAITING";
-        case application::TelemetrySetupState::configuring:
-            return "TELEMETRY SETUP " + progress + " ACCEPTED";
-        case application::TelemetrySetupState::active:
-            return "TELEMETRY READY / " +
-                   std::to_string(telemetry.total_requests) +
-                   " STREAMS";
-        case application::TelemetrySetupState::failed:
-            return "TELEMETRY FAILED / " + progress + " ACCEPTED";
+    case application::TelemetrySetupState::waiting_for_vehicle:
+        return "TELEMETRY WAITING";
+    case application::TelemetrySetupState::configuring:
+        return "TELEMETRY SETUP " + progress + " ACCEPTED";
+    case application::TelemetrySetupState::active:
+        return "TELEMETRY READY / " + std::to_string(telemetry.total_requests) +
+               " STREAMS";
+    case application::TelemetrySetupState::failed:
+        return "TELEMETRY FAILED / " + progress + " ACCEPTED";
     }
     return "TELEMETRY UNKNOWN";
 }
 
 std::string companion_link_failsafe_detail(
-    const application::CompanionLinkFailsafeSnapshot& failsafe
-) {
+    const application::CompanionLinkFailsafeSnapshot& failsafe) {
     if (!failsafe.accepted()) {
         return "LINK FAILSAFE / " + failsafe.detail;
     }
@@ -397,84 +333,75 @@ std::string companion_link_failsafe_detail(
     }
     if (failsafe.configured_gcs_system_id.has_value()) {
         detail << " / SYSID "
-               << static_cast<unsigned int>(
-                      *failsafe.configured_gcs_system_id
-                  );
+               << static_cast<unsigned int>(*failsafe.configured_gcs_system_id);
     }
     return detail.str();
 }
 
 Tone companion_link_failsafe_tone(
-    const application::CompanionLinkFailsafeSnapshot& failsafe
-) {
+    const application::CompanionLinkFailsafeSnapshot& failsafe) {
     switch (failsafe.phase) {
-        case application::CompanionLinkFailsafePhase::accepted:
-            return Tone::good;
-        case application::CompanionLinkFailsafePhase::rejected:
-            return Tone::bad;
-        case application::CompanionLinkFailsafePhase::reading_parameters:
-            return Tone::waiting;
-        case application::CompanionLinkFailsafePhase::waiting_for_vehicle:
-            return Tone::dim;
+    case application::CompanionLinkFailsafePhase::accepted:
+        return Tone::good;
+    case application::CompanionLinkFailsafePhase::rejected:
+        return Tone::bad;
+    case application::CompanionLinkFailsafePhase::reading_parameters:
+        return Tone::waiting;
+    case application::CompanionLinkFailsafePhase::waiting_for_vehicle:
+        return Tone::dim;
     }
     return Tone::bad;
 }
 
 Tone metadata_tone(const application::AppSnapshot& snapshot) {
-    if (snapshot.telemetry.state ==
-        application::TelemetrySetupState::failed) {
+    if (snapshot.telemetry.state == application::TelemetrySetupState::failed) {
         return Tone::bad;
     }
-    if (snapshot.telemetry.state ==
-            application::TelemetrySetupState::active &&
+    if (snapshot.telemetry.state == application::TelemetrySetupState::active &&
         snapshot.vehicle.autopilot_metadata.has_value()) {
         return Tone::good;
     }
     return snapshot.vehicle.connected ? Tone::waiting : Tone::dim;
 }
 
-std::string camera_phase_name(
-    const application::CameraSnapshot& camera
-) {
+std::string camera_phase_name(const application::CameraSnapshot& camera) {
     switch (camera.phase) {
-        case application::ports::CameraSourcePhase::starting:
-            return "CAMERA STARTING";
-        case application::ports::CameraSourcePhase::streaming:
-            return "CAMERA STREAMING";
-        case application::ports::CameraSourcePhase::reconnecting:
-            return "CAMERA RECONNECTING";
-        case application::ports::CameraSourcePhase::stopped:
-            return "CAMERA STOPPED";
-        case application::ports::CameraSourcePhase::failed:
-            return "CAMERA FAILED";
+    case application::ports::CameraSourcePhase::starting:
+        return "CAMERA STARTING";
+    case application::ports::CameraSourcePhase::streaming:
+        return "CAMERA STREAMING";
+    case application::ports::CameraSourcePhase::reconnecting:
+        return "CAMERA RECONNECTING";
+    case application::ports::CameraSourcePhase::stopped:
+        return "CAMERA STOPPED";
+    case application::ports::CameraSourcePhase::failed:
+        return "CAMERA FAILED";
     }
     return "CAMERA FAILED";
 }
 
 Tone camera_tone(const application::CameraSnapshot& camera) {
     switch (camera.phase) {
-        case application::ports::CameraSourcePhase::starting:
-            return Tone::waiting;
-        case application::ports::CameraSourcePhase::streaming:
-            return Tone::good;
-        case application::ports::CameraSourcePhase::reconnecting:
-            return Tone::waiting;
-        case application::ports::CameraSourcePhase::stopped:
-            return Tone::dim;
-        case application::ports::CameraSourcePhase::failed:
-            return Tone::bad;
+    case application::ports::CameraSourcePhase::starting:
+        return Tone::waiting;
+    case application::ports::CameraSourcePhase::streaming:
+        return Tone::good;
+    case application::ports::CameraSourcePhase::reconnecting:
+        return Tone::waiting;
+    case application::ports::CameraSourcePhase::stopped:
+        return Tone::dim;
+    case application::ports::CameraSourcePhase::failed:
+        return Tone::bad;
     }
     return Tone::bad;
 }
 
-std::string camera_stream_detail(
-    const application::CameraSnapshot& camera
-) {
+std::string camera_stream_detail(const application::CameraSnapshot& camera) {
     std::ostringstream detail;
     detail << camera_phase_name(camera);
     if (camera.width > 0U && camera.height > 0U) {
-        detail << "   |   " << camera.width << "x"
-               << camera.height << " YUV420";
+        detail << "   |   " << camera.width << "x" << camera.height
+               << " YUV420";
     }
     if (camera.measured_fps.has_value()) {
         detail << "   |   " << std::fixed << std::setprecision(1)
@@ -482,15 +409,12 @@ std::string camera_stream_detail(
     }
     detail << "   |   " << camera.received_frames << " FRAMES";
     if (camera.camera_restarts > 0U) {
-        detail << "   |   " << camera.camera_restarts
-               << " RESTARTS";
+        detail << "   |   " << camera.camera_restarts << " RESTARTS";
     }
     return detail.str();
 }
 
-std::string camera_latency_detail(
-    const application::CameraSnapshot& camera
-) {
+std::string camera_latency_detail(const application::CameraSnapshot& camera) {
     if (!camera.error.empty()) {
         return camera.error;
     }
@@ -499,8 +423,7 @@ std::string camera_latency_detail(
     }
 
     std::ostringstream detail;
-    detail << std::fixed << std::setprecision(1)
-           << "CAMERA LATENCY "
+    detail << std::fixed << std::setprecision(1) << "CAMERA LATENCY "
            << *camera.latest_latency_ms << " MS LATEST";
     if (camera.average_latency_ms.has_value()) {
         detail << " / " << *camera.average_latency_ms << " MS AVG";
@@ -508,17 +431,14 @@ std::string camera_latency_detail(
     if (camera.maximum_latency_ms.has_value()) {
         detail << " / " << *camera.maximum_latency_ms << " MS MAX";
     }
-    detail << "   |   DROP "
-           << camera.dropped_before_processing;
+    detail << "   |   DROP " << camera.dropped_before_processing;
     return detail.str();
 }
 
-std::string vision_pipeline_detail(
-    const application::VisionSnapshot& vision
-) {
+std::string vision_pipeline_detail(const application::VisionSnapshot& vision) {
     std::ostringstream detail;
-    detail << "VISION " << vision.detector
-           << "   |   " << vision.processed_frames << " FRAMES";
+    detail << "VISION " << vision.detector << "   |   "
+           << vision.processed_frames << " FRAMES";
     if (vision.average_processing_ms.has_value()) {
         detail << "   |   " << std::fixed << std::setprecision(1)
                << *vision.average_processing_ms << " MS AVG";
@@ -526,21 +446,15 @@ std::string vision_pipeline_detail(
     return detail.str();
 }
 
-std::string vision_target_detail(
-    const application::VisionSnapshot& vision
-) {
+std::string vision_target_detail(const application::VisionSnapshot& vision) {
     const auto& track = vision.target_track;
-    if (track.phase !=
-            application::TargetTrackPhase::searching &&
+    if (track.phase != application::TargetTrackPhase::searching &&
         track.position.has_value()) {
         std::ostringstream detail;
         detail << std::fixed << std::setprecision(2)
-               << "TARGET POSITION   |   X RIGHT "
-               << track.position->right_m << " M"
-               << "   |   Y DOWN "
-               << track.position->down_m << " M"
-               << "   |   Z FORWARD "
-               << track.position->forward_m << " M";
+               << "TARGET POSITION   |   X RIGHT " << track.position->right_m
+               << " M" << "   |   Y DOWN " << track.position->down_m << " M"
+               << "   |   Z FORWARD " << track.position->forward_m << " M";
         return detail.str();
     }
 
@@ -552,72 +466,53 @@ std::string vision_target_detail(
     std::ostringstream detail;
     detail << "TARGET ID " << target.id;
     if (target.pose.has_value()) {
-        detail << std::fixed << std::setprecision(2)
-               << "   |   X RIGHT "
-               << target.pose->position.right_m << " M"
-               << "   |   Y DOWN "
-               << target.pose->position.down_m << " M"
-               << "   |   Z FORWARD "
+        detail << std::fixed << std::setprecision(2) << "   |   X RIGHT "
+               << target.pose->position.right_m << " M" << "   |   Y DOWN "
+               << target.pose->position.down_m << " M" << "   |   Z FORWARD "
                << target.pose->position.forward_m << " M";
     } else {
-        detail << "   |   CENTER " << std::fixed
-               << std::setprecision(1)
-               << target.center.x_px << "/"
-               << target.center.y_px << " PX"
-               << "   |   MARGIN "
-               << target.decision_margin
-               << "   |   CORRECTED "
-               << target.corrected_bits;
+        detail << "   |   CENTER " << std::fixed << std::setprecision(1)
+               << target.center.x_px << "/" << target.center.y_px << " PX"
+               << "   |   MARGIN " << target.decision_margin
+               << "   |   CORRECTED " << target.corrected_bits;
     }
     if (vision.latest_targets.size() > 1U) {
-        detail << "   |   " << vision.latest_targets.size()
-               << " TAGS";
+        detail << "   |   " << vision.latest_targets.size() << " TAGS";
     }
     return detail.str();
 }
 
 std::optional<std::string> vision_track_status_detail(
-    const application::VisionSnapshot& vision
-) {
+    const application::VisionSnapshot& vision) {
     const auto& track = vision.target_track;
-    if (track.phase ==
-            application::TargetTrackPhase::searching ||
+    if (track.phase == application::TargetTrackPhase::searching ||
         !track.target_id.has_value()) {
         return std::nullopt;
     }
 
     std::ostringstream detail;
     detail << "TARGET ID " << *track.target_id;
-    if (track.phase ==
-        application::TargetTrackPhase::acquiring) {
-        detail << "   |   ACQUIRING "
-               << track.consecutive_observations << "/"
+    if (track.phase == application::TargetTrackPhase::acquiring) {
+        detail << "   |   ACQUIRING " << track.consecutive_observations << "/"
                << track.required_observations;
     } else {
         detail << "   |   TRACKING";
     }
     if (track.observation_age_ms.has_value()) {
-        detail << std::fixed << std::setprecision(0)
-               << "   |   AGE "
+        detail << std::fixed << std::setprecision(0) << "   |   AGE "
                << *track.observation_age_ms << " MS";
     }
     return detail.str();
 }
 
-Tone vision_target_tone(
-    const application::VisionSnapshot& vision
-) {
-    if (vision.target_track.phase ==
-        application::TargetTrackPhase::tracking) {
+Tone vision_target_tone(const application::VisionSnapshot& vision) {
+    if (vision.target_track.phase == application::TargetTrackPhase::tracking) {
         return Tone::good;
     }
-    if (vision.target_track.phase ==
-        application::TargetTrackPhase::acquiring) {
+    if (vision.target_track.phase == application::TargetTrackPhase::acquiring) {
         return Tone::waiting;
     }
-    return vision.latest_targets.empty()
-        ? Tone::dim
-        : Tone::good;
+    return vision.latest_targets.empty() ? Tone::dim : Tone::good;
 }
 
 std::string altitude_detail(const domain::VehicleSnapshot& vehicle) {
@@ -634,9 +529,7 @@ std::string altitude_detail(const domain::VehicleSnapshot& vehicle) {
 std::string gps_detail(const domain::VehicleSnapshot& vehicle) {
     std::string result = gps_fix_name(vehicle.gps_fix_type);
     if (vehicle.satellites_visible.has_value()) {
-        result += " / " +
-                  std::to_string(*vehicle.satellites_visible) +
-                  " SAT";
+        result += " / " + std::to_string(*vehicle.satellites_visible) + " SAT";
     }
     return result;
 }
@@ -650,9 +543,7 @@ std::string battery_detail(const domain::VehicleSnapshot& vehicle) {
         parts.push_back(voltage.str());
     }
     if (vehicle.battery_remaining_pct.has_value()) {
-        parts.push_back(
-            std::to_string(*vehicle.battery_remaining_pct) + "%"
-        );
+        parts.push_back(std::to_string(*vehicle.battery_remaining_pct) + "%");
     }
     if (parts.empty()) {
         return "WAITING";
@@ -668,74 +559,65 @@ std::string battery_detail(const domain::VehicleSnapshot& vehicle) {
     return output.str();
 }
 
-std::string startup_phase_name(
-    const application::FlightStartupPhase phase
-) {
+std::string startup_phase_name(const application::FlightStartupPhase phase) {
     switch (phase) {
-        case application::FlightStartupPhase::disabled:
-            return "IDLE";
-        case application::FlightStartupPhase::waiting_for_vehicle:
-        case application::FlightStartupPhase::waiting_for_readiness:
-            return "WAITING";
-        case application::FlightStartupPhase::setting_guided:
-            return "GUIDED";
-        case application::FlightStartupPhase::arming:
-            return "ARMING";
-        case application::FlightStartupPhase::taking_off:
-            return "TAKEOFF";
-        case application::FlightStartupPhase::completed:
-            return "COMPLETE";
-        case application::FlightStartupPhase::failed:
-            return "FAILED";
+    case application::FlightStartupPhase::disabled:
+        return "IDLE";
+    case application::FlightStartupPhase::waiting_for_vehicle:
+    case application::FlightStartupPhase::waiting_for_readiness:
+        return "WAITING";
+    case application::FlightStartupPhase::setting_guided:
+        return "GUIDED";
+    case application::FlightStartupPhase::arming:
+        return "ARMING";
+    case application::FlightStartupPhase::taking_off:
+        return "TAKEOFF";
+    case application::FlightStartupPhase::completed:
+        return "COMPLETE";
+    case application::FlightStartupPhase::failed:
+        return "FAILED";
     }
     return "UNKNOWN";
 }
 
-std::string autonomy_phase_name(
-    const application::AutonomyRuntimePhase phase
-) {
+std::string autonomy_phase_name(const application::AutonomyRuntimePhase phase) {
     switch (phase) {
-        case application::AutonomyRuntimePhase::disabled:
-            return "IDLE";
-        case application::AutonomyRuntimePhase::waiting_for_startup:
-            return "WAITING";
-        case application::AutonomyRuntimePhase::active:
-            return "ACTIVE";
-        case application::AutonomyRuntimePhase::landing:
-            return "LANDING";
-        case application::AutonomyRuntimePhase::completed:
-            return "COMPLETE";
-        case application::AutonomyRuntimePhase::failed:
-            return "FAILED";
+    case application::AutonomyRuntimePhase::disabled:
+        return "IDLE";
+    case application::AutonomyRuntimePhase::waiting_for_startup:
+        return "WAITING";
+    case application::AutonomyRuntimePhase::active:
+        return "ACTIVE";
+    case application::AutonomyRuntimePhase::landing:
+        return "LANDING";
+    case application::AutonomyRuntimePhase::completed:
+        return "COMPLETE";
+    case application::AutonomyRuntimePhase::failed:
+        return "FAILED";
     }
     return "UNKNOWN";
 }
 
-Tone autonomy_tone(
-    const application::AutonomyRuntimePhase phase
-) {
+Tone autonomy_tone(const application::AutonomyRuntimePhase phase) {
     switch (phase) {
-        case application::AutonomyRuntimePhase::completed:
-            return Tone::good;
-        case application::AutonomyRuntimePhase::failed:
-            return Tone::bad;
-        case application::AutonomyRuntimePhase::active:
-        case application::AutonomyRuntimePhase::landing:
-            return Tone::accent;
-        case application::AutonomyRuntimePhase::disabled:
-            return Tone::dim;
-        case application::AutonomyRuntimePhase::waiting_for_startup:
-            return Tone::waiting;
+    case application::AutonomyRuntimePhase::completed:
+        return Tone::good;
+    case application::AutonomyRuntimePhase::failed:
+        return Tone::bad;
+    case application::AutonomyRuntimePhase::active:
+    case application::AutonomyRuntimePhase::landing:
+        return Tone::accent;
+    case application::AutonomyRuntimePhase::disabled:
+        return Tone::dim;
+    case application::AutonomyRuntimePhase::waiting_for_startup:
+        return Tone::waiting;
     }
     return Tone::normal;
 }
 
-bool activity_is_fresh(
-    const std::optional<application::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed
-) {
-    return activity.has_value() &&
-           elapsed >= activity->observed_at &&
+bool activity_is_fresh(const std::optional<application::LinkActivity>& activity,
+    const std::chrono::milliseconds elapsed) {
+    return activity.has_value() && elapsed >= activity->observed_at &&
            elapsed - activity->observed_at <= kActivityVisibleFor;
 }
 
@@ -743,77 +625,59 @@ bool blink_is_bright(const std::chrono::milliseconds elapsed) {
     return (elapsed.count() / kBlinkHalfPeriod.count()) % 2 == 0;
 }
 
-Tone activity_tone(
-    const std::optional<application::LinkActivity>& activity,
+Tone activity_tone(const std::optional<application::LinkActivity>& activity,
     const std::chrono::milliseconds elapsed,
-    const Tone group_tone
-) {
-    if (!activity_is_fresh(activity, elapsed) ||
-        !blink_is_bright(elapsed)) {
+    const Tone group_tone) {
+    if (!activity_is_fresh(activity, elapsed) || !blink_is_bright(elapsed)) {
         return Tone::dim;
     }
     return group_tone;
 }
 
-std::string activity_label(
-    const application::LinkActivity& activity
-) {
+std::string activity_label(const application::LinkActivity& activity) {
     return activity.detail.empty()
-        ? activity.message_name
-        : activity.message_name + ": " + activity.detail;
+               ? activity.message_name
+               : activity.message_name + ": " + activity.detail;
 }
 
 std::string outbound_wire(
     const std::optional<application::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed
-) {
-    if (!activity.has_value() ||
-        !activity_is_fresh(activity, elapsed)) {
+    const std::chrono::milliseconds elapsed) {
+    if (!activity.has_value() || !activity_is_fresh(activity, elapsed)) {
         return std::string(kLinkWidth - 1, '-') + ">";
     }
 
     constexpr std::size_t decoration_width = 7;
-    const std::string label = clipped(
-        activity_label(activity.value()),
-        kLinkWidth - decoration_width
-    );
+    const std::string label = clipped(activity_label(activity.value()),
+        kLinkWidth - decoration_width);
     const std::string packet = "[ " + label + " ]";
     const char pulse = blink_is_bright(elapsed) ? '=' : '-';
     return std::string(2, pulse) + packet +
-           std::string(kLinkWidth - packet.size() - 3, pulse) +
-           ">";
+           std::string(kLinkWidth - packet.size() - 3, pulse) + ">";
 }
 
 std::string inbound_wire(
     const std::optional<application::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed
-) {
-    if (!activity.has_value() ||
-        !activity_is_fresh(activity, elapsed)) {
+    const std::chrono::milliseconds elapsed) {
+    if (!activity.has_value() || !activity_is_fresh(activity, elapsed)) {
         return "<" + std::string(kLinkWidth - 1, '-');
     }
 
     constexpr std::size_t decoration_width = 7;
-    const std::string label = clipped(
-        activity_label(activity.value()),
-        kLinkWidth - decoration_width
-    );
+    const std::string label = clipped(activity_label(activity.value()),
+        kLinkWidth - decoration_width);
     const std::string packet = "[ " + label + " ]";
     const char pulse = blink_is_bright(elapsed) ? '=' : '-';
-    return "<" +
-           std::string(kLinkWidth - packet.size() - 3, pulse) +
-           packet + std::string(2, pulse);
+    return "<" + std::string(kLinkWidth - packet.size() - 3, pulse) + packet +
+           std::string(2, pulse);
 }
 
-std::string overall_status(
-    const application::AppSnapshot& snapshot
-) {
+std::string overall_status(const application::AppSnapshot& snapshot) {
     const auto& vehicle = snapshot.vehicle;
     const auto phase = snapshot.autonomy.phase;
-    const bool telemetry_complete =
-        vehicle.gps_fix_type.has_value() &&
-        vehicle.battery_voltage_v.has_value() &&
-        vehicle.system_health_known;
+    const bool telemetry_complete = vehicle.gps_fix_type.has_value() &&
+                                    vehicle.battery_voltage_v.has_value() &&
+                                    vehicle.system_health_known;
 
     if (phase == application::AutonomyRuntimePhase::completed) {
         return "FLIGHT COMPLETE";
@@ -849,241 +713,188 @@ Tone overall_tone(const application::AppSnapshot& snapshot) {
     return Tone::waiting;
 }
 
-}  // namespace
-
-std::string render_console(
+void write_topology(std::ostringstream& output,
     const application::AppSnapshot& snapshot,
-    const std::string_view transport_description,
-    const bool use_color,
-    const BoardTypeResolver* board_type_resolver
-) {
+    const BoardTypeResolver* resolver,
+    const bool use_color) {
     const auto& vehicle = snapshot.vehicle;
-    const auto& startup = snapshot.flight_startup;
-    const auto& autonomy = snapshot.autonomy;
-
-    const std::string link_status =
-        vehicle.connected ? "ONLINE" : "WAITING";
-    const std::string companion_heartbeat =
-        snapshot.companion_heartbeat_active
-            ? "HEARTBEAT ON"
-            : "HEARTBEAT WAIT";
+    const std::string heartbeat =
+        snapshot.companion_heartbeat_active ? "HEARTBEAT ON" : "HEARTBEAT WAIT";
     const std::string controller_mode =
-        vehicle.connected
-            ? flight_mode_name(vehicle.flight_mode) +
-                  (vehicle.armed ? " / ARMED" : " / DISARMED")
-            : "WAITING FOR LINK";
+        vehicle.connected ? flight_mode_name(vehicle.flight_mode) +
+                                (vehicle.armed ? " / ARMED" : " / DISARMED")
+                          : "WAITING FOR LINK";
 
-    std::ostringstream output;
-    write_border(output, '=', use_color);
-    write_header(
-        output,
-        link_status,
-        transport_description,
-        vehicle.connected,
-        use_color
-    );
-    write_border(output, '-', use_color);
     write_line(output, "", Tone::normal, use_color);
-    write_topology_line(
-        output,
+    write_topology_line(output,
         "+--o--------------o--+",
         Tone::accent,
         centered("MAVLINK", kLinkWidth),
         Tone::dim,
         "/--o--------------o--\\",
         Tone::controller,
-        use_color
-    );
-    write_topology_line(
-        output,
+        use_color);
+    write_topology_line(output,
         device_line("RASPBERRY PI 5"),
         Tone::accent,
         outbound_wire(snapshot.tx_activity, snapshot.elapsed),
-        activity_tone(
-            snapshot.tx_activity,
-            snapshot.elapsed,
-            Tone::accent
-        ),
-        device_line(
-            controller_hardware_name(
-                vehicle,
-                board_type_resolver
-            )
-        ),
+        activity_tone(snapshot.tx_activity, snapshot.elapsed, Tone::accent),
+        device_line(controller_hardware_name(vehicle, resolver)),
         Tone::controller,
-        use_color
-    );
-    write_topology_line(
-        output,
+        use_color);
+    write_topology_line(output,
         device_line("COMPANION COMPUTER"),
         Tone::accent,
         inbound_wire(snapshot.rx_activity, snapshot.elapsed),
-        activity_tone(
-            snapshot.rx_activity,
-            snapshot.elapsed,
-            Tone::controller
-        ),
+        activity_tone(snapshot.rx_activity, snapshot.elapsed, Tone::controller),
         device_line("FLIGHT CONTROLLER"),
         Tone::controller,
-        use_color
-    );
-    write_topology_line(
-        output,
-        device_line(companion_heartbeat),
+        use_color);
+    write_topology_line(output,
+        device_line(heartbeat),
         vehicle.connected ? Tone::accent : Tone::dim,
         "",
         Tone::dim,
         device_line(controller_mode),
         vehicle.connected ? Tone::controller : Tone::dim,
-        use_color
-    );
-    write_topology_line(
-        output,
+        use_color);
+    write_topology_line(output,
         device_line("ONBOARD AUTONOMY"),
         Tone::accent,
         "",
         Tone::dim,
         device_line(autopilot_name(vehicle.autopilot_type)),
         Tone::controller,
-        use_color
-    );
-    write_topology_line(
-        output,
+        use_color);
+    write_topology_line(output,
         "+--o--------------o--+",
         Tone::accent,
         "",
         Tone::dim,
         "\\--o--------------o--/",
         Tone::controller,
-        use_color
-    );
+        use_color);
     write_line(output, "", Tone::normal, use_color);
-    write_centered_line(
-        output,
+}
+
+void write_camera_and_vision(std::ostringstream& output,
+    const application::AppSnapshot& snapshot,
+    const bool use_color) {
+    if (snapshot.camera.has_value()) {
+        const auto tone = camera_tone(*snapshot.camera);
+        write_centered_line(output,
+            camera_stream_detail(*snapshot.camera),
+            tone,
+            use_color);
+        write_centered_line(output,
+            camera_latency_detail(*snapshot.camera),
+            tone,
+            use_color);
+    }
+    if (!snapshot.vision.has_value()) {
+        return;
+    }
+
+    const auto target_tone = vision_target_tone(*snapshot.vision);
+    write_centered_line(output,
+        vision_pipeline_detail(*snapshot.vision),
+        Tone::accent,
+        use_color);
+    if (const auto status = vision_track_status_detail(*snapshot.vision);
+        status.has_value()) {
+        write_centered_line(output, *status, target_tone, use_color);
+    }
+    write_centered_line(output,
+        vision_target_detail(*snapshot.vision),
+        target_tone,
+        use_color);
+}
+
+void write_vehicle_status(std::ostringstream& output,
+    const application::AppSnapshot& snapshot,
+    const BoardTypeResolver* resolver,
+    const bool use_color) {
+    const auto& vehicle = snapshot.vehicle;
+    write_centered_line(output,
         "[ " + overall_status(snapshot) + " ]",
         overall_tone(snapshot),
-        use_color
-    );
-    write_centered_line(
-        output,
+        use_color);
+    write_centered_line(output,
         telemetry_detail(snapshot.telemetry) + "   |   " +
             firmware_detail(vehicle),
         metadata_tone(snapshot),
-        use_color
-    );
-    write_centered_line(
-        output,
-        board_detail(vehicle, board_type_resolver),
+        use_color);
+    write_centered_line(output,
+        board_detail(vehicle, resolver),
         metadata_tone(snapshot),
-        use_color
-    );
-    write_centered_line(
-        output,
-        companion_link_failsafe_detail(
-            snapshot.companion_link_failsafe
-        ),
-        companion_link_failsafe_tone(
-            snapshot.companion_link_failsafe
-        ),
-        use_color
-    );
-    if (snapshot.camera.has_value()) {
-        write_centered_line(
-            output,
-            camera_stream_detail(*snapshot.camera),
-            camera_tone(*snapshot.camera),
-            use_color
-        );
-        write_centered_line(
-            output,
-            camera_latency_detail(*snapshot.camera),
-            camera_tone(*snapshot.camera),
-            use_color
-        );
-    }
-    if (snapshot.vision.has_value()) {
-        write_centered_line(
-            output,
-            vision_pipeline_detail(*snapshot.vision),
-            Tone::accent,
-            use_color
-        );
-        const auto track_status =
-            vision_track_status_detail(*snapshot.vision);
-        if (track_status.has_value()) {
-            write_centered_line(
-                output,
-                *track_status,
-                vision_target_tone(*snapshot.vision),
-                use_color
-            );
-        }
-        write_centered_line(
-            output,
-            vision_target_detail(*snapshot.vision),
-            vision_target_tone(*snapshot.vision),
-            use_color
-        );
-    }
-    write_centered_line(
-        output,
-        "MODE " + flight_mode_name(vehicle.flight_mode) +
-            "   |   ALT " + altitude_detail(vehicle) +
-            "   |   GPS " + gps_detail(vehicle) +
+        use_color);
+    write_centered_line(output,
+        companion_link_failsafe_detail(snapshot.companion_link_failsafe),
+        companion_link_failsafe_tone(snapshot.companion_link_failsafe),
+        use_color);
+    write_camera_and_vision(output, snapshot, use_color);
+    write_centered_line(output,
+        "MODE " + flight_mode_name(vehicle.flight_mode) + "   |   ALT " +
+            altitude_detail(vehicle) + "   |   GPS " + gps_detail(vehicle) +
             "   |   BAT " + battery_detail(vehicle),
         vehicle.connected ? Tone::normal : Tone::dim,
-        use_color
-    );
-    if (vehicle.warnings.empty()) {
-        write_centered_line(
-            output,
-            vehicle.connected
-                ? "NO ACTIVE WARNINGS"
-                : "WARNINGS AVAILABLE AFTER CONNECTION",
-            vehicle.connected ? Tone::good : Tone::dim,
-            use_color
-        );
-    } else {
-        write_centered_line(
-            output,
-            "! " + vehicle.warnings.front(),
-            Tone::bad,
-            use_color
-        );
-    }
+        use_color);
+    const bool healthy = vehicle.warnings.empty();
+    const std::string warning =
+        healthy ? (vehicle.connected ? "NO ACTIVE WARNINGS"
+                                     : "WARNINGS AVAILABLE AFTER CONNECTION")
+                : "! " + vehicle.warnings.front();
+    const Tone warning_tone =
+        healthy ? (vehicle.connected ? Tone::good : Tone::dim) : Tone::bad;
+    write_centered_line(output, warning, warning_tone, use_color);
+}
+
+void write_runtime_footer(std::ostringstream& output,
+    const application::AppSnapshot& snapshot,
+    const bool use_color) {
+    const auto& startup = snapshot.flight_startup;
+    const auto& autonomy = snapshot.autonomy;
+    const bool startup_finished =
+        startup.phase == application::FlightStartupPhase::completed ||
+        startup.phase == application::FlightStartupPhase::disabled;
 
     write_border(output, '-', use_color);
-    write_line(
-        output,
+    write_line(output,
         " AUTONOMY: " + autonomy_phase_name(autonomy.phase) +
             " | STARTUP: " + startup_phase_name(startup.phase),
         autonomy_tone(autonomy.phase),
-        use_color
-    );
-    write_line(
-        output,
-        " " +
-            (startup.phase ==
-                         application::FlightStartupPhase::completed ||
-                     startup.phase ==
-                         application::FlightStartupPhase::disabled
-                 ? autonomy.detail
-                 : startup.detail),
+        use_color);
+    write_line(output,
+        " " + (startup_finished ? autonomy.detail : startup.detail),
         autonomy_tone(autonomy.phase),
-        use_color
-    );
-    write_centered_line(
-        output,
+        use_color);
+    write_centered_line(output,
         snapshot.motion_commands_allowed
             ? "[S] START AGAIN     [Q] QUIT"
             : "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT",
-        snapshot.motion_commands_allowed
-            ? Tone::normal
-            : Tone::dim,
-        use_color
-    );
+        snapshot.motion_commands_allowed ? Tone::normal : Tone::dim,
+        use_color);
     write_border(output, '=', use_color);
+}
+
+} // namespace
+
+std::string render_console(const application::AppSnapshot& snapshot,
+    const std::string_view transport_description,
+    const bool use_color,
+    const BoardTypeResolver* board_type_resolver) {
+    std::ostringstream output;
+    write_border(output, '=', use_color);
+    write_header(output,
+        snapshot.vehicle.connected ? "ONLINE" : "WAITING",
+        transport_description,
+        snapshot.vehicle.connected,
+        use_color);
+    write_border(output, '-', use_color);
+    write_topology(output, snapshot, board_type_resolver, use_color);
+    write_vehicle_status(output, snapshot, board_type_resolver, use_color);
+    write_runtime_footer(output, snapshot, use_color);
     return output.str();
 }
 
-}  // namespace onboard_autonomy::presentation::console
+} // namespace onboard_autonomy::presentation::console

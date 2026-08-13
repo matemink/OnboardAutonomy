@@ -36,48 +36,67 @@ struct FlightStartupSnapshot {
 };
 
 class FlightStartupController {
-public:
+  public:
     explicit FlightStartupController(FlightStartupConfig config = {});
 
     [[nodiscard]] std::vector<FlightActionRequest> update(
         const domain::VehicleSnapshot& vehicle,
         bool telemetry_ready,
         const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
-        domain::TimePoint now
-    );
+        domain::TimePoint now);
 
-    void on_action_sent(
-        const FlightActionRequest& request,
+    void on_action_sent(const FlightActionRequest& request,
         bool sent,
-        domain::TimePoint now
-    );
+        domain::TimePoint now);
 
-    void on_command_ack(
-        FlightAction action,
+    void on_command_ack(FlightAction action,
         FlightCommandAckOutcome outcome,
         std::uint8_t raw_result,
         std::uint8_t source_system,
-        domain::TimePoint now
-    );
+        domain::TimePoint now);
 
     void restart();
     [[nodiscard]] FlightStartupSnapshot snapshot() const;
 
-private:
-    void enter_phase(
-        FlightStartupPhase phase,
-        domain::TimePoint now
-    );
-    void fail(std::string detail);
-    void update_readiness_detail(
+  private:
+    enum class PhaseUpdate { advance, stop };
+
+    [[nodiscard]] bool validate_active_context(
+        const domain::VehicleSnapshot& vehicle,
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe);
+    [[nodiscard]] PhaseUpdate update_current_phase(
         const domain::VehicleSnapshot& vehicle,
         bool telemetry_ready,
-        const CompanionLinkFailsafeSnapshot& companion_link_failsafe
-    );
-    [[nodiscard]] std::optional<FlightActionRequest> update_command(
-        FlightAction action,
-        domain::TimePoint now
-    );
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+        domain::TimePoint now,
+        std::vector<FlightActionRequest>& actions);
+    [[nodiscard]] PhaseUpdate update_waiting_for_vehicle(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now);
+    [[nodiscard]] PhaseUpdate update_waiting_for_readiness(
+        const domain::VehicleSnapshot& vehicle,
+        bool telemetry_ready,
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+        domain::TimePoint now);
+    [[nodiscard]] PhaseUpdate update_setting_guided(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now,
+        std::vector<FlightActionRequest>& actions);
+    [[nodiscard]] PhaseUpdate update_arming(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now,
+        std::vector<FlightActionRequest>& actions);
+    [[nodiscard]] PhaseUpdate update_taking_off(
+        const domain::VehicleSnapshot& vehicle,
+        domain::TimePoint now,
+        std::vector<FlightActionRequest>& actions);
+    void enter_phase(FlightStartupPhase phase, domain::TimePoint now);
+    void fail(std::string detail);
+    void update_readiness_detail(const domain::VehicleSnapshot& vehicle,
+        bool telemetry_ready,
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe);
+    [[nodiscard]] std::optional<FlightActionRequest>
+    update_command(FlightAction action, domain::TimePoint now);
     [[nodiscard]] std::optional<FlightAction> expected_action() const;
 
     FlightStartupConfig config_;
@@ -92,4 +111,4 @@ private:
     std::optional<std::uint8_t> failure_result_;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application
