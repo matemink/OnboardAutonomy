@@ -1,6 +1,6 @@
 #include "TestCases.hpp"
 
-#include "onboard_autonomy/application/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/AppSnapshot.hpp"
 #include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
 
 #include <nlohmann/json.hpp>
@@ -15,8 +15,8 @@
 namespace {
 
 using Json = nlohmann::json;
-using onboard_autonomy::application::AppSnapshot;
 using onboard_autonomy::diagnostics::logging::JsonDiagnosticSink;
+using onboard_autonomy::mission::AppSnapshot;
 
 void require(const bool condition, const std::string& message) {
     if (!condition) {
@@ -46,29 +46,28 @@ Json serialize_snapshot(const AppSnapshot& snapshot) {
 void snapshot_keeps_runtime_state_without_camera_data() {
     AppSnapshot snapshot;
     snapshot.flight_startup.phase =
-        onboard_autonomy::application::FlightStartupPhase::waiting_for_vehicle;
+        onboard_autonomy::mission::FlightStartupPhase::waiting_for_vehicle;
     snapshot.flight_startup.detail = "Waiting for controller";
     snapshot.autonomy.phase =
-        onboard_autonomy::application::AutonomyRuntimePhase::active;
+        onboard_autonomy::mission::AutonomyRuntimePhase::active;
     snapshot.autonomy.detail = "Autonomy active";
     snapshot.autonomy.vision_landing_target_active = true;
     snapshot.autonomy.terminal_descent_active = true;
     snapshot.motion_commands_allowed = true;
-    snapshot.simulated_wind =
-        onboard_autonomy::application::SimulatedWindProfile{
-            .speed_m_s = 3.0,
-            .direction_from_deg = 270.0,
-            .turbulence_m_s = 0.6,
-        };
+    snapshot.simulated_wind = onboard_autonomy::mission::SimulatedWindProfile{
+        .speed_m_s = 3.0,
+        .direction_from_deg = 270.0,
+        .turbulence_m_s = 0.6,
+    };
     snapshot.companion_heartbeat_active = true;
     snapshot.companion_link_failsafe.phase =
-        onboard_autonomy::application::CompanionLinkFailsafePhase::accepted;
+        onboard_autonomy::mission::CompanionLinkFailsafePhase::accepted;
     snapshot.companion_link_failsafe.action =
-        onboard_autonomy::application::ArduPilotGcsFailsafeAction::land;
+        onboard_autonomy::mission::ArduPilotGcsFailsafeAction::land;
     snapshot.companion_link_failsafe.timeout_s = 3.0;
     snapshot.companion_link_failsafe.options = 0U;
     snapshot.telemetry.state =
-        onboard_autonomy::application::TelemetrySetupState::active;
+        onboard_autonomy::mission::TelemetrySetupState::active;
     snapshot.telemetry.completed_requests = 6;
     snapshot.telemetry.total_requests = 6;
 
@@ -93,9 +92,8 @@ void snapshot_keeps_runtime_state_without_camera_data() {
 
 void snapshot_serializes_camera_and_metric_vision() {
     AppSnapshot snapshot;
-    snapshot.camera = onboard_autonomy::application::CameraSnapshot{
-        .phase =
-            onboard_autonomy::application::ports::CameraSourcePhase::streaming,
+    snapshot.camera = onboard_autonomy::mission::CameraSnapshot{
+        .phase = onboard_autonomy::mission::ports::CameraSourcePhase::streaming,
         .source = "Camera Module 3 \"Wide\"",
         .error = "",
         .width = 640,
@@ -110,7 +108,7 @@ void snapshot_serializes_camera_and_metric_vision() {
         .maximum_latency_ms = std::nullopt,
         .latest_frame_age_ms = std::nullopt,
     };
-    snapshot.vision = onboard_autonomy::application::VisionSnapshot{
+    snapshot.vision = onboard_autonomy::mission::VisionSnapshot{
         .detector = "AprilTag 3 / tagStandard41h12",
         .processed_frames = 10,
         .frames_with_targets = 1,
@@ -127,7 +125,7 @@ void snapshot_serializes_camera_and_metric_vision() {
             .corrected_bits = 0,
             .decision_margin = 80.0,
             .pose =
-                onboard_autonomy::domain::TargetPose{
+                onboard_autonomy::mission::TargetPose{
                     .position = {.right_m = 0.1,
                         .down_m = -0.2,
                         .forward_m = 1.25},
@@ -138,8 +136,7 @@ void snapshot_serializes_camera_and_metric_vision() {
         }},
         .target_track =
             {
-                .phase =
-                    onboard_autonomy::application::TargetTrackPhase::tracking,
+                .phase = onboard_autonomy::mission::TargetTrackPhase::tracking,
                 .target_id = 0,
                 .consecutive_observations = 4,
                 .required_observations = 3,
@@ -147,7 +144,7 @@ void snapshot_serializes_camera_and_metric_vision() {
                 .observation_age_ms = 12.0,
                 .latest_decision_margin = 80.0,
                 .position =
-                    onboard_autonomy::domain::CameraFramePosition{
+                    onboard_autonomy::mission::CameraFramePosition{
                         .right_m = 0.09,
                         .down_m = -0.18,
                         .forward_m = 1.20,
@@ -177,12 +174,12 @@ void transition_events_reconstruct_runtime_failures() {
     AppSnapshot waiting;
     waiting.elapsed = 10ms;
     waiting.flight_startup.phase =
-        onboard_autonomy::application::FlightStartupPhase::waiting_for_vehicle;
-    waiting.autonomy.phase = onboard_autonomy::application::
-        AutonomyRuntimePhase::waiting_for_startup;
-    waiting.camera = onboard_autonomy::application::CameraSnapshot{
-        .phase = onboard_autonomy::application::ports::CameraSourcePhase::
-            reconnecting,
+        onboard_autonomy::mission::FlightStartupPhase::waiting_for_vehicle;
+    waiting.autonomy.phase =
+        onboard_autonomy::mission::AutonomyRuntimePhase::waiting_for_startup;
+    waiting.camera = onboard_autonomy::mission::CameraSnapshot{
+        .phase =
+            onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting,
         .source = "test camera",
         .error = "stream unavailable",
         .width = 0,
@@ -197,33 +194,32 @@ void transition_events_reconstruct_runtime_failures() {
         .maximum_latency_ms = std::nullopt,
         .latest_frame_age_ms = std::nullopt,
     };
-    waiting.vision = onboard_autonomy::application::VisionSnapshot{};
+    waiting.vision = onboard_autonomy::mission::VisionSnapshot{};
     sink.consume(waiting, std::chrono::system_clock::time_point{1s});
 
     AppSnapshot active = waiting;
     active.elapsed = 120ms;
     active.vehicle.connected = true;
     active.camera->phase =
-        onboard_autonomy::application::ports::CameraSourcePhase::streaming;
+        onboard_autonomy::mission::ports::CameraSourcePhase::streaming;
     active.camera->error.clear();
     active.vision->target_track.phase =
-        onboard_autonomy::application::TargetTrackPhase::tracking;
+        onboard_autonomy::mission::TargetTrackPhase::tracking;
     active.flight_startup.phase =
-        onboard_autonomy::application::FlightStartupPhase::setting_guided;
+        onboard_autonomy::mission::FlightStartupPhase::setting_guided;
     active.flight_startup.detail = "GUIDED command accepted";
     active.autonomy.phase =
-        onboard_autonomy::application::AutonomyRuntimePhase::active;
+        onboard_autonomy::mission::AutonomyRuntimePhase::active;
     active.autonomy.detail = "precision landing active";
     active.companion_link_failsafe.phase =
-        onboard_autonomy::application::CompanionLinkFailsafePhase::accepted;
+        onboard_autonomy::mission::CompanionLinkFailsafePhase::accepted;
     active.companion_link_failsafe.detail = "failsafe parameters accepted";
     active.motion_commands_allowed = true;
     active.link_events.push_back({
         .sequence = 1,
         .elapsed = 100ms,
-        .direction =
-            onboard_autonomy::application::LinkEventDirection::outbound,
-        .status = onboard_autonomy::application::LinkEventStatus::success,
+        .direction = onboard_autonomy::mission::LinkEventDirection::outbound,
+        .status = onboard_autonomy::mission::LinkEventStatus::success,
         .label = "GUIDED",
         .detail = "COMMAND_ACK ACCEPTED",
     });
@@ -233,25 +229,25 @@ void transition_events_reconstruct_runtime_failures() {
     failed.elapsed = 300ms;
     failed.vehicle.connected = false;
     failed.camera->phase =
-        onboard_autonomy::application::ports::CameraSourcePhase::reconnecting;
+        onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting;
     failed.camera->error = "frame stalled";
     failed.vision->target_track.phase =
-        onboard_autonomy::application::TargetTrackPhase::searching;
+        onboard_autonomy::mission::TargetTrackPhase::searching;
     failed.flight_startup.phase =
-        onboard_autonomy::application::FlightStartupPhase::failed;
+        onboard_autonomy::mission::FlightStartupPhase::failed;
     failed.flight_startup.detail = "arm command rejected";
     failed.autonomy.phase =
-        onboard_autonomy::application::AutonomyRuntimePhase::failed;
+        onboard_autonomy::mission::AutonomyRuntimePhase::failed;
     failed.autonomy.detail = "controller heartbeat was lost";
     failed.companion_link_failsafe.phase =
-        onboard_autonomy::application::CompanionLinkFailsafePhase::rejected;
+        onboard_autonomy::mission::CompanionLinkFailsafePhase::rejected;
     failed.companion_link_failsafe.detail = "failsafe activation failed";
     failed.motion_commands_allowed = false;
     failed.link_events.push_back({
         .sequence = 2,
         .elapsed = 280ms,
-        .direction = onboard_autonomy::application::LinkEventDirection::inbound,
-        .status = onboard_autonomy::application::LinkEventStatus::failure,
+        .direction = onboard_autonomy::mission::LinkEventDirection::inbound,
+        .status = onboard_autonomy::mission::LinkEventStatus::failure,
         .label = "ARM",
         .detail = "COMMAND_ACK DENIED",
     });

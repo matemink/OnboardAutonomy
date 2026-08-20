@@ -1,6 +1,6 @@
 #include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
 
-#include "onboard_autonomy/application/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/AppSnapshot.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -33,8 +33,8 @@ Json optional_signed_byte(const std::optional<std::int8_t>& value) {
 }
 
 std::string_view camera_phase_name(
-    const application::ports::CameraSourcePhase phase) {
-    using application::ports::CameraSourcePhase;
+    const mission::ports::CameraSourcePhase phase) {
+    using mission::ports::CameraSourcePhase;
     switch (phase) {
     case CameraSourcePhase::starting:
         return "starting";
@@ -51,8 +51,8 @@ std::string_view camera_phase_name(
 }
 
 std::string_view target_track_phase_name(
-    const application::TargetTrackPhase phase) {
-    using application::TargetTrackPhase;
+    const mission::TargetTrackPhase phase) {
+    using mission::TargetTrackPhase;
     switch (phase) {
     case TargetTrackPhase::searching:
         return "searching";
@@ -65,8 +65,8 @@ std::string_view target_track_phase_name(
 }
 
 std::string_view telemetry_state_name(
-    const application::TelemetrySetupState state) {
-    using application::TelemetrySetupState;
+    const mission::TelemetrySetupState state) {
+    using mission::TelemetrySetupState;
     switch (state) {
     case TelemetrySetupState::waiting_for_vehicle:
         return "waiting_for_vehicle";
@@ -80,9 +80,8 @@ std::string_view telemetry_state_name(
     return "failed";
 }
 
-std::string_view startup_phase_name(
-    const application::FlightStartupPhase phase) {
-    using application::FlightStartupPhase;
+std::string_view startup_phase_name(const mission::FlightStartupPhase phase) {
+    using mission::FlightStartupPhase;
     switch (phase) {
     case FlightStartupPhase::disabled:
         return "disabled";
@@ -105,8 +104,8 @@ std::string_view startup_phase_name(
 }
 
 std::string_view autonomy_phase_name(
-    const application::AutonomyRuntimePhase phase) {
-    using application::AutonomyRuntimePhase;
+    const mission::AutonomyRuntimePhase phase) {
+    using mission::AutonomyRuntimePhase;
     switch (phase) {
     case AutonomyRuntimePhase::disabled:
         return "disabled";
@@ -125,13 +124,13 @@ std::string_view autonomy_phase_name(
 }
 
 std::string_view link_direction_name(
-    const application::LinkEventDirection direction) {
-    return direction == application::LinkEventDirection::outbound ? "outbound"
-                                                                  : "inbound";
+    const mission::LinkEventDirection direction) {
+    return direction == mission::LinkEventDirection::outbound ? "outbound"
+                                                              : "inbound";
 }
 
-std::string_view link_status_name(const application::LinkEventStatus status) {
-    using application::LinkEventStatus;
+std::string_view link_status_name(const mission::LinkEventStatus status) {
+    using mission::LinkEventStatus;
     switch (status) {
     case LinkEventStatus::neutral:
         return "neutral";
@@ -147,7 +146,7 @@ std::string_view link_status_name(const application::LinkEventStatus status) {
     return "failure";
 }
 
-Json vehicle_json(const domain::VehicleSnapshot& vehicle) {
+Json vehicle_json(const mission::VehicleSnapshot& vehicle) {
     Json result{
         {"connected", vehicle.connected},
         {"gps_ready", vehicle.gps_ready},
@@ -201,7 +200,7 @@ Json vehicle_json(const domain::VehicleSnapshot& vehicle) {
     return result;
 }
 
-Json camera_json(const std::optional<application::CameraSnapshot>& camera) {
+Json camera_json(const std::optional<mission::CameraSnapshot>& camera) {
     if (!camera.has_value()) {
         return nullptr;
     }
@@ -224,7 +223,7 @@ Json camera_json(const std::optional<application::CameraSnapshot>& camera) {
     };
 }
 
-Json target_pose_json(const std::optional<domain::TargetPose>& pose) {
+Json target_pose_json(const std::optional<mission::TargetPose>& pose) {
     if (!pose.has_value()) {
         return nullptr;
     }
@@ -238,7 +237,7 @@ Json target_pose_json(const std::optional<domain::TargetPose>& pose) {
     };
 }
 
-Json target_json(const domain::TargetObservation& target) {
+Json target_json(const mission::TargetObservation& target) {
     return Json{
         {"id", target.id},
         {"family", target.family},
@@ -250,7 +249,7 @@ Json target_json(const domain::TargetObservation& target) {
     };
 }
 
-Json track_json(const application::TargetTrackSnapshot& track) {
+Json track_json(const mission::TargetTrackSnapshot& track) {
     Json position = nullptr;
     if (track.position.has_value()) {
         position = {
@@ -273,7 +272,7 @@ Json track_json(const application::TargetTrackSnapshot& track) {
     };
 }
 
-Json vision_json(const std::optional<application::VisionSnapshot>& vision) {
+Json vision_json(const std::optional<mission::VisionSnapshot>& vision) {
     if (!vision.has_value()) {
         return nullptr;
     }
@@ -298,7 +297,7 @@ Json vision_json(const std::optional<application::VisionSnapshot>& vision) {
     };
 }
 
-Json link_event_json(const application::LinkEvent& event) {
+Json link_event_json(const mission::LinkEvent& event) {
     return Json{
         {"sequence", event.sequence},
         {"elapsed_ms", event.elapsed.count()},
@@ -309,8 +308,7 @@ Json link_event_json(const application::LinkEvent& event) {
     };
 }
 
-Json link_activity_json(
-    const std::optional<application::LinkActivity>& activity) {
+Json link_activity_json(const std::optional<mission::LinkActivity>& activity) {
     if (!activity.has_value()) {
         return nullptr;
     }
@@ -322,7 +320,7 @@ Json link_activity_json(
     };
 }
 
-Json snapshot_json(const application::AppSnapshot& snapshot,
+Json snapshot_json(const mission::AppSnapshot& snapshot,
     const std::int64_t recorded_at_unix_ms) {
     Json result = vehicle_json(snapshot.vehicle);
     result["record_type"] = "snapshot";
@@ -346,7 +344,7 @@ Json snapshot_json(const application::AppSnapshot& snapshot,
             : Json(nullptr);
     result["companion_link_failsafe"] = {
         {"phase",
-            application::companion_link_failsafe_phase_name(
+            mission::companion_link_failsafe_phase_name(
                 snapshot.companion_link_failsafe.phase)},
         {"detail", snapshot.companion_link_failsafe.detail},
         {"heartbeat_system_id",
@@ -357,9 +355,8 @@ Json snapshot_json(const application::AppSnapshot& snapshot,
                 snapshot.companion_link_failsafe.configured_gcs_system_id)},
         {"action",
             snapshot.companion_link_failsafe.action.has_value()
-                ? Json(std::string(
-                      application::ardupilot_gcs_failsafe_action_name(
-                          *snapshot.companion_link_failsafe.action)))
+                ? Json(std::string(mission::ardupilot_gcs_failsafe_action_name(
+                      *snapshot.companion_link_failsafe.action)))
                 : Json(nullptr)},
         {"timeout_s",
             optional_number(snapshot.companion_link_failsafe.timeout_s)},
@@ -402,16 +399,16 @@ std::int64_t unix_milliseconds(
         .count();
 }
 
-bool target_tracked(const application::AppSnapshot& snapshot) {
+bool target_tracked(const mission::AppSnapshot& snapshot) {
     return snapshot.vision.has_value() &&
            snapshot.vision->target_track.phase ==
-               application::TargetTrackPhase::tracking;
+               mission::TargetTrackPhase::tracking;
 }
 
-bool camera_streaming(const application::AppSnapshot& snapshot) {
+bool camera_streaming(const mission::AppSnapshot& snapshot) {
     return snapshot.camera.has_value() &&
            snapshot.camera->phase ==
-               application::ports::CameraSourcePhase::streaming;
+               mission::ports::CameraSourcePhase::streaming;
 }
 
 } // namespace
@@ -428,7 +425,7 @@ class JsonDiagnosticSink::Impl {
         }
     }
 
-    void consume(const application::AppSnapshot& snapshot,
+    void consume(const mission::AppSnapshot& snapshot,
         const std::chrono::system_clock::time_point recorded_at) {
         const auto recorded_at_ms = unix_milliseconds(recorded_at);
         write(snapshot_json(snapshot, recorded_at_ms));
@@ -443,7 +440,7 @@ class JsonDiagnosticSink::Impl {
 
     void event(const std::string_view name,
         const std::int64_t recorded_at_ms,
-        const application::AppSnapshot& snapshot,
+        const mission::AppSnapshot& snapshot,
         const std::string_view detail,
         Json context = Json::object()) {
         write({
@@ -456,7 +453,7 @@ class JsonDiagnosticSink::Impl {
         });
     }
 
-    void write_initial_event(const application::AppSnapshot& snapshot,
+    void write_initial_event(const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
         event("runtime_observation_started",
             recorded_at_ms,
@@ -467,8 +464,8 @@ class JsonDiagnosticSink::Impl {
                 {"target_tracked", target_tracked(snapshot)}});
     }
 
-    void write_connection_events(const application::AppSnapshot& previous,
-        const application::AppSnapshot& snapshot,
+    void write_connection_events(const mission::AppSnapshot& previous,
+        const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
         if (previous.vehicle.connected != snapshot.vehicle.connected) {
             event(snapshot.vehicle.connected ? "flight_controller_recovered"
@@ -503,8 +500,8 @@ class JsonDiagnosticSink::Impl {
         }
     }
 
-    void write_phase_events(const application::AppSnapshot& previous,
-        const application::AppSnapshot& snapshot,
+    void write_phase_events(const mission::AppSnapshot& previous,
+        const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
         if (previous.flight_startup.phase != snapshot.flight_startup.phase) {
             event("flight_startup_phase_changed",
@@ -529,10 +526,10 @@ class JsonDiagnosticSink::Impl {
                 snapshot,
                 snapshot.companion_link_failsafe.detail,
                 {{"from",
-                     application::companion_link_failsafe_phase_name(
+                     mission::companion_link_failsafe_phase_name(
                          previous.companion_link_failsafe.phase)},
                     {"to",
-                        application::companion_link_failsafe_phase_name(
+                        mission::companion_link_failsafe_phase_name(
                             snapshot.companion_link_failsafe.phase)}});
         }
         if (previous.motion_commands_allowed !=
@@ -545,7 +542,7 @@ class JsonDiagnosticSink::Impl {
         }
     }
 
-    void write_link_events(const application::AppSnapshot& snapshot,
+    void write_link_events(const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
         for (const auto& link_event : snapshot.link_events) {
             if (link_event.sequence <= last_link_event_sequence_) {
@@ -560,7 +557,7 @@ class JsonDiagnosticSink::Impl {
         }
     }
 
-    void write_events(const application::AppSnapshot& snapshot,
+    void write_events(const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
         if (!previous_.has_value()) {
             write_initial_event(snapshot, recorded_at_ms);
@@ -574,7 +571,7 @@ class JsonDiagnosticSink::Impl {
 
     std::ofstream owned_output_;
     std::ostream* output_;
-    std::optional<application::AppSnapshot> previous_;
+    std::optional<mission::AppSnapshot> previous_;
     std::uint64_t last_link_event_sequence_{0};
 };
 
@@ -586,7 +583,7 @@ JsonDiagnosticSink::JsonDiagnosticSink(const std::filesystem::path& output_file)
 
 JsonDiagnosticSink::~JsonDiagnosticSink() = default;
 
-void JsonDiagnosticSink::consume(const application::AppSnapshot& snapshot,
+void JsonDiagnosticSink::consume(const mission::AppSnapshot& snapshot,
     const std::chrono::system_clock::time_point recorded_at) {
     impl_->consume(snapshot, recorded_at);
 }

@@ -96,182 +96,182 @@ function(onboard_autonomy_enable_warnings target)
 endfunction()
 
 add_library(
-    onboard_autonomy_domain
-    src/domain/CameraCalibration.cpp
-    src/domain/TargetTransform.cpp
-    src/domain/VehicleState.cpp
+    onboard_autonomy_mission_types
+    src/mission/cv/calibration/CameraCalibration.cpp
+    src/mission/cv/extrinsics/TargetTransform.cpp
+    src/mission/flight/VehicleState.cpp
 )
 target_link_libraries(
-    onboard_autonomy_domain
+    onboard_autonomy_mission_types
     PUBLIC
         onboard_autonomy_public_headers
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_domain)
+onboard_autonomy_enable_warnings(onboard_autonomy_mission_types)
 
-add_library(onboard_autonomy_transport_port INTERFACE)
+add_library(onboard_autonomy_mission_transport_port INTERFACE)
 target_link_libraries(
-    onboard_autonomy_transport_port
+    onboard_autonomy_mission_transport_port
     INTERFACE
         onboard_autonomy_public_headers
 )
 
-add_library(onboard_autonomy_camera_port INTERFACE)
+add_library(onboard_autonomy_mission_camera_port INTERFACE)
 target_link_libraries(
-    onboard_autonomy_camera_port
+    onboard_autonomy_mission_camera_port
     INTERFACE
         onboard_autonomy_public_headers
 )
 
-add_library(onboard_autonomy_target_detector_port INTERFACE)
+add_library(onboard_autonomy_mission_target_detector_port INTERFACE)
 target_link_libraries(
-    onboard_autonomy_target_detector_port
+    onboard_autonomy_mission_target_detector_port
     INTERFACE
         onboard_autonomy_public_headers
 )
 
-add_library(onboard_autonomy_camera_preview_port INTERFACE)
+add_library(onboard_autonomy_diagnostics_preview_port INTERFACE)
 target_link_libraries(
-    onboard_autonomy_camera_preview_port
+    onboard_autonomy_diagnostics_preview_port
     INTERFACE
-        onboard_autonomy_camera_port
+        onboard_autonomy_mission_camera_port
         onboard_autonomy_public_headers
 )
 
 add_library(
-    onboard_autonomy_camera_adapter
-    src/adapters/camera/GStreamerCameraSource.cpp
-    src/adapters/camera/RpicamCameraSource.cpp
+    onboard_autonomy_hardware_camera
+    src/hardware/camera/GStreamerCameraSource.cpp
+    src/hardware/camera/RpicamCameraSource.cpp
 )
 target_link_libraries(
-    onboard_autonomy_camera_adapter
+    onboard_autonomy_hardware_camera
     PUBLIC
-        onboard_autonomy_camera_port
+        onboard_autonomy_mission_camera_port
     PRIVATE
         Threads::Threads
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_camera_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_hardware_camera)
 
 add_library(
-    onboard_autonomy_apriltag_adapter
-    src/adapters/vision/AprilTagTargetDetector.cpp
-    src/adapters/vision/CameraGeometry.cpp
+    onboard_autonomy_mission_cv_detection
+    src/mission/cv/detection/AprilTagTargetDetector.cpp
+    src/mission/cv/detection/CameraGeometry.cpp
 )
 target_link_libraries(
-    onboard_autonomy_apriltag_adapter
+    onboard_autonomy_mission_cv_detection
     PUBLIC
-        onboard_autonomy_target_detector_port
+        onboard_autonomy_mission_target_detector_port
     PRIVATE
         apriltag
 )
 target_include_directories(
-    onboard_autonomy_apriltag_adapter
+    onboard_autonomy_mission_cv_detection
     SYSTEM PRIVATE
         ${apriltag_source_SOURCE_DIR}
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_apriltag_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_mission_cv_detection)
 
 add_library(
-    onboard_autonomy_camera_calibration_adapter
-    src/adapters/vision/CameraCalibrationLoader.cpp
-    src/adapters/vision/CameraExtrinsicsLoader.cpp
+    onboard_autonomy_mission_cv_geometry
+    src/mission/cv/calibration/CameraCalibrationLoader.cpp
+    src/mission/cv/extrinsics/CameraExtrinsicsLoader.cpp
 )
 target_link_libraries(
-    onboard_autonomy_camera_calibration_adapter
+    onboard_autonomy_mission_cv_geometry
     PUBLIC
-        onboard_autonomy_domain
+        onboard_autonomy_mission_types
         onboard_autonomy_public_headers
     PRIVATE
         nlohmann_json::nlohmann_json
 )
 onboard_autonomy_enable_warnings(
-    onboard_autonomy_camera_calibration_adapter
+    onboard_autonomy_mission_cv_geometry
 )
 
 add_library(
-    onboard_autonomy_camera_preview_adapter
-    src/adapters/preview/HttpCameraPreviewServer.cpp
+    onboard_autonomy_diagnostics_preview
+    src/diagnostics/preview/HttpCameraPreviewServer.cpp
 )
 target_link_libraries(
-    onboard_autonomy_camera_preview_adapter
+    onboard_autonomy_diagnostics_preview
     PUBLIC
-        onboard_autonomy_camera_preview_port
+        onboard_autonomy_diagnostics_preview_port
     PRIVATE
         Threads::Threads
 )
 target_include_directories(
-    onboard_autonomy_camera_preview_adapter
+    onboard_autonomy_diagnostics_preview
     SYSTEM PRIVATE
         ${cpp_httplib_source_SOURCE_DIR}
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_camera_preview_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_diagnostics_preview)
 
 add_library(
-    onboard_autonomy_transport_adapter
-    src/adapters/transport/PosixSerialTransport.cpp
-    src/adapters/transport/UdpTransport.cpp
+    onboard_autonomy_hardware_transport
+    src/hardware/transport/PosixSerialTransport.cpp
+    src/hardware/transport/UdpTransport.cpp
 )
 target_link_libraries(
-    onboard_autonomy_transport_adapter
+    onboard_autonomy_hardware_transport
     PUBLIC
-        onboard_autonomy_transport_port
+        onboard_autonomy_mission_transport_port
 )
 if(WIN32)
-    target_link_libraries(onboard_autonomy_transport_adapter PRIVATE ws2_32)
+    target_link_libraries(onboard_autonomy_hardware_transport PRIVATE ws2_32)
 endif()
-onboard_autonomy_enable_warnings(onboard_autonomy_transport_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_hardware_transport)
 
 add_library(
-    onboard_autonomy_mavlink_adapter
-    src/adapters/mavlink/MavlinkDecoder.cpp
-    src/adapters/mavlink/MavlinkEncoder.cpp
-    src/adapters/mavlink/TelemetryStreamConfigurator.cpp
+    onboard_autonomy_hardware_mavlink
+    src/hardware/mavlink/MavlinkDecoder.cpp
+    src/hardware/mavlink/MavlinkEncoder.cpp
+    src/hardware/mavlink/TelemetryStreamConfigurator.cpp
 )
 target_link_libraries(
-    onboard_autonomy_mavlink_adapter
+    onboard_autonomy_hardware_mavlink
     PUBLIC
-        onboard_autonomy_domain
+        onboard_autonomy_mission_types
         onboard_autonomy_mavlink_headers
         onboard_autonomy_public_headers
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_mavlink_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_hardware_mavlink)
 
 add_library(
-    onboard_autonomy_ardupilot_catalog_adapter
-    src/adapters/ardupilot/BoardTypeCatalog.cpp
+    onboard_autonomy_operator_screen
+    src/operator/ui/screen/BoardTypeCatalog.cpp
 )
 target_link_libraries(
-    onboard_autonomy_ardupilot_catalog_adapter
+    onboard_autonomy_operator_screen
     PUBLIC
         onboard_autonomy_public_headers
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_ardupilot_catalog_adapter)
+onboard_autonomy_enable_warnings(onboard_autonomy_operator_screen)
 
 add_library(
-    onboard_autonomy_application
-    src/application/AutonomyRuntime.cpp
-    src/application/CameraMonitor.cpp
-    src/application/CompanionLinkFailsafe.cpp
-    src/application/DecisionEngine.cpp
-    src/application/FlightStartupController.cpp
-    src/application/MotionSafetyPolicy.cpp
-    src/application/SafetySupervisor.cpp
-    src/application/TargetTracker.cpp
-    src/application/VisionMonitor.cpp
-    src/application/WorldState.cpp
-    src/application/CompanionApplication.cpp
+    onboard_autonomy_mission
+    src/mission/autonomy/AutonomyRuntime.cpp
+    src/mission/cv/CameraMonitor.cpp
+    src/mission/safety/CompanionLinkFailsafe.cpp
+    src/mission/autonomy/DecisionEngine.cpp
+    src/mission/flight/FlightStartupController.cpp
+    src/mission/safety/MotionSafetyPolicy.cpp
+    src/mission/safety/SafetySupervisor.cpp
+    src/mission/cv/tracking/TargetTracker.cpp
+    src/mission/cv/VisionMonitor.cpp
+    src/mission/autonomy/WorldState.cpp
+    src/mission/CompanionApplication.cpp
 )
 target_link_libraries(
-    onboard_autonomy_application
+    onboard_autonomy_mission
     PUBLIC
-        onboard_autonomy_domain
-        onboard_autonomy_camera_port
-        onboard_autonomy_target_detector_port
+        onboard_autonomy_mission_types
+        onboard_autonomy_mission_camera_port
+        onboard_autonomy_mission_target_detector_port
         onboard_autonomy_public_headers
-        onboard_autonomy_transport_port
+        onboard_autonomy_mission_transport_port
     PRIVATE
-        onboard_autonomy_mavlink_adapter
+        onboard_autonomy_hardware_mavlink
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_application)
+onboard_autonomy_enable_warnings(onboard_autonomy_mission)
 
 add_library(
     onboard_autonomy_mission_runtime
@@ -280,54 +280,54 @@ add_library(
 target_link_libraries(
     onboard_autonomy_mission_runtime
     PUBLIC
-        onboard_autonomy_application
+        onboard_autonomy_mission
         onboard_autonomy_public_headers
     PRIVATE
-        onboard_autonomy_apriltag_adapter
-        onboard_autonomy_camera_adapter
-        onboard_autonomy_camera_calibration_adapter
-        onboard_autonomy_transport_adapter
+        onboard_autonomy_mission_cv_detection
+        onboard_autonomy_hardware_camera
+        onboard_autonomy_mission_cv_geometry
+        onboard_autonomy_hardware_transport
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_mission_runtime)
 
 add_library(
-    onboard_autonomy_console_presentation
-    src/presentation/console/ConsoleInput.cpp
-    src/presentation/console/ConsoleSnapshotSink.cpp
-    src/presentation/console/ConsoleView.cpp
+    onboard_autonomy_operator_ui
+    src/operator/ui/input/ConsoleInput.cpp
+    src/operator/ui/screen/ConsoleSnapshotSink.cpp
+    src/operator/ui/screen/ConsoleView.cpp
 )
 target_link_libraries(
-    onboard_autonomy_console_presentation
+    onboard_autonomy_operator_ui
     PUBLIC
-        onboard_autonomy_application
+        onboard_autonomy_mission
         onboard_autonomy_public_headers
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_console_presentation)
+onboard_autonomy_enable_warnings(onboard_autonomy_operator_ui)
 
 add_library(
-    onboard_autonomy_diagnostic_logging
+    onboard_autonomy_diagnostics_logging
     src/diagnostics/logging/JsonDiagnosticSink.cpp
 )
 target_link_libraries(
-    onboard_autonomy_diagnostic_logging
+    onboard_autonomy_diagnostics_logging
     PUBLIC
-        onboard_autonomy_application
+        onboard_autonomy_mission
         onboard_autonomy_public_headers
     PRIVATE
         nlohmann_json::nlohmann_json
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_diagnostic_logging)
+onboard_autonomy_enable_warnings(onboard_autonomy_diagnostics_logging)
 
 add_library(
-    onboard_autonomy_cli_presentation
-    src/presentation/cli/CommandLine.cpp
+    onboard_autonomy_operator_cli
+    src/operator/cli/CommandLine.cpp
 )
 target_link_libraries(
-    onboard_autonomy_cli_presentation
+    onboard_autonomy_operator_cli
     PUBLIC
         onboard_autonomy_public_headers
 )
-onboard_autonomy_enable_warnings(onboard_autonomy_cli_presentation)
+onboard_autonomy_enable_warnings(onboard_autonomy_operator_cli)
 
 add_executable(
     onboard_autonomy
@@ -338,11 +338,11 @@ add_executable(
 target_link_libraries(
     onboard_autonomy
     PRIVATE
-        onboard_autonomy_cli_presentation
-        onboard_autonomy_ardupilot_catalog_adapter
-        onboard_autonomy_camera_preview_adapter
-        onboard_autonomy_console_presentation
-        onboard_autonomy_diagnostic_logging
+        onboard_autonomy_operator_cli
+        onboard_autonomy_operator_screen
+        onboard_autonomy_diagnostics_preview
+        onboard_autonomy_operator_ui
+        onboard_autonomy_diagnostics_logging
         onboard_autonomy_mission_runtime
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
@@ -431,21 +431,21 @@ if(BUILD_TESTING)
     target_link_libraries(
         onboard_autonomy_tests
         PRIVATE
-            onboard_autonomy_application
-            onboard_autonomy_cli_presentation
-            onboard_autonomy_ardupilot_catalog_adapter
-            onboard_autonomy_camera_adapter
-            onboard_autonomy_camera_calibration_adapter
-            onboard_autonomy_camera_port
-            onboard_autonomy_camera_preview_port
-            onboard_autonomy_apriltag_adapter
-            onboard_autonomy_target_detector_port
-            onboard_autonomy_domain
-            onboard_autonomy_mavlink_adapter
-            onboard_autonomy_console_presentation
-            onboard_autonomy_diagnostic_logging
-            onboard_autonomy_transport_adapter
-            onboard_autonomy_transport_port
+            onboard_autonomy_mission
+            onboard_autonomy_operator_cli
+            onboard_autonomy_operator_screen
+            onboard_autonomy_hardware_camera
+            onboard_autonomy_mission_cv_geometry
+            onboard_autonomy_mission_camera_port
+            onboard_autonomy_diagnostics_preview_port
+            onboard_autonomy_mission_cv_detection
+            onboard_autonomy_mission_target_detector_port
+            onboard_autonomy_mission_types
+            onboard_autonomy_hardware_mavlink
+            onboard_autonomy_operator_ui
+            onboard_autonomy_diagnostics_logging
+            onboard_autonomy_hardware_transport
+            onboard_autonomy_mission_transport_port
             apriltag
             nlohmann_json::nlohmann_json
     )
