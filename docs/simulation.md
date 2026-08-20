@@ -237,13 +237,10 @@ bounded frame count, and disables it during cleanup.
 
 The launcher selects the D3D12 Mesa path when `/dev/dxg` is available.
 If Gazebo opens without a visible scene or falls back to slow software
-rendering, use the verified troubleshooting record in
-[learning/11-wslg-gpu-acceleration.uk.md](learning/11-wslg-gpu-acceleration.uk.md).
+rendering, restart the WSL environment before retrying.
 
-The rolled-back decorative-airfield experiment is documented separately
-in
-[learning/14-gazebo-airfield-failed-experiment.uk.md](learning/14-gazebo-airfield-failed-experiment.uk.md)
-so an unsuccessful GUI path is not presented as a working feature.
+The decorative-airfield experiment was rolled back so an unsuccessful GUI
+path is not presented as a working feature.
 
 ## Safety boundary
 
