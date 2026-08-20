@@ -227,7 +227,7 @@ ONBOARD_AUTONOMY_BINARY=./build/onboard_autonomy \
 
 Expected behavior:
 
-- JSON is printed once per second and written to a timestamped JSONL log.
+- JSONL snapshots and transition events are written to a timestamped log.
 - `connected` changes to `true` after an ArduPilot heartbeat.
 - GPS and battery remain not ready if the corresponding messages are
   absent.

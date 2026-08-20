@@ -2,15 +2,13 @@
 
 #include "onboard_autonomy/application/AppSnapshot.hpp"
 #include "onboard_autonomy/application/CompanionApplication.hpp"
-#include "onboard_autonomy/application/ports/Transport.hpp"
-#include "onboard_autonomy/presentation/console/ConsoleView.hpp"
+#include "onboard_autonomy/application/ports/RuntimeSnapshotSink.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <csignal>
-#include <iostream>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 
 namespace onboard_autonomy::bootstrap {
 namespace {
@@ -18,8 +16,6 @@ namespace {
 // std::signal requires process-lifetime state accessible to the handler.
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 volatile std::sig_atomic_t keep_running = 1;
-constexpr auto kMaximumInteractiveRefreshInterval =
-    std::chrono::milliseconds{100};
 constexpr auto kEventLoopSleep = std::chrono::milliseconds{5};
 
 void handle_signal(int) {
@@ -27,53 +23,24 @@ void handle_signal(int) {
     keep_running = 0;
 }
 
-class ConsoleSession {
-  public:
-    explicit ConsoleSession(const bool active) : active_(active) {
-        if (active_) {
-            std::cout << "\x1b[2J\x1b[H\x1b[?25l" << std::flush;
-        }
-    }
-
-    ~ConsoleSession() {
-        if (active_) {
-            std::cout << "\x1b[?25h\x1b[0m\n" << std::flush;
-        }
-    }
-
-    ConsoleSession(const ConsoleSession&) = delete;
-    ConsoleSession& operator=(const ConsoleSession&) = delete;
-
-  private:
-    bool active_;
-};
-
 bool terminal_phase(const application::AutonomyRuntimePhase phase) {
     return phase == application::AutonomyRuntimePhase::completed ||
            phase == application::AutonomyRuntimePhase::failed;
-}
-
-std::chrono::milliseconds snapshot_interval(
-    const CompanionRunnerOptions& options) {
-    const auto configured =
-        std::chrono::milliseconds(options.snapshot_interval_ms);
-    return options.json_output
-               ? configured
-               : std::min(configured, kMaximumInteractiveRefreshInterval);
 }
 
 } // namespace
 
 CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
     application::CompanionApplication& application,
-    application::ports::Transport& transport,
-    const presentation::BoardTypeResolver* board_type_resolver)
-    : options_(options),
-      console_input_(options.interactive && !options.json_output),
-      application_(application), transport_(transport),
-      board_type_resolver_(board_type_resolver),
-      snapshot_interval_(snapshot_interval(options)),
+    std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks)
+    : options_(options), console_input_(options.interactive),
+      application_(application), snapshot_sinks_(std::move(snapshot_sinks)),
+      snapshot_interval_(options.snapshot_interval_ms),
       next_snapshot_(std::chrono::steady_clock::now()) {
+    if (snapshot_sinks_.empty()) {
+        throw std::invalid_argument(
+            "at least one runtime snapshot sink is required");
+    }
     if (options_.interactive && !console_input_.active()) {
         throw std::invalid_argument("--interactive requires a live terminal");
     }
@@ -83,8 +50,6 @@ int CompanionRunner::run() {
     keep_running = 1;
     std::signal(SIGINT, handle_signal);
     std::signal(SIGTERM, handle_signal);
-    ConsoleSession console_session{!options_.json_output};
-
     while (keep_running != 0) {
         handle_console_input();
         if (keep_running == 0) {
@@ -99,7 +64,7 @@ int CompanionRunner::run() {
         }
 
         const auto snapshot = application_.snapshot(now);
-        render_snapshot(snapshot);
+        publish_snapshot(snapshot);
         update_terminal_state(snapshot);
         next_snapshot_ = now + snapshot_interval_;
         std::this_thread::sleep_for(kEventLoopSleep);
@@ -121,19 +86,14 @@ void CompanionRunner::handle_console_input() {
     }
 }
 
-void CompanionRunner::render_snapshot(
+void CompanionRunner::publish_snapshot(
     const application::AppSnapshot& snapshot) const {
-    if (options_.json_output) {
-        std::cout << snapshot.to_json() << '\n' << std::flush;
-        return;
+    const auto recorded_at = std::chrono::system_clock::now();
+    for (auto* sink : snapshot_sinks_) {
+        if (sink != nullptr) {
+            sink->consume(snapshot, recorded_at);
+        }
     }
-
-    std::cout << "\x1b[H"
-              << presentation::console::render_console(snapshot,
-                     transport_.description(),
-                     true,
-                     board_type_resolver_)
-              << std::flush;
 }
 
 void CompanionRunner::update_terminal_state(

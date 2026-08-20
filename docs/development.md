@@ -217,10 +217,9 @@ python python/run_sitl_smoke_test.py --scenario prearm
 The isolated PreArm test never arms the vehicle or drives motors. Its
 parameter change exists only in the temporary SITL EEPROM for that run.
 
-## Machine-readable mode
+## Structured diagnostics
 
-Pass `--json` to emit one snapshot per interval instead of the operator
-console:
+Pass `--json` to emit JSON Lines instead of the operator console:
 
 ```bash
 "${HOME}/build/onboard_autonomy/onboard_autonomy" \
@@ -229,6 +228,21 @@ console:
     --json
 ```
 
+Snapshot records preserve the existing top-level telemetry fields and add
+`record_type`, wall-clock time, link activity, and elapsed runtime. Event
+records capture controller and camera loss/recovery, target acquisition/loss,
+mission and failsafe phase changes, motion-safety changes, and MAVLink command
+results.
+
+Structured logging can also run alongside the normal console:
+
+```bash
+"${HOME}/build/onboard_autonomy/onboard_autonomy" \
+    --transport udp \
+    --udp-port 14550 \
+    --diagnostic-log artifacts/flight.jsonl
+```
+
 Heartbeat freshness controls `connected`; stale data is not reported as
-healthy. JSON mode is the stable boundary used by Python integration
-tests and hardware logging.
+healthy. Console rendering and diagnostic serialization are independent
+snapshot consumers.

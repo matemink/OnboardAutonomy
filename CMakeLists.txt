@@ -248,7 +248,6 @@ onboard_autonomy_enable_warnings(onboard_autonomy_ardupilot_catalog_adapter)
 
 add_library(
     onboard_autonomy_application
-    src/application/AppSnapshot.cpp
     src/application/AutonomyRuntime.cpp
     src/application/CameraMonitor.cpp
     src/application/CompanionLinkFailsafe.cpp
@@ -278,6 +277,7 @@ onboard_autonomy_enable_warnings(onboard_autonomy_application)
 add_library(
     onboard_autonomy_console_presentation
     src/presentation/console/ConsoleInput.cpp
+    src/presentation/console/ConsoleSnapshotSink.cpp
     src/presentation/console/ConsoleView.cpp
 )
 target_link_libraries(
@@ -287,6 +287,20 @@ target_link_libraries(
         onboard_autonomy_public_headers
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_console_presentation)
+
+add_library(
+    onboard_autonomy_diagnostic_logging
+    src/diagnostics/logging/JsonDiagnosticSink.cpp
+)
+target_link_libraries(
+    onboard_autonomy_diagnostic_logging
+    PUBLIC
+        onboard_autonomy_application
+        onboard_autonomy_public_headers
+    PRIVATE
+        nlohmann_json::nlohmann_json
+)
+onboard_autonomy_enable_warnings(onboard_autonomy_diagnostic_logging)
 
 add_library(
     onboard_autonomy_cli_presentation
@@ -317,6 +331,7 @@ target_link_libraries(
         onboard_autonomy_camera_preview_adapter
         onboard_autonomy_apriltag_adapter
         onboard_autonomy_console_presentation
+        onboard_autonomy_diagnostic_logging
         onboard_autonomy_transport_adapter
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
@@ -380,7 +395,7 @@ if(BUILD_TESTING)
     add_executable(
         onboard_autonomy_tests
         tests/CompanionApplicationTests.cpp
-        tests/AppSnapshotTests.cpp
+        tests/JsonDiagnosticSinkTests.cpp
         tests/AutonomyCoreTests.cpp
         tests/AutonomyRuntimeTests.cpp
         tests/FlightStartupControllerTests.cpp
@@ -417,6 +432,7 @@ if(BUILD_TESTING)
             onboard_autonomy_domain
             onboard_autonomy_mavlink_adapter
             onboard_autonomy_console_presentation
+            onboard_autonomy_diagnostic_logging
             onboard_autonomy_transport_adapter
             onboard_autonomy_transport_port
             apriltag

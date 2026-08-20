@@ -61,6 +61,7 @@ struct AutonomyOptions {
 struct OperatorInterfaceOptions {
     bool interactive{};
     bool json_output{};
+    std::string diagnostic_log_file;
     std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
     std::string board_types_file;
 };
