@@ -1,7 +1,6 @@
 #pragma once
 
 #include "onboard_autonomy/application/VisionMonitor.hpp"
-#include "onboard_autonomy/application/ports/CameraPreviewSink.hpp"
 #include "onboard_autonomy/application/ports/CameraSource.hpp"
 #include "onboard_autonomy/domain/VehicleState.hpp"
 
@@ -9,13 +8,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace onboard_autonomy::application {
 
 struct CameraSnapshot {
-    ports::CameraSourcePhase phase{
-        ports::CameraSourcePhase::starting
-    };
+    ports::CameraSourcePhase phase{ports::CameraSourcePhase::starting};
     std::string source;
     std::string error;
     std::uint32_t width{0};
@@ -31,13 +29,16 @@ struct CameraSnapshot {
     std::optional<double> latest_frame_age_ms;
 };
 
+struct ProcessedCameraFrame {
+    ports::CameraFrame frame;
+    std::vector<domain::TargetObservation> targets;
+    TargetTrackSnapshot target_track;
+};
+
 class CameraMonitor {
-public:
-    explicit CameraMonitor(
-        ports::CameraSource& source,
-        ports::TargetDetector* target_detector = nullptr,
-        ports::CameraPreviewSink* preview_sink = nullptr
-    );
+  public:
+    explicit CameraMonitor(ports::CameraSource& source,
+        ports::TargetDetector* target_detector = nullptr);
     ~CameraMonitor();
 
     CameraMonitor(const CameraMonitor&) = delete;
@@ -48,12 +49,13 @@ public:
     void poll(domain::TimePoint now);
     [[nodiscard]] CameraSnapshot snapshot(domain::TimePoint now) const;
     [[nodiscard]] std::optional<VisionSnapshot> vision_snapshot(
-        domain::TimePoint now
-    ) const;
+        domain::TimePoint now) const;
+    [[nodiscard]] std::optional<ProcessedCameraFrame>
+    take_latest_processed_frame();
 
-private:
+  private:
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

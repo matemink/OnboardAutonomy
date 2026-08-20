@@ -265,7 +265,6 @@ target_link_libraries(
     PUBLIC
         onboard_autonomy_domain
         onboard_autonomy_camera_port
-        onboard_autonomy_camera_preview_port
         onboard_autonomy_target_detector_port
         onboard_autonomy_public_headers
         onboard_autonomy_transport_port
@@ -273,6 +272,23 @@ target_link_libraries(
         onboard_autonomy_mavlink_adapter
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_application)
+
+add_library(
+    onboard_autonomy_mission_runtime
+    src/bootstrap/MissionRuntime.cpp
+)
+target_link_libraries(
+    onboard_autonomy_mission_runtime
+    PUBLIC
+        onboard_autonomy_application
+        onboard_autonomy_public_headers
+    PRIVATE
+        onboard_autonomy_apriltag_adapter
+        onboard_autonomy_camera_adapter
+        onboard_autonomy_camera_calibration_adapter
+        onboard_autonomy_transport_adapter
+)
+onboard_autonomy_enable_warnings(onboard_autonomy_mission_runtime)
 
 add_library(
     onboard_autonomy_console_presentation
@@ -317,22 +333,17 @@ add_executable(
     onboard_autonomy
     src/main.cpp
     src/bootstrap/CompanionRunner.cpp
-    src/bootstrap/CompanionSystem.cpp
     src/bootstrap/Program.cpp
 )
 target_link_libraries(
     onboard_autonomy
     PRIVATE
-        onboard_autonomy_application
         onboard_autonomy_cli_presentation
         onboard_autonomy_ardupilot_catalog_adapter
-        onboard_autonomy_camera_adapter
-        onboard_autonomy_camera_calibration_adapter
         onboard_autonomy_camera_preview_adapter
-        onboard_autonomy_apriltag_adapter
         onboard_autonomy_console_presentation
         onboard_autonomy_diagnostic_logging
-        onboard_autonomy_transport_adapter
+        onboard_autonomy_mission_runtime
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
 

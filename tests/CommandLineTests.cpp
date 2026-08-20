@@ -150,10 +150,17 @@ void diagnostic_log_is_independent_from_console_output() {
     const auto* hardware = std::get_if<HardwareLaunchOptions>(&options);
     require(hardware != nullptr && hardware->operator_interface.interactive &&
                 !hardware->operator_interface.json_output &&
-                hardware->operator_interface.diagnostic_log_file ==
-                    "artifacts/flight.jsonl",
+                hardware->diagnostics.log_file == "artifacts/flight.jsonl",
         "structured diagnostics must be independently configurable");
     require_rejected({"--diagnostic-log", ""}, "cannot be empty");
+
+    const auto preview_options = parse({"--camera", "--camera-preview"});
+    const auto* preview_hardware =
+        std::get_if<HardwareLaunchOptions>(&preview_options);
+    require(preview_hardware != nullptr &&
+                preview_hardware->camera.has_value() &&
+                preview_hardware->diagnostics.camera_preview.has_value(),
+        "camera preview must be diagnostics, not mission configuration");
 }
 
 void removed_options_provide_migration_guidance() {

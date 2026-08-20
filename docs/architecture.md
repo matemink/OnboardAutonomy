@@ -38,9 +38,11 @@ flowchart LR
     VisionMonitor --> AppSnapshot
     VisionMonitor --> Tracker["TargetTracker"]
     Tracker --> AppSnapshot
-    CameraMonitor --> PreviewPort["CameraPreviewSink port"]
-    VisionMonitor --> PreviewPort
-    Tracker --> PreviewPort
+    CameraMonitor --> ProcessedFrame["ProcessedCameraFrame"]
+    VisionMonitor --> ProcessedFrame
+    Tracker --> ProcessedFrame
+    ProcessedFrame --> Loop["Bootstrap runtime loop"]
+    Loop --> PreviewPort["CameraPreviewSink port"]
     PreviewPort --> HTTP["HTTP preview adapter"]
     HTTP --> Browser["Windows browser canvas"]
     Tracker --> Transform["Camera to body-FRD transform"]
@@ -61,21 +63,39 @@ flowchart LR
     Application --> Mavlink
     Application --> TransportPort
     Application --> CameraPort
-    Application --> PreviewPort
     Application --> DetectorPort
     Transport["onboard_autonomy_transport_adapter"] --> TransportPort
     Camera["onboard_autonomy_camera_adapter"] --> CameraPort
     Preview["onboard_autonomy_camera_preview_adapter"] --> PreviewPort
     AprilTag["onboard_autonomy_apriltag_adapter"] --> DetectorPort
+    Mission["onboard_autonomy_mission_runtime"] --> Application
+    Mission --> Transport
+    Mission --> Camera
+    Mission --> AprilTag
     Presentation["onboard_autonomy_console_presentation"] --> Application
+    Diagnostics["onboard_autonomy_diagnostic_logging"] --> Application
     CLI["onboard_autonomy_cli_presentation"]
-    Executable["onboard_autonomy"] --> Application
-    Executable --> Transport
+    Executable["onboard_autonomy"] --> Mission
     Executable --> Presentation
+    Executable --> Diagnostics
+    Executable --> Preview
     Executable --> CLI
 ```
 
 ## Design boundaries
+
+### Runtime composition
+
+`Program` is the composition root and builds three explicit groups. The
+`MissionRuntime` owns only MAVLink transport, camera capture, target detection,
+camera geometry, motion safety, and `CompanionApplication`. Operator input,
+board-name resolution, console rendering, HTTP camera preview, and JSONL
+logging are constructed separately and consume mission outputs through the
+bootstrap loop.
+
+The `onboard_autonomy_mission_runtime` CMake target does not link the console,
+board catalog, preview, or diagnostic logger. Disabling any of those optional
+consumers therefore leaves mission construction unchanged.
 
 ### Transport
 
@@ -141,12 +161,14 @@ instead of jumping between visible markers. Rotation remains raw because
 averaging rotation matrices component by component would be mathematically
 invalid.
 
-The separate application-owned `CameraPreviewSink` receives the same
-frame plus its current detections and track snapshot. Its HTTP adapter
+`CameraMonitor` exposes the latest `ProcessedCameraFrame` after mission-side
+vision processing. The bootstrap loop forwards it to an optional
+`CameraPreviewSink`; neither `CameraMonitor` nor `CompanionApplication` accepts
+a preview dependency. The HTTP adapter
 rate-limits copies to 10 FPS and serves raw luminance bytes to a browser
 canvas. The browser draws target corners and shows acquisition, lock,
-filtered position, and freshness. Neither the application nor the camera
-adapter depends on HTTP or HTML.
+filtered position, and freshness. Mission execution therefore does not depend
+on HTTP, HTML, or the presence of a preview consumer.
 
 ### MAVLink decoder
 

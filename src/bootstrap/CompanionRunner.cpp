@@ -2,6 +2,7 @@
 
 #include "onboard_autonomy/application/AppSnapshot.hpp"
 #include "onboard_autonomy/application/CompanionApplication.hpp"
+#include "onboard_autonomy/application/ports/CameraPreviewSink.hpp"
 #include "onboard_autonomy/application/ports/RuntimeSnapshotSink.hpp"
 
 #include <chrono>
@@ -32,17 +33,18 @@ bool terminal_phase(const application::AutonomyRuntimePhase phase) {
 
 CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
     application::CompanionApplication& application,
-    std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks)
-    : options_(options), console_input_(options.interactive),
-      application_(application), snapshot_sinks_(std::move(snapshot_sinks)),
+    RuntimeCommandSource* command_source,
+    std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks,
+    std::vector<application::ports::CameraPreviewSink*> preview_sinks)
+    : options_(options), application_(application),
+      command_source_(command_source),
+      snapshot_sinks_(std::move(snapshot_sinks)),
+      preview_sinks_(std::move(preview_sinks)),
       snapshot_interval_(options.snapshot_interval_ms),
       next_snapshot_(std::chrono::steady_clock::now()) {
     if (snapshot_sinks_.empty()) {
         throw std::invalid_argument(
             "at least one runtime snapshot sink is required");
-    }
-    if (options_.interactive && !console_input_.active()) {
-        throw std::invalid_argument("--interactive requires a live terminal");
     }
 }
 
@@ -51,12 +53,13 @@ int CompanionRunner::run() {
     std::signal(SIGINT, handle_signal);
     std::signal(SIGTERM, handle_signal);
     while (keep_running != 0) {
-        handle_console_input();
+        handle_runtime_commands();
         if (keep_running == 0) {
             break;
         }
 
         application_.poll();
+        publish_camera_frame();
         const auto now = std::chrono::steady_clock::now();
         if (now < next_snapshot_) {
             std::this_thread::sleep_for(kEventLoopSleep);
@@ -73,15 +76,32 @@ int CompanionRunner::run() {
     return autonomy_failed_ ? 2 : 0;
 }
 
-void CompanionRunner::handle_console_input() {
-    while (const auto key = console_input_.poll()) {
+void CompanionRunner::handle_runtime_commands() {
+    if (command_source_ == nullptr) {
+        return;
+    }
+    while (const auto command = command_source_->poll()) {
         const auto command_time = std::chrono::steady_clock::now();
-        if (*key == 's' || *key == 'S') {
+        if (*command == RuntimeCommand::start_autonomy) {
             static_cast<void>(
                 application_.request_autonomy_start(command_time));
             next_snapshot_ = command_time;
-        } else if (*key == 'q' || *key == 'Q') {
+        } else if (*command == RuntimeCommand::shutdown) {
             keep_running = 0;
+        }
+    }
+}
+
+void CompanionRunner::publish_camera_frame() {
+    auto processed = application_.take_latest_processed_camera_frame();
+    if (!processed.has_value()) {
+        return;
+    }
+    for (auto* sink : preview_sinks_) {
+        if (sink != nullptr) {
+            sink->publish(processed->frame,
+                processed->targets,
+                processed->target_track);
         }
     }
 }
