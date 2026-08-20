@@ -1,6 +1,6 @@
 #include "TestCases.hpp"
 
-#include "onboard_autonomy/presentation/cli/CommandLine.hpp"
+#include "onboard_autonomy/operator/cli/CommandLine.hpp"
 
 #include <initializer_list>
 #include <stdexcept>
@@ -11,13 +11,13 @@
 
 namespace {
 
-using onboard_autonomy::presentation::cli::CommandLineOptions;
-using onboard_autonomy::presentation::cli::GStreamerCameraOptions;
-using onboard_autonomy::presentation::cli::HardwareLaunchOptions;
-using onboard_autonomy::presentation::cli::parse_command_line;
-using onboard_autonomy::presentation::cli::SerialConnectionOptions;
-using onboard_autonomy::presentation::cli::SimulationLaunchOptions;
-using onboard_autonomy::presentation::cli::UdpConnectionOptions;
+using onboard_autonomy::operator_interface::cli::CommandLineOptions;
+using onboard_autonomy::operator_interface::cli::GStreamerCameraOptions;
+using onboard_autonomy::operator_interface::cli::HardwareLaunchOptions;
+using onboard_autonomy::operator_interface::cli::parse_command_line;
+using onboard_autonomy::operator_interface::cli::SerialConnectionOptions;
+using onboard_autonomy::operator_interface::cli::SimulationLaunchOptions;
+using onboard_autonomy::operator_interface::cli::UdpConnectionOptions;
 
 void require(const bool condition, const std::string& message) {
     if (!condition) {

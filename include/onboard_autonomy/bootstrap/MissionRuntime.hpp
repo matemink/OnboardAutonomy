@@ -1,6 +1,6 @@
 #pragma once
 
-#include "onboard_autonomy/application/EnvironmentProfile.hpp"
+#include "onboard_autonomy/mission/EnvironmentProfile.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -8,11 +8,11 @@
 #include <string>
 #include <variant>
 
-namespace onboard_autonomy::application {
+namespace onboard_autonomy::mission {
 class CompanionApplication;
 }
 
-namespace onboard_autonomy::application::ports {
+namespace onboard_autonomy::mission::ports {
 class Transport;
 }
 
@@ -63,7 +63,7 @@ struct MissionCameraConfig {
 struct MissionRuntimeConfig {
     MissionConnection connection;
     std::optional<MissionCameraConfig> camera;
-    std::optional<application::SimulatedWindProfile> simulated_wind;
+    std::optional<mission::SimulatedWindProfile> simulated_wind;
     MissionEnvironment environment{MissionEnvironment::hardware};
     bool autonomous{};
     bool motion_commands_requested{};
@@ -80,8 +80,8 @@ class MissionRuntime {
     MissionRuntime(MissionRuntime&&) = delete;
     MissionRuntime& operator=(MissionRuntime&&) = delete;
 
-    [[nodiscard]] application::CompanionApplication& application();
-    [[nodiscard]] application::ports::Transport& transport();
+    [[nodiscard]] mission::CompanionApplication& application();
+    [[nodiscard]] mission::ports::Transport& transport();
 
   private:
     class Impl;

@@ -5,17 +5,18 @@
 #include <optional>
 #include <vector>
 
-namespace onboard_autonomy::application {
+namespace onboard_autonomy::mission {
 class CompanionApplication;
 struct AppSnapshot;
-} // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::mission
 
-namespace onboard_autonomy::application::ports {
+namespace onboard_autonomy::diagnostics::preview {
 class CameraPreviewSink;
-class RuntimeSnapshotSink;
-} // namespace onboard_autonomy::application::ports
+}
 
 namespace onboard_autonomy::bootstrap {
+
+class RuntimeSnapshotSink;
 
 enum class RuntimeCommand {
     start_autonomy,
@@ -37,24 +38,24 @@ struct CompanionRunnerOptions {
 class CompanionRunner {
   public:
     CompanionRunner(CompanionRunnerOptions options,
-        application::CompanionApplication& application,
+        mission::CompanionApplication& application,
         RuntimeCommandSource* command_source,
-        std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks,
-        std::vector<application::ports::CameraPreviewSink*> preview_sinks);
+        std::vector<RuntimeSnapshotSink*> snapshot_sinks,
+        std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks);
 
     [[nodiscard]] int run();
 
   private:
     void handle_runtime_commands();
     void publish_camera_frame();
-    void publish_snapshot(const application::AppSnapshot& snapshot) const;
-    void update_terminal_state(const application::AppSnapshot& snapshot);
+    void publish_snapshot(const mission::AppSnapshot& snapshot) const;
+    void update_terminal_state(const mission::AppSnapshot& snapshot);
 
     CompanionRunnerOptions options_;
-    application::CompanionApplication& application_;
+    mission::CompanionApplication& application_;
     RuntimeCommandSource* command_source_;
-    std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks_;
-    std::vector<application::ports::CameraPreviewSink*> preview_sinks_;
+    std::vector<RuntimeSnapshotSink*> snapshot_sinks_;
+    std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks_;
     std::chrono::milliseconds snapshot_interval_;
     std::chrono::steady_clock::time_point next_snapshot_;
     bool autonomy_failed_{};

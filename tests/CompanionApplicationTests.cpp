@@ -1,7 +1,7 @@
 #include "TestCases.hpp"
 
-#include "onboard_autonomy/application/CompanionApplication.hpp"
-#include "onboard_autonomy/adapters/mavlink/MavlinkEncoder.hpp"
+#include "onboard_autonomy/mission/CompanionApplication.hpp"
+#include "onboard_autonomy/hardware/mavlink/MavlinkEncoder.hpp"
 
 #include <ardupilotmega/mavlink.h>
 
@@ -31,8 +31,7 @@ std::vector<std::uint8_t> serialize(const mavlink_message_t& message) {
     return {buffer.begin(), buffer.begin() + length};
 }
 
-class FakeTransport final
-    : public onboard_autonomy::application::ports::Transport {
+class FakeTransport final : public onboard_autonomy::mission::ports::Transport {
   public:
     void enqueue(std::vector<std::uint8_t> frame) {
         incoming_.push_back(std::move(frame));
@@ -71,36 +70,36 @@ class FakeTransport final
 };
 
 class FakeCameraSource final
-    : public onboard_autonomy::application::ports::CameraSource {
+    : public onboard_autonomy::mission::ports::CameraSource {
   public:
-    std::optional<onboard_autonomy::application::ports::CameraFrame>
+    std::optional<onboard_autonomy::mission::ports::CameraFrame>
     take_latest_frame() override {
         return std::nullopt;
     }
 
-    onboard_autonomy::application::ports::CameraSourceStatus
+    onboard_autonomy::mission::ports::CameraSourceStatus
     status() const override {
-        onboard_autonomy::application::ports::CameraSourceStatus result;
+        onboard_autonomy::mission::ports::CameraSourceStatus result;
         result.phase =
-            onboard_autonomy::application::ports::CameraSourcePhase::streaming;
+            onboard_autonomy::mission::ports::CameraSourcePhase::streaming;
         result.description = "fake camera";
         return result;
     }
 };
 
 class FakeTargetDetector final
-    : public onboard_autonomy::application::ports::TargetDetector {
+    : public onboard_autonomy::mission::ports::TargetDetector {
   public:
-    onboard_autonomy::domain::TargetDetectionBatch detect(
-        const onboard_autonomy::application::ports::CameraFrame&) override {
+    onboard_autonomy::mission::TargetDetectionBatch detect(
+        const onboard_autonomy::mission::ports::CameraFrame&) override {
         return {};
     }
 
     std::string description() const override { return "fake detector"; }
 };
 
-onboard_autonomy::domain::CameraExtrinsics identity_extrinsics() {
-    onboard_autonomy::domain::CameraExtrinsics extrinsics;
+onboard_autonomy::mission::CameraExtrinsics identity_extrinsics() {
+    onboard_autonomy::mission::CameraExtrinsics extrinsics;
     extrinsics.rotation_camera_to_body = {
         1.0,
         0.0,
@@ -188,14 +187,14 @@ std::vector<std::uint8_t> accepted_interval_ack() {
         100,
         0,
         1,
-        onboard_autonomy::adapters::mavlink::kCompanionComponentId);
+        onboard_autonomy::hardware::mavlink::kCompanionComponentId);
     return serialize(message);
 }
 
 void application_orchestrates_the_complete_telemetry_setup() {
     FakeTransport transport;
-    onboard_autonomy::application::CompanionApplication application{transport};
-    const onboard_autonomy::domain::TimePoint start{};
+    onboard_autonomy::mission::CompanionApplication application{transport};
+    const onboard_autonomy::mission::TimePoint start{};
 
     transport.enqueue(autopilot_heartbeat());
     application.poll(start);
@@ -205,21 +204,20 @@ void application_orchestrates_the_complete_telemetry_setup() {
     require(snapshot.companion_heartbeat_active,
         "application must publish its companion heartbeat");
     require(snapshot.telemetry.state ==
-                onboard_autonomy::application::TelemetrySetupState::configuring,
+                onboard_autonomy::mission::TelemetrySetupState::configuring,
         "application must start telemetry setup");
     require(
         transport.outgoing().size() == 2 &&
             message_id(transport.outgoing()[0]) == MAVLINK_MSG_ID_HEARTBEAT &&
             message_id(transport.outgoing()[1]) == MAVLINK_MSG_ID_COMMAND_LONG,
         "application must emit heartbeat and first setup command");
-    require(
-        snapshot.link_events.size() == 2 &&
-            snapshot.link_events[0].direction ==
-                onboard_autonomy::application::LinkEventDirection::inbound &&
-            snapshot.link_events[0].label == "HEARTBEAT" &&
-            snapshot.link_events[1].direction ==
-                onboard_autonomy::application::LinkEventDirection::outbound &&
-            snapshot.link_events[1].label == "SET_INTERVAL",
+    require(snapshot.link_events.size() == 2 &&
+                snapshot.link_events[0].direction ==
+                    onboard_autonomy::mission::LinkEventDirection::inbound &&
+                snapshot.link_events[0].label == "HEARTBEAT" &&
+                snapshot.link_events[1].direction ==
+                    onboard_autonomy::mission::LinkEventDirection::outbound &&
+                snapshot.link_events[1].label == "SET_INTERVAL",
         "application must expose real inbound and outbound link events");
     require(snapshot.rx_activity.has_value() &&
                 snapshot.rx_activity->message_name == "HEARTBEAT" &&
@@ -237,7 +235,7 @@ void application_orchestrates_the_complete_telemetry_setup() {
 
     snapshot = application.snapshot(start + std::chrono::milliseconds(600));
     require(snapshot.telemetry.state ==
-                onboard_autonomy::application::TelemetrySetupState::active,
+                onboard_autonomy::mission::TelemetrySetupState::active,
         "six accepted commands must activate telemetry");
     require(transport.outgoing().size() == 10 &&
                 message_id(transport.outgoing()[7]) ==
@@ -254,10 +252,10 @@ void application_orchestrates_the_complete_telemetry_setup() {
         "link event history must remain bounded");
     require(std::any_of(snapshot.link_events.begin(),
                 snapshot.link_events.end(),
-                [](const onboard_autonomy::application::LinkEvent& event) {
-                    return event.direction == onboard_autonomy::application::
+                [](const onboard_autonomy::mission::LinkEvent& event) {
+                    return event.direction == onboard_autonomy::mission::
                                                   LinkEventDirection::inbound &&
-                           event.status == onboard_autonomy::application::
+                           event.status == onboard_autonomy::mission::
                                                LinkEventStatus::success &&
                            event.label == "ACK SET_INTERVAL";
                 }),
@@ -274,8 +272,8 @@ void application_orchestrates_the_complete_telemetry_setup() {
 
 void quiet_transport_does_not_stall_runtime_scheduling() {
     FakeTransport transport;
-    onboard_autonomy::application::CompanionApplication application{transport};
-    const onboard_autonomy::domain::TimePoint start{};
+    onboard_autonomy::mission::CompanionApplication application{transport};
+    const onboard_autonomy::mission::TimePoint start{};
 
     transport.enqueue(autopilot_heartbeat());
     application.poll(start);
@@ -291,10 +289,10 @@ void quiet_transport_does_not_stall_runtime_scheduling() {
 }
 
 void interactive_autonomy_restart_is_guarded() {
-    const onboard_autonomy::domain::TimePoint start{};
+    const onboard_autonomy::mission::TimePoint start{};
 
     FakeTransport blocked_transport;
-    onboard_autonomy::application::CompanionApplication blocked_application{
+    onboard_autonomy::mission::CompanionApplication blocked_application{
         blocked_transport};
     require(!blocked_application.request_autonomy_start(start),
         "autonomy start must be blocked without motion permission");
@@ -305,7 +303,7 @@ void interactive_autonomy_restart_is_guarded() {
     FakeTransport transport;
     FakeCameraSource camera;
     FakeTargetDetector detector;
-    onboard_autonomy::application::CompanionApplication application{transport,
+    onboard_autonomy::mission::CompanionApplication application{transport,
         {
             .flight_startup =
                 {
@@ -342,14 +340,14 @@ void interactive_autonomy_restart_is_guarded() {
     const auto snapshot = application.snapshot(
         start + std::chrono::seconds(92) + std::chrono::milliseconds(1));
     require(snapshot.flight_startup.phase ==
-                    onboard_autonomy::application::FlightStartupPhase::
+                    onboard_autonomy::mission::FlightStartupPhase::
                         waiting_for_vehicle &&
                 snapshot.autonomy.phase ==
-                    onboard_autonomy::application::AutonomyRuntimePhase::
+                    onboard_autonomy::mission::AutonomyRuntimePhase::
                         waiting_for_startup &&
                 snapshot.link_events.back().label == "START" &&
                 snapshot.link_events.back().status ==
-                    onboard_autonomy::application::LinkEventStatus::pending,
+                    onboard_autonomy::mission::LinkEventStatus::pending,
         "restart must reset both state machines and remain observable");
 }
 
@@ -357,8 +355,7 @@ void autonomy_runtime_requires_vision_guidance() {
     FakeTransport transport;
     bool rejected = false;
     try {
-        onboard_autonomy::application::CompanionApplication application{
-            transport,
+        onboard_autonomy::mission::CompanionApplication application{transport,
             {
                 .flight_startup =
                     {

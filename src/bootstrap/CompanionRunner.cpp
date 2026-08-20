@@ -1,9 +1,9 @@
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 
-#include "onboard_autonomy/application/AppSnapshot.hpp"
-#include "onboard_autonomy/application/CompanionApplication.hpp"
-#include "onboard_autonomy/application/ports/CameraPreviewSink.hpp"
-#include "onboard_autonomy/application/ports/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/CompanionApplication.hpp"
+#include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
+#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
 
 #include <chrono>
 #include <csignal>
@@ -24,18 +24,18 @@ void handle_signal(int) {
     keep_running = 0;
 }
 
-bool terminal_phase(const application::AutonomyRuntimePhase phase) {
-    return phase == application::AutonomyRuntimePhase::completed ||
-           phase == application::AutonomyRuntimePhase::failed;
+bool terminal_phase(const mission::AutonomyRuntimePhase phase) {
+    return phase == mission::AutonomyRuntimePhase::completed ||
+           phase == mission::AutonomyRuntimePhase::failed;
 }
 
 } // namespace
 
 CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
-    application::CompanionApplication& application,
+    mission::CompanionApplication& application,
     RuntimeCommandSource* command_source,
-    std::vector<application::ports::RuntimeSnapshotSink*> snapshot_sinks,
-    std::vector<application::ports::CameraPreviewSink*> preview_sinks)
+    std::vector<bootstrap::RuntimeSnapshotSink*> snapshot_sinks,
+    std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks)
     : options_(options), application_(application),
       command_source_(command_source),
       snapshot_sinks_(std::move(snapshot_sinks)),
@@ -107,7 +107,7 @@ void CompanionRunner::publish_camera_frame() {
 }
 
 void CompanionRunner::publish_snapshot(
-    const application::AppSnapshot& snapshot) const {
+    const mission::AppSnapshot& snapshot) const {
     const auto recorded_at = std::chrono::system_clock::now();
     for (auto* sink : snapshot_sinks_) {
         if (sink != nullptr) {
@@ -117,14 +117,14 @@ void CompanionRunner::publish_snapshot(
 }
 
 void CompanionRunner::update_terminal_state(
-    const application::AppSnapshot& snapshot) {
+    const mission::AppSnapshot& snapshot) {
     if (!options_.exit_after_autonomy ||
         !terminal_phase(snapshot.autonomy.phase)) {
         return;
     }
 
     autonomy_failed_ =
-        snapshot.autonomy.phase == application::AutonomyRuntimePhase::failed;
+        snapshot.autonomy.phase == mission::AutonomyRuntimePhase::failed;
     keep_running = 0;
 }
 

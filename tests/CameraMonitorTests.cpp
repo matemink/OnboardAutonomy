@@ -1,9 +1,9 @@
 #include "TestCases.hpp"
 
-#include "onboard_autonomy/adapters/camera/GStreamerCameraSource.hpp"
-#include "onboard_autonomy/adapters/camera/RpicamCameraSource.hpp"
-#include "onboard_autonomy/application/AppSnapshot.hpp"
-#include "onboard_autonomy/application/CameraMonitor.hpp"
+#include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
+#include "onboard_autonomy/hardware/camera/RpicamCameraSource.hpp"
+#include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -23,24 +23,23 @@ void require(const bool condition, const std::string& message) {
 }
 
 class FakeCameraSource final
-    : public onboard_autonomy::application::ports::CameraSource {
+    : public onboard_autonomy::mission::ports::CameraSource {
   public:
-    void emit(onboard_autonomy::application::ports::CameraFrame frame) {
+    void emit(onboard_autonomy::mission::ports::CameraFrame frame) {
         latest_ = std::move(frame);
         ++status_.produced_frames;
         status_.phase =
-            onboard_autonomy::application::ports::CameraSourcePhase::streaming;
+            onboard_autonomy::mission::ports::CameraSourcePhase::streaming;
     }
 
     void reconnecting(std::string error, const std::uint64_t restart_count) {
-        status_.phase = onboard_autonomy::application::ports::
-            CameraSourcePhase::reconnecting;
+        status_.phase =
+            onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting;
         status_.error = std::move(error);
         status_.restart_count = restart_count;
     }
 
-    [[nodiscard]] std::optional<
-        onboard_autonomy::application::ports::CameraFrame>
+    [[nodiscard]] std::optional<onboard_autonomy::mission::ports::CameraFrame>
     take_latest_frame() override {
         auto frame = std::move(latest_);
         latest_.reset();
@@ -48,25 +47,24 @@ class FakeCameraSource final
     }
 
     [[nodiscard]]
-    onboard_autonomy::application::ports::CameraSourceStatus
+    onboard_autonomy::mission::ports::CameraSourceStatus
     status() const override {
         return status_;
     }
 
   private:
-    onboard_autonomy::application::ports::CameraSourceStatus status_{
+    onboard_autonomy::mission::ports::CameraSourceStatus status_{
         .description = "fake camera",
         .error = "",
     };
-    std::optional<onboard_autonomy::application::ports::CameraFrame> latest_;
+    std::optional<onboard_autonomy::mission::ports::CameraFrame> latest_;
 };
 
 class FakeTargetDetector final
-    : public onboard_autonomy::application::ports::TargetDetector {
+    : public onboard_autonomy::mission::ports::TargetDetector {
   public:
-    [[nodiscard]] onboard_autonomy::domain::TargetDetectionBatch detect(
-        const onboard_autonomy::application::ports::CameraFrame& input)
-        override {
+    [[nodiscard]] onboard_autonomy::mission::TargetDetectionBatch detect(
+        const onboard_autonomy::mission::ports::CameraFrame& input) override {
         return {
             .frame_sequence = input.sequence,
             .captured_at = input.captured_at,
@@ -92,7 +90,7 @@ class FakeTargetDetector final
     }
 };
 
-onboard_autonomy::application::ports::CameraFrame frame(
+onboard_autonomy::mission::ports::CameraFrame frame(
     const std::uint64_t sequence,
     const std::chrono::system_clock::time_point captured_at,
     const double latency_ms) {
@@ -113,9 +111,9 @@ void monitor_calculates_frame_rate_latency_and_gaps() {
     using namespace std::chrono_literals;
 
     FakeCameraSource source;
-    onboard_autonomy::application::CameraMonitor monitor{source};
+    onboard_autonomy::mission::CameraMonitor monitor{source};
     const auto wall_start = std::chrono::system_clock::time_point{1000s};
-    const onboard_autonomy::domain::TimePoint app_start{};
+    const onboard_autonomy::mission::TimePoint app_start{};
 
     source.emit(frame(1, wall_start, 20.0));
     monitor.poll(app_start);
@@ -125,9 +123,8 @@ void monitor_calculates_frame_rate_latency_and_gaps() {
     monitor.poll(app_start + 80ms);
 
     const auto snapshot = monitor.snapshot(app_start + 90ms);
-    require(
-        snapshot.phase ==
-            onboard_autonomy::application::ports::CameraSourcePhase::streaming,
+    require(snapshot.phase ==
+                onboard_autonomy::mission::ports::CameraSourcePhase::streaming,
         "camera monitor must expose streaming state");
     require(snapshot.received_frames == 3U &&
                 snapshot.dropped_before_processing == 1U,
@@ -150,12 +147,12 @@ void monitor_calculates_frame_rate_latency_and_gaps() {
 
 void metadata_parser_accepts_only_frame_wall_clock() {
     const auto parsed =
-        onboard_autonomy::adapters::camera::parse_rpicam_frame_wall_clock_ns(
+        onboard_autonomy::hardware::camera::parse_rpicam_frame_wall_clock_ns(
             "    \"FrameWallClock\": 1785440325818936064,");
     require(parsed.has_value() && *parsed == 1785440325818936064LL,
         "rpicam parser must read the nanosecond wall-clock timestamp");
     require(
-        !onboard_autonomy::adapters::camera::parse_rpicam_frame_wall_clock_ns(
+        !onboard_autonomy::hardware::camera::parse_rpicam_frame_wall_clock_ns(
             "    \"SensorTimestamp\": 413528965000")
              .has_value(),
         "rpicam parser must not confuse monotonic and wall clocks");
@@ -163,7 +160,7 @@ void metadata_parser_accepts_only_frame_wall_clock() {
 
 void gstreamer_pipeline_is_explicit_and_machine_readable() {
     const auto arguments =
-        onboard_autonomy::adapters::camera::make_gstreamer_camera_arguments({
+        onboard_autonomy::hardware::camera::make_gstreamer_camera_arguments({
             .width = 640,
             .height = 480,
             .udp_port = 5601,
@@ -184,23 +181,23 @@ void gstreamer_pipeline_is_explicit_and_machine_readable() {
 }
 
 void recovery_timings_must_be_non_zero() {
-    onboard_autonomy::adapters::camera::GStreamerCameraConfig gstreamer;
+    onboard_autonomy::hardware::camera::GStreamerCameraConfig gstreamer;
     gstreamer.frame_timeout_ms = 0;
     bool gstreamer_rejected = false;
     try {
         static_cast<void>(
-            onboard_autonomy::adapters::camera::make_gstreamer_camera_arguments(
+            onboard_autonomy::hardware::camera::make_gstreamer_camera_arguments(
                 gstreamer));
     } catch (const std::invalid_argument&) {
         gstreamer_rejected = true;
     }
 
-    onboard_autonomy::adapters::camera::RpicamCameraConfig rpicam;
+    onboard_autonomy::hardware::camera::RpicamCameraConfig rpicam;
     rpicam.restart_delay_ms = 0;
     bool rpicam_rejected = false;
     try {
         static_cast<void>(
-            onboard_autonomy::adapters::camera::make_rpicam_camera_source(
+            onboard_autonomy::hardware::camera::make_rpicam_camera_source(
                 rpicam));
     } catch (const std::invalid_argument&) {
         rpicam_rejected = true;
@@ -212,12 +209,12 @@ void recovery_timings_must_be_non_zero() {
 
 void monitor_exposes_camera_recovery_state() {
     FakeCameraSource source;
-    onboard_autonomy::application::CameraMonitor monitor{source};
+    onboard_autonomy::mission::CameraMonitor monitor{source};
     source.reconnecting("GStreamer frame stalled for 2000 ms", 3);
 
     const auto snapshot =
-        monitor.snapshot(onboard_autonomy::domain::TimePoint{});
-    require(snapshot.phase == onboard_autonomy::application::ports::
+        monitor.snapshot(onboard_autonomy::mission::TimePoint{});
+    require(snapshot.phase == onboard_autonomy::mission::ports::
                                   CameraSourcePhase::reconnecting &&
                 snapshot.camera_restarts == 3U && !snapshot.error.empty(),
         "camera monitor must preserve visible recovery evidence");
@@ -226,13 +223,13 @@ void monitor_exposes_camera_recovery_state() {
 void monitor_exposes_processed_frames_without_a_preview_dependency() {
     FakeCameraSource source;
     FakeTargetDetector detector;
-    onboard_autonomy::application::CameraMonitor monitor{
+    onboard_autonomy::mission::CameraMonitor monitor{
         source,
         &detector,
     };
 
     source.emit(frame(21, std::chrono::system_clock::time_point{}, 10.0));
-    monitor.poll(onboard_autonomy::domain::TimePoint{});
+    monitor.poll(onboard_autonomy::mission::TimePoint{});
     const auto processed = monitor.take_latest_processed_frame();
 
     require(processed.has_value() && processed->frame.sequence == 21U &&
@@ -240,7 +237,7 @@ void monitor_exposes_processed_frames_without_a_preview_dependency() {
                 processed->targets.size() == 1U &&
                 processed->targets.front().id == 12 &&
                 processed->target_track.phase ==
-                    onboard_autonomy::application::TargetTrackPhase::searching,
+                    onboard_autonomy::mission::TargetTrackPhase::searching,
         "camera monitor must expose processed data to optional consumers");
     require(!monitor.take_latest_processed_frame().has_value(),
         "processed camera output must be consumed only once");

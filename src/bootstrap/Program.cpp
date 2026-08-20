@@ -1,16 +1,16 @@
 #include "onboard_autonomy/bootstrap/Program.hpp"
 
-#include "onboard_autonomy/adapters/ardupilot/BoardTypeCatalog.hpp"
-#include "onboard_autonomy/adapters/preview/HttpCameraPreviewServer.hpp"
-#include "onboard_autonomy/application/ports/CameraPreviewSink.hpp"
-#include "onboard_autonomy/application/ports/RuntimeSnapshotSink.hpp"
-#include "onboard_autonomy/application/ports/Transport.hpp"
+#include "onboard_autonomy/operator/ui/screen/BoardTypeCatalog.hpp"
+#include "onboard_autonomy/diagnostics/preview/HttpCameraPreviewServer.hpp"
+#include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
+#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 #include "onboard_autonomy/bootstrap/MissionRuntime.hpp"
 #include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
-#include "onboard_autonomy/presentation/cli/CommandLine.hpp"
-#include "onboard_autonomy/presentation/console/ConsoleInput.hpp"
-#include "onboard_autonomy/presentation/console/ConsoleSnapshotSink.hpp"
+#include "onboard_autonomy/operator/cli/CommandLine.hpp"
+#include "onboard_autonomy/operator/ui/input/ConsoleInput.hpp"
+#include "onboard_autonomy/operator/ui/screen/ConsoleSnapshotSink.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -31,9 +31,9 @@ namespace {
 
 constexpr std::uint32_t kMaximumConsoleRefreshIntervalMs = 100;
 
-using BoardTypeCatalog = adapters::ardupilot::BoardTypeCatalog;
-using CameraPreviewSink = application::ports::CameraPreviewSink;
-using RuntimeSnapshotSink = application::ports::RuntimeSnapshotSink;
+using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
+using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
+using RuntimeSnapshotSink = bootstrap::RuntimeSnapshotSink;
 
 std::vector<std::string_view> command_line_arguments(const int argc,
     char** argv) {
@@ -45,41 +45,43 @@ std::vector<std::string_view> command_line_arguments(const int argc,
     return arguments;
 }
 
-const presentation::cli::AutonomyOptions& autonomy_options(
-    const presentation::cli::CommandLineOptions& options) {
+const operator_interface::cli::AutonomyOptions& autonomy_options(
+    const operator_interface::cli::CommandLineOptions& options) {
     return std::visit(
-        [](const auto& launch) -> const presentation::cli::AutonomyOptions& {
+        [](const auto& launch)
+            -> const operator_interface::cli::AutonomyOptions& {
             return launch.autonomy;
         },
         options);
 }
 
-const presentation::cli::OperatorInterfaceOptions& operator_options(
-    const presentation::cli::CommandLineOptions& options) {
+const operator_interface::cli::OperatorInterfaceOptions& operator_options(
+    const operator_interface::cli::CommandLineOptions& options) {
     return std::visit(
         [](const auto& launch)
-            -> const presentation::cli::OperatorInterfaceOptions& {
+            -> const operator_interface::cli::OperatorInterfaceOptions& {
             return launch.operator_interface;
         },
         options);
 }
 
-const presentation::cli::DiagnosticsOptions& diagnostics_options(
-    const presentation::cli::CommandLineOptions& options) {
+const operator_interface::cli::DiagnosticsOptions& diagnostics_options(
+    const operator_interface::cli::CommandLineOptions& options) {
     return std::visit(
-        [](const auto& launch) -> const presentation::cli::DiagnosticsOptions& {
+        [](const auto& launch)
+            -> const operator_interface::cli::DiagnosticsOptions& {
             return launch.diagnostics;
         },
         options);
 }
 
 MissionConnection make_mission_connection(
-    const presentation::cli::MavlinkConnectionOptions& connection) {
+    const operator_interface::cli::MavlinkConnectionOptions& connection) {
     return std::visit(
         [](const auto& configured) -> MissionConnection {
             using Connection = std::decay_t<decltype(configured)>;
             if constexpr (std::is_same_v<Connection,
-                              presentation::cli::UdpConnectionOptions>) {
+                              operator_interface::cli::UdpConnectionOptions>) {
                 return UdpMissionConnection{
                     .bind_address = configured.bind_address,
                     .port = configured.port,
@@ -95,12 +97,12 @@ MissionConnection make_mission_connection(
 }
 
 MissionCameraSource make_mission_camera_source(
-    const presentation::cli::CameraSourceOptions& source) {
+    const operator_interface::cli::CameraSourceOptions& source) {
     return std::visit(
         [](const auto& configured) -> MissionCameraSource {
             using Source = std::decay_t<decltype(configured)>;
             if constexpr (std::is_same_v<Source,
-                              presentation::cli::RpicamOptions>) {
+                              operator_interface::cli::RpicamOptions>) {
                 return RpicamMissionSource{
                     .frames_per_second = configured.frames_per_second,
                 };
@@ -114,7 +116,7 @@ MissionCameraSource make_mission_camera_source(
 }
 
 std::optional<MissionCameraConfig> make_mission_camera(
-    const std::optional<presentation::cli::CameraOptions>& configured) {
+    const std::optional<operator_interface::cli::CameraOptions>& configured) {
     if (!configured.has_value()) {
         return std::nullopt;
     }
@@ -136,7 +138,7 @@ std::optional<MissionCameraConfig> make_mission_camera(
 }
 
 MissionRuntimeConfig make_mission_runtime_config(
-    const presentation::cli::HardwareLaunchOptions& options) {
+    const operator_interface::cli::HardwareLaunchOptions& options) {
     return {
         .connection = make_mission_connection(options.connection),
         .camera = make_mission_camera(options.camera),
@@ -149,7 +151,7 @@ MissionRuntimeConfig make_mission_runtime_config(
 }
 
 MissionRuntimeConfig make_mission_runtime_config(
-    const presentation::cli::SimulationLaunchOptions& options) {
+    const operator_interface::cli::SimulationLaunchOptions& options) {
     return {
         .connection =
             UdpMissionConnection{
@@ -166,14 +168,14 @@ MissionRuntimeConfig make_mission_runtime_config(
 }
 
 MissionRuntimeConfig make_mission_runtime_config(
-    const presentation::cli::CommandLineOptions& options) {
+    const operator_interface::cli::CommandLineOptions& options) {
     return std::visit(
         [](const auto& launch) { return make_mission_runtime_config(launch); },
         options);
 }
 
 std::unique_ptr<BoardTypeCatalog> load_board_type_catalog(
-    const presentation::cli::OperatorInterfaceOptions& options,
+    const operator_interface::cli::OperatorInterfaceOptions& options,
     const std::filesystem::path& executable) {
     if (options.json_output) {
         return nullptr;
@@ -222,32 +224,32 @@ std::filesystem::path find_camera_preview_page(
 }
 
 std::unique_ptr<CameraPreviewSink> make_camera_preview(
-    const presentation::cli::DiagnosticsOptions& options,
+    const operator_interface::cli::DiagnosticsOptions& options,
     const std::filesystem::path& executable) {
     if (!options.camera_preview.has_value()) {
         return nullptr;
     }
-    return adapters::preview::make_http_camera_preview_server({
+    return diagnostics::preview::make_http_camera_preview_server({
         .bind_address = "0.0.0.0",
         .port = options.camera_preview->port,
-        .maximum_frames_per_second = adapters::preview::
+        .maximum_frames_per_second = diagnostics::preview::
             HttpCameraPreviewConfig::kDefaultMaximumFramesPerSecond,
         .page_file = find_camera_preview_page(executable),
     });
 }
 
 std::uint32_t snapshot_interval_ms(
-    const presentation::cli::OperatorInterfaceOptions& options) {
+    const operator_interface::cli::OperatorInterfaceOptions& options) {
     return options.json_output ? options.snapshot_interval_ms
                                : std::min(options.snapshot_interval_ms,
                                      kMaximumConsoleRefreshIntervalMs);
 }
 
 std::vector<std::unique_ptr<RuntimeSnapshotSink>> make_snapshot_sinks(
-    const presentation::cli::OperatorInterfaceOptions& operator_interface,
-    const presentation::cli::DiagnosticsOptions& diagnostics,
-    const application::ports::Transport& transport,
-    const presentation::BoardTypeResolver* board_type_resolver) {
+    const operator_interface::cli::OperatorInterfaceOptions& operator_interface,
+    const operator_interface::cli::DiagnosticsOptions& diagnostics,
+    const mission::ports::Transport& transport,
+    const operator_interface::ui::BoardTypeResolver* board_type_resolver) {
     std::vector<std::unique_ptr<RuntimeSnapshotSink>> sinks;
     if (operator_interface.json_output) {
         sinks.push_back(
@@ -255,7 +257,7 @@ std::vector<std::unique_ptr<RuntimeSnapshotSink>> make_snapshot_sinks(
                 std::cout));
     } else {
         sinks.push_back(
-            std::make_unique<presentation::console::ConsoleSnapshotSink>(
+            std::make_unique<operator_interface::ui::ConsoleSnapshotSink>(
                 std::cout,
                 transport.description(),
                 board_type_resolver));
@@ -307,13 +309,13 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
     }
 
   private:
-    presentation::console::ConsoleInput input_;
+    operator_interface::ui::ConsoleInput input_;
 };
 
 } // namespace
 
 int run_program(const int argc, char** argv) {
-    const auto options = presentation::cli::parse_command_line(
+    const auto options = operator_interface::cli::parse_command_line(
         command_line_arguments(argc, argv));
     const auto& autonomy = autonomy_options(options);
     const auto& operator_interface = operator_options(options);

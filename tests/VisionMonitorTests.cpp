@@ -1,9 +1,9 @@
 #include "TestCases.hpp"
 
-#include "onboard_autonomy/adapters/vision/AprilTagTargetDetector.hpp"
-#include "onboard_autonomy/adapters/vision/CameraGeometry.hpp"
-#include "onboard_autonomy/application/AppSnapshot.hpp"
-#include "onboard_autonomy/application/VisionMonitor.hpp"
+#include "onboard_autonomy/mission/cv/detection/AprilTagTargetDetector.hpp"
+#include "onboard_autonomy/mission/cv/detection/CameraGeometry.hpp"
+#include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/cv/VisionMonitor.hpp"
 
 #include <apriltag.h>
 #include <common/image_u8.h>
@@ -28,12 +28,11 @@ void require(const bool condition, const std::string& message) {
 }
 
 class FakeTargetDetector final
-    : public onboard_autonomy::application::ports::TargetDetector {
+    : public onboard_autonomy::mission::ports::TargetDetector {
   public:
-    [[nodiscard]] onboard_autonomy::domain::TargetDetectionBatch detect(
-        const onboard_autonomy::application::ports::CameraFrame& frame)
-        override {
-        std::vector<onboard_autonomy::domain::TargetObservation> targets;
+    [[nodiscard]] onboard_autonomy::mission::TargetDetectionBatch detect(
+        const onboard_autonomy::mission::ports::CameraFrame& frame) override {
+        std::vector<onboard_autonomy::mission::TargetObservation> targets;
         if (frame.sequence == 1U) {
             targets.push_back({
                 .id = 7,
@@ -61,11 +60,10 @@ class FakeTargetDetector final
 };
 
 class PoseTargetDetector final
-    : public onboard_autonomy::application::ports::TargetDetector {
+    : public onboard_autonomy::mission::ports::TargetDetector {
   public:
-    [[nodiscard]] onboard_autonomy::domain::TargetDetectionBatch detect(
-        const onboard_autonomy::application::ports::CameraFrame& frame)
-        override {
+    [[nodiscard]] onboard_autonomy::mission::TargetDetectionBatch detect(
+        const onboard_autonomy::mission::ports::CameraFrame& frame) override {
         const double right_m = frame.sequence == 1U ? 0.0 : 1.0;
         const double forward_m =
             frame.sequence == 1U ? 1.0 : (frame.sequence == 2U ? 1.2 : 0.8);
@@ -84,7 +82,7 @@ class PoseTargetDetector final
                         .corrected_bits = 0,
                         .decision_margin = 70.0,
                         .pose =
-                            onboard_autonomy::domain::TargetPose{
+                            onboard_autonomy::mission::TargetPose{
                                 .position =
                                     {
                                         .right_m = right_m,
@@ -104,7 +102,7 @@ class PoseTargetDetector final
     }
 };
 
-onboard_autonomy::application::ports::CameraFrame empty_frame(
+onboard_autonomy::mission::ports::CameraFrame empty_frame(
     const std::uint64_t sequence) {
     return {
         .sequence = sequence,
@@ -120,8 +118,8 @@ void vision_monitor_tracks_processing_and_detections() {
     using namespace std::chrono_literals;
 
     FakeTargetDetector detector;
-    onboard_autonomy::application::VisionMonitor monitor{detector};
-    const onboard_autonomy::domain::TimePoint start{};
+    onboard_autonomy::mission::VisionMonitor monitor{detector};
+    const onboard_autonomy::mission::TimePoint start{};
 
     monitor.process(empty_frame(1), start);
     auto snapshot = monitor.snapshot(start);
@@ -153,7 +151,7 @@ void vision_monitor_tracks_processing_and_detections() {
 void vision_monitor_exposes_the_smoothed_confirmed_track() {
     using namespace std::chrono_literals;
     PoseTargetDetector detector;
-    onboard_autonomy::application::VisionMonitor monitor{
+    onboard_autonomy::mission::VisionMonitor monitor{
         detector,
         {
             .required_consecutive_observations = 3,
@@ -162,7 +160,7 @@ void vision_monitor_exposes_the_smoothed_confirmed_track() {
             .minimum_decision_margin = 20.0,
         },
     };
-    const onboard_autonomy::domain::TimePoint start{};
+    const onboard_autonomy::mission::TimePoint start{};
 
     monitor.process(empty_frame(1), start);
     monitor.process(empty_frame(2), start + 20ms);
@@ -171,7 +169,7 @@ void vision_monitor_exposes_the_smoothed_confirmed_track() {
 
     require(
         snapshot.target_track.phase ==
-                onboard_autonomy::application::TargetTrackPhase::tracking &&
+                onboard_autonomy::mission::TargetTrackPhase::tracking &&
             snapshot.target_track.position.has_value() &&
             std::abs(snapshot.target_track.position->right_m - 0.75) < 1.0e-9 &&
             std::abs(snapshot.target_track.position->forward_m - 0.95) < 1.0e-9,
@@ -234,7 +232,7 @@ void real_apriltag_adapter_detects_generated_id_zero() {
     tagStandard41h12_destroy(family);
 
     auto detector =
-        onboard_autonomy::adapters::vision::make_apriltag_target_detector();
+        onboard_autonomy::mission::cv::make_apriltag_target_detector();
     const auto result = detector->detect(frame);
     require(result.targets.size() == 1U,
         "real AprilTag adapter must find one generated tag");
@@ -248,7 +246,7 @@ void real_apriltag_adapter_detects_generated_id_zero() {
         "detected center and quality must match the rendered marker");
 }
 
-onboard_autonomy::domain::CameraCalibration test_calibration() {
+onboard_autonomy::mission::CameraCalibration test_calibration() {
     return {
         .camera_model = "synthetic",
         .image_width = 320,
@@ -285,13 +283,12 @@ void distortion_round_trip_recovers_undistorted_point() {
             (radius_squared + 2.0 * source_y * source_y) +
         2.0 * calibration.distortion[3] * source_x * source_y;
 
-    const auto recovered =
-        onboard_autonomy::adapters::vision::undistort_image_point(
-            {
-                .x_px = calibration.fx_px * distorted_x + calibration.cx_px,
-                .y_px = calibration.fy_px * distorted_y + calibration.cy_px,
-            },
-            calibration);
+    const auto recovered = onboard_autonomy::mission::cv::undistort_image_point(
+        {
+            .x_px = calibration.fx_px * distorted_x + calibration.cx_px,
+            .y_px = calibration.fy_px * distorted_y + calibration.cy_px,
+        },
+        calibration);
     require(std::abs(recovered.x_px - (calibration.fx_px * source_x +
                                           calibration.cx_px)) < 1.0e-8 &&
                 std::abs(recovered.y_px - (calibration.fy_px * source_y +
@@ -345,9 +342,9 @@ void generated_tag_produces_metric_pose() {
     tagStandard41h12_destroy(family);
 
     auto detector =
-        onboard_autonomy::adapters::vision::make_apriltag_target_detector({
+        onboard_autonomy::mission::cv::make_apriltag_target_detector({
             .pose =
-                onboard_autonomy::adapters::vision::AprilTagPoseConfig{
+                onboard_autonomy::mission::cv::AprilTagPoseConfig{
                     .calibration = test_calibration(),
                     .tag_size_m = tag_size_m,
                 },

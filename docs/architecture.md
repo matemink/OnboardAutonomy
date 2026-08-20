@@ -4,14 +4,38 @@ OnboardAutonomy keeps flight-controller I/O, protocol decoding, state,
 autonomy decisions, safety supervision, vision, and test orchestration
 separate.
 
+## Package map
+
+The source tree is organized by responsibility rather than by generic
+architectural layers:
+
+| Package | Responsibility |
+| --- | --- |
+| `bootstrap` | Process startup, dependency wiring, and the outer runtime loop |
+| `mission/autonomy` | Mission decisions and world state |
+| `mission/flight` | Vehicle state, startup sequencing, and requested flight actions |
+| `mission/safety` | Motion and companion-link safety policies |
+| `mission/cv` | Frame interpretation, detection, tracking, calibration, and extrinsics |
+| `hardware/camera` | Physical and simulated frame acquisition |
+| `hardware/mavlink` | MAVLink encoding, decoding, and telemetry setup |
+| `hardware/transport` | UDP and serial byte transport |
+| `operator/cli` | Startup arguments and help text |
+| `operator/ui` | Live input and terminal screen rendering |
+| `diagnostics/logging` | Machine-readable runtime diagnostics |
+| `diagnostics/preview` | Optional HTTP camera preview |
+
+Public headers mirror this structure under `include/onboard_autonomy`. The
+physical package is named `operator`, while its C++ namespace is
+`operator_interface` because `operator` is a reserved C++ keyword.
+
 ```mermaid
 flowchart LR
     SITL["ArduPilot SITL"] <-->|"MAVLink UDP"| Transport["Transport port"]
     Pixhawk["Pixhawk 6C"] <-->|"USB or UART"| Transport
-    Transport <--> Application["CompanionApplication"]
-    Application --> Decoder["MAVLink Decoder"]
+    Transport <--> Mission["CompanionApplication"]
+    Mission --> Decoder["MAVLink Decoder"]
     Decoder --> State["VehicleState"]
-    State --> Application
+    State --> Mission
     State --> Startup["Flight Startup Controller"]
     Startup --> Runtime["Autonomy Runtime"]
     State --> World["World State"]
@@ -22,8 +46,8 @@ flowchart LR
     Runtime -->|"Actions"| Encoder
     Decoder -->|"COMMAND_ACK"| StreamConfig["Telemetry Configurator"]
     StreamConfig --> Encoder["MAVLink Encoder"]
-    Encoder --> Application
-    Application --> AppSnapshot["AppSnapshot"]
+    Encoder --> Mission
+    Mission --> AppSnapshot["AppSnapshot"]
     AppSnapshot --> Console["Operator Console"]
     AppSnapshot --> Snapshot["JSON Health Snapshot"]
     Python["Python fault-injection harness"] --> SITL
@@ -53,30 +77,30 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Domain["onboard_autonomy_domain"]
-    TransportPort["onboard_autonomy_transport_port"]
-    CameraPort["onboard_autonomy_camera_port"]
-    PreviewPort["onboard_autonomy_camera_preview_port"]
-    DetectorPort["onboard_autonomy_target_detector_port"]
-    Mavlink["onboard_autonomy_mavlink_adapter"] --> Domain
-    Application["onboard_autonomy_application"] --> Domain
-    Application --> Mavlink
-    Application --> TransportPort
-    Application --> CameraPort
-    Application --> DetectorPort
-    Transport["onboard_autonomy_transport_adapter"] --> TransportPort
-    Camera["onboard_autonomy_camera_adapter"] --> CameraPort
-    Preview["onboard_autonomy_camera_preview_adapter"] --> PreviewPort
-    AprilTag["onboard_autonomy_apriltag_adapter"] --> DetectorPort
-    Mission["onboard_autonomy_mission_runtime"] --> Application
-    Mission --> Transport
-    Mission --> Camera
-    Mission --> AprilTag
-    Presentation["onboard_autonomy_console_presentation"] --> Application
-    Diagnostics["onboard_autonomy_diagnostic_logging"] --> Application
-    CLI["onboard_autonomy_cli_presentation"]
-    Executable["onboard_autonomy"] --> Mission
-    Executable --> Presentation
+    Domain["onboard_autonomy_mission_types"]
+    TransportPort["onboard_autonomy_mission_transport_port"]
+    CameraPort["onboard_autonomy_mission_camera_port"]
+    PreviewPort["onboard_autonomy_diagnostics_preview_port"]
+    DetectorPort["onboard_autonomy_mission_target_detector_port"]
+    Mavlink["onboard_autonomy_hardware_mavlink"] --> Domain
+    MissionCore["onboard_autonomy_mission"] --> Domain
+    MissionCore --> Mavlink
+    MissionCore --> TransportPort
+    MissionCore --> CameraPort
+    MissionCore --> DetectorPort
+    Transport["onboard_autonomy_hardware_transport"] --> TransportPort
+    Camera["onboard_autonomy_hardware_camera"] --> CameraPort
+    Preview["onboard_autonomy_diagnostics_preview"] --> PreviewPort
+    AprilTag["onboard_autonomy_mission_cv_detection"] --> DetectorPort
+    MissionRuntime["onboard_autonomy_mission_runtime"] --> MissionCore
+    MissionRuntime --> Transport
+    MissionRuntime --> Camera
+    MissionRuntime --> AprilTag
+    OperatorUI["onboard_autonomy_operator_ui"] --> MissionCore
+    Diagnostics["onboard_autonomy_diagnostics_logging"] --> MissionCore
+    CLI["onboard_autonomy_operator_cli"]
+    Executable["onboard_autonomy"] --> MissionRuntime
+    Executable --> OperatorUI
     Executable --> Diagnostics
     Executable --> Preview
     Executable --> CLI
@@ -99,7 +123,7 @@ consumers therefore leaves mission construction unchanged.
 
 ### Transport
 
-The application-owned `Transport` port moves bytes only. UDP and Linux
+The mission-owned `Transport` port moves bytes only. UDP and Linux
 serial adapters implement that contract without understanding MAVLink
 or vehicle readiness. UDP can represent SITL or a real network bridge;
 Linux serial is used for the Pixhawk bench connection. Transport type is
@@ -116,14 +140,14 @@ explicit device path.
 
 ### Camera source and monitor
 
-The application-owned `CameraSource` port returns typed YUV420 frames
+The mission-owned `CameraSource` port returns typed YUV420 frames
 without exposing Linux processes or `rpicam` arguments. The Linux
 `RpicamCameraSource` adapter starts `rpicam-vid` with a fixed manual
 hyperfocal lens position, receives fixed-size raw
 frames through one pipe, and receives per-frame metadata through another.
 The `GStreamerCameraSource` adapter starts an explicit `gst-launch-1.0`
 pipeline, receives Gazebo RTP/H.264 over UDP, decodes it, and publishes the
-same fixed-size I420 frame type through the same port. The application layer
+same fixed-size I420 frame type through the same port. The mission package
 therefore does not branch between physical and simulated cameras.
 
 Both adapters treat a process exit, pipe failure, missing metadata, or two
@@ -136,21 +160,21 @@ so retry attempts do not masquerade as dropped camera frames.
 
 `FrameWallClock` is paired with each completed frame. `CameraMonitor`
 calculates consumed FPS, sequence gaps, latest/average/maximum
-sensor-to-application latency, and frame age. It does not know whether
+sensor-to-mission latency, and frame age. It does not know whether
 the source is `rpicam`, GStreamer, or a test fake. Gazebo frames do not carry
 the Raspberry Pi `FrameWallClock`, so their capture latency remains unknown
 rather than being reported as a fabricated zero.
 
 ### Vision and camera preview
 
-The application-owned `TargetDetector` port maps a `CameraFrame` into
+The mission-owned `TargetDetector` port maps a `CameraFrame` into
 typed `TargetObservation` values. The current adapter uses the official
 AprilTag 3 implementation with the `tagStandard41h12` family and reads
 the Y plane directly, without OpenCV or a color conversion. With a
 quality-gated camera calibration and measured tag span, it undistorts
 the corners and estimates metric camera-optical pose.
 
-The application-owned `TargetTracker` accepts only finite, forward-facing,
+The mission CV `TargetTracker` accepts only finite, forward-facing,
 uncorrected poses above the decision-margin threshold. It requires three
 consecutive observations before declaring a lock, supports optional EMA
 translation smoothing, exposes observation age, and expires the track after
@@ -185,8 +209,8 @@ frames. OnboardAutonomy discovers the autopilot system ID, uses component ID
 
 ### Companion-link failsafe policy
 
-The MAVLink adapter forwards generic `PARAM_VALUE` records without embedding
-safety policy. `CompanionLinkFailsafe` in the application layer gives the four
+The MAVLink package forwards generic `PARAM_VALUE` records without embedding
+safety policy. `CompanionLinkFailsafe` in `mission/safety` gives the four
 required ArduPilot values typed meaning: action, timeout, options bitmask, and
 watched heartbeat system id.
 
@@ -208,7 +232,7 @@ The state model owns freshness windows and readiness rules. Missing data
 is unknown rather than healthy. A heartbeat older than three seconds
 invalidates the entire connected snapshot.
 
-### Application
+### Mission orchestration
 
 `CompanionApplication` owns the long-running use-case orchestration:
 reading transport bytes, feeding the decoder, scheduling the companion
@@ -217,7 +241,7 @@ fresh world state, running autonomy and safety decisions, and writing
 outbound frames. Its public header uses Pimpl so MAVLink implementation
 types do not leak into callers.
 
-`AppSnapshot` combines domain state with application-level heartbeat,
+`AppSnapshot` combines vehicle state with mission-level heartbeat,
 telemetry-setup, and companion-link failsafe status. Presentation depends on
 this neutral model,
 not on `MavlinkDecoder` or `TelemetryStreamConfigurator`.
