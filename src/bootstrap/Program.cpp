@@ -1,11 +1,18 @@
 #include "onboard_autonomy/bootstrap/Program.hpp"
 
+#include "onboard_autonomy/application/ports/RuntimeSnapshotSink.hpp"
 #include "onboard_autonomy/application/ports/Transport.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 #include "onboard_autonomy/bootstrap/CompanionSystem.hpp"
+#include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
 #include "onboard_autonomy/presentation/cli/CommandLine.hpp"
+#include "onboard_autonomy/presentation/console/ConsoleSnapshotSink.hpp"
 
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <variant>
@@ -13,6 +20,8 @@
 
 namespace onboard_autonomy::bootstrap {
 namespace {
+
+constexpr std::uint32_t kMaximumConsoleRefreshIntervalMs = 100;
 
 std::vector<std::string_view> command_line_arguments(const int argc,
     char** argv) {
@@ -53,6 +62,49 @@ const presentation::cli::OperatorInterfaceOptions& operator_options(
         options);
 }
 
+std::uint32_t snapshot_interval_ms(
+    const presentation::cli::OperatorInterfaceOptions& options) {
+    return options.json_output ? options.snapshot_interval_ms
+                               : std::min(options.snapshot_interval_ms,
+                                     kMaximumConsoleRefreshIntervalMs);
+}
+
+using RuntimeSnapshotSink = application::ports::RuntimeSnapshotSink;
+
+std::vector<std::unique_ptr<RuntimeSnapshotSink>> make_snapshot_sinks(
+    const presentation::cli::OperatorInterfaceOptions& options,
+    CompanionSystem& system) {
+    std::vector<std::unique_ptr<RuntimeSnapshotSink>> sinks;
+    if (options.json_output) {
+        sinks.push_back(
+            std::make_unique<diagnostics::logging::JsonDiagnosticSink>(
+                std::cout));
+    } else {
+        sinks.push_back(
+            std::make_unique<presentation::console::ConsoleSnapshotSink>(
+                std::cout,
+                system.transport().description(),
+                system.board_type_resolver()));
+    }
+    if (!options.diagnostic_log_file.empty()) {
+        sinks.push_back(
+            std::make_unique<diagnostics::logging::JsonDiagnosticSink>(
+                options.diagnostic_log_file));
+    }
+    return sinks;
+}
+
+std::vector<RuntimeSnapshotSink*> sink_pointers(
+    const std::vector<std::unique_ptr<RuntimeSnapshotSink>>& sinks) {
+    std::vector<RuntimeSnapshotSink*> result;
+    result.reserve(sinks.size());
+    std::transform(sinks.begin(),
+        sinks.end(),
+        std::back_inserter(result),
+        [](const auto& sink) { return sink.get(); });
+    return result;
+}
+
 } // namespace
 
 int run_program(const int argc, char** argv) {
@@ -70,16 +122,16 @@ int run_program(const int argc, char** argv) {
                   << camera->preview->port << "/\n";
     }
 
+    auto snapshot_sinks =
+        make_snapshot_sinks(operator_interface, companion_system);
     CompanionRunner runner{
         {
             .interactive = operator_interface.interactive,
-            .json_output = operator_interface.json_output,
             .exit_after_autonomy = autonomy.exit_when_finished,
-            .snapshot_interval_ms = operator_interface.snapshot_interval_ms,
+            .snapshot_interval_ms = snapshot_interval_ms(operator_interface),
         },
         companion_system.application(),
-        companion_system.transport(),
-        companion_system.board_type_resolver(),
+        sink_pointers(snapshot_sinks),
     };
     return runner.run();
 }

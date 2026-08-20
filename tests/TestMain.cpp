@@ -7,7 +7,7 @@ int main() {
     try {
         run_vehicle_state_tests();
         run_companion_application_tests();
-        run_app_snapshot_tests();
+        run_json_diagnostic_sink_tests();
         run_mavlink_decoder_tests();
         run_mavlink_encoder_tests();
         run_telemetry_stream_configurator_tests();

@@ -24,31 +24,24 @@ void require(const bool condition, const std::string& message) {
 
 class FakeCameraSource final
     : public onboard_autonomy::application::ports::CameraSource {
-public:
-    void emit(
-        onboard_autonomy::application::ports::CameraFrame frame
-    ) {
+  public:
+    void emit(onboard_autonomy::application::ports::CameraFrame frame) {
         latest_ = std::move(frame);
         ++status_.produced_frames;
         status_.phase =
-            onboard_autonomy::application::ports::
-                CameraSourcePhase::streaming;
+            onboard_autonomy::application::ports::CameraSourcePhase::streaming;
     }
 
-    void reconnecting(
-        std::string error,
-        const std::uint64_t restart_count
-    ) {
-        status_.phase =
-            onboard_autonomy::application::ports::
-                CameraSourcePhase::reconnecting;
+    void reconnecting(std::string error, const std::uint64_t restart_count) {
+        status_.phase = onboard_autonomy::application::ports::
+            CameraSourcePhase::reconnecting;
         status_.error = std::move(error);
         status_.restart_count = restart_count;
     }
 
     [[nodiscard]] std::optional<
-        onboard_autonomy::application::ports::CameraFrame
-    > take_latest_frame() override {
+        onboard_autonomy::application::ports::CameraFrame>
+    take_latest_frame() override {
         auto frame = std::move(latest_);
         latest_.reset();
         return frame;
@@ -60,22 +53,20 @@ public:
         return status_;
     }
 
-private:
+  private:
     onboard_autonomy::application::ports::CameraSourceStatus status_{
         .description = "fake camera",
         .error = "",
     };
-    std::optional<
-        onboard_autonomy::application::ports::CameraFrame
-    > latest_;
+    std::optional<onboard_autonomy::application::ports::CameraFrame> latest_;
 };
 
 class FakeTargetDetector final
     : public onboard_autonomy::application::ports::TargetDetector {
-public:
+  public:
     [[nodiscard]] onboard_autonomy::domain::TargetDetectionBatch detect(
-        const onboard_autonomy::application::ports::CameraFrame& input
-    ) override {
+        const onboard_autonomy::application::ports::CameraFrame& input)
+        override {
         return {
             .frame_sequence = input.sequence,
             .captured_at = input.captured_at,
@@ -103,18 +94,14 @@ public:
 
 class FakeCameraPreviewSink final
     : public onboard_autonomy::application::ports::CameraPreviewSink {
-public:
-    void publish(
-        const onboard_autonomy::application::ports::CameraFrame& input,
-        const std::span<
-            const onboard_autonomy::domain::TargetObservation
-        > input_targets,
+  public:
+    void publish(const onboard_autonomy::application::ports::CameraFrame& input,
+        const std::span<const onboard_autonomy::domain::TargetObservation>
+            input_targets,
         const onboard_autonomy::application::TargetTrackSnapshot&
-            input_target_track
-    ) override {
+            input_target_track) override {
         sequence = input.sequence;
-        luma_size =
-            static_cast<std::size_t>(input.width) * input.height;
+        luma_size = static_cast<std::size_t>(input.width) * input.height;
         targets.assign(input_targets.begin(), input_targets.end());
         target_track = input_target_track;
     }
@@ -132,8 +119,7 @@ public:
 onboard_autonomy::application::ports::CameraFrame frame(
     const std::uint64_t sequence,
     const std::chrono::system_clock::time_point captured_at,
-    const double latency_ms
-) {
+    const double latency_ms) {
     return {
         .sequence = sequence,
         .width = 640,
@@ -142,9 +128,8 @@ onboard_autonomy::application::ports::CameraFrame frame(
         .captured_at = captured_at,
         .received_at =
             captured_at +
-            std::chrono::duration_cast<
-                std::chrono::system_clock::duration
-            >(std::chrono::duration<double, std::milli>(latency_ms)),
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                std::chrono::duration<double, std::milli>(latency_ms)),
     };
 }
 
@@ -153,8 +138,7 @@ void monitor_calculates_frame_rate_latency_and_gaps() {
 
     FakeCameraSource source;
     onboard_autonomy::application::CameraMonitor monitor{source};
-    const auto wall_start =
-        std::chrono::system_clock::time_point{1000s};
+    const auto wall_start = std::chrono::system_clock::time_point{1000s};
     const onboard_autonomy::domain::TimePoint app_start{};
 
     source.emit(frame(1, wall_start, 20.0));
@@ -167,103 +151,70 @@ void monitor_calculates_frame_rate_latency_and_gaps() {
     const auto snapshot = monitor.snapshot(app_start + 90ms);
     require(
         snapshot.phase ==
-            onboard_autonomy::application::ports::
-                CameraSourcePhase::streaming,
-        "camera monitor must expose streaming state"
-    );
-    require(
-        snapshot.received_frames == 3U &&
-            snapshot.dropped_before_processing == 1U,
-        "camera monitor must count frames and sequence gaps"
-    );
-    require(
-        snapshot.measured_fps.has_value() &&
-            *snapshot.measured_fps > 24.9 &&
-            *snapshot.measured_fps < 25.1,
-        "camera monitor must measure FPS from capture timestamps"
-    );
-    require(
-        snapshot.latest_latency_ms.has_value() &&
-            *snapshot.latest_latency_ms > 39.9 &&
-            snapshot.average_latency_ms.has_value() &&
-            *snapshot.average_latency_ms > 29.9 &&
-            *snapshot.average_latency_ms < 30.1 &&
-            snapshot.maximum_latency_ms.has_value() &&
-            *snapshot.maximum_latency_ms > 39.9,
-        "camera monitor must calculate latest, average and max latency"
-    );
-    require(
-        snapshot.latest_frame_age_ms.has_value() &&
-            *snapshot.latest_frame_age_ms > 9.9,
-        "camera monitor must expose frame age on the application clock"
-    );
+            onboard_autonomy::application::ports::CameraSourcePhase::streaming,
+        "camera monitor must expose streaming state");
+    require(snapshot.received_frames == 3U &&
+                snapshot.dropped_before_processing == 1U,
+        "camera monitor must count frames and sequence gaps");
+    require(snapshot.measured_fps.has_value() &&
+                *snapshot.measured_fps > 24.9 && *snapshot.measured_fps < 25.1,
+        "camera monitor must measure FPS from capture timestamps");
+    require(snapshot.latest_latency_ms.has_value() &&
+                *snapshot.latest_latency_ms > 39.9 &&
+                snapshot.average_latency_ms.has_value() &&
+                *snapshot.average_latency_ms > 29.9 &&
+                *snapshot.average_latency_ms < 30.1 &&
+                snapshot.maximum_latency_ms.has_value() &&
+                *snapshot.maximum_latency_ms > 39.9,
+        "camera monitor must calculate latest, average and max latency");
+    require(snapshot.latest_frame_age_ms.has_value() &&
+                *snapshot.latest_frame_age_ms > 9.9,
+        "camera monitor must expose frame age on the application clock");
 }
 
 void metadata_parser_accepts_only_frame_wall_clock() {
     const auto parsed =
-        onboard_autonomy::adapters::camera::
-            parse_rpicam_frame_wall_clock_ns(
-                "    \"FrameWallClock\": 1785440325818936064,"
-            );
+        onboard_autonomy::adapters::camera::parse_rpicam_frame_wall_clock_ns(
+            "    \"FrameWallClock\": 1785440325818936064,");
+    require(parsed.has_value() && *parsed == 1785440325818936064LL,
+        "rpicam parser must read the nanosecond wall-clock timestamp");
     require(
-        parsed.has_value() &&
-            *parsed == 1785440325818936064LL,
-        "rpicam parser must read the nanosecond wall-clock timestamp"
-    );
-    require(
-        !onboard_autonomy::adapters::camera::
-             parse_rpicam_frame_wall_clock_ns(
-                 "    \"SensorTimestamp\": 413528965000"
-             ).has_value(),
-        "rpicam parser must not confuse monotonic and wall clocks"
-    );
+        !onboard_autonomy::adapters::camera::parse_rpicam_frame_wall_clock_ns(
+            "    \"SensorTimestamp\": 413528965000")
+             .has_value(),
+        "rpicam parser must not confuse monotonic and wall clocks");
 }
 
 void gstreamer_pipeline_is_explicit_and_machine_readable() {
     const auto arguments =
-        onboard_autonomy::adapters::camera::
-            make_gstreamer_camera_arguments(
-                {
-                    .width = 640,
-                    .height = 480,
-                    .udp_port = 5601,
-                    .jitter_latency_ms = 75,
-                    .command = "gst-launch-test",
-                }
-            );
+        onboard_autonomy::adapters::camera::make_gstreamer_camera_arguments({
+            .width = 640,
+            .height = 480,
+            .udp_port = 5601,
+            .jitter_latency_ms = 75,
+            .command = "gst-launch-test",
+        });
     const auto contains = [&arguments](const std::string& value) {
-        return std::find(
-            arguments.begin(),
-            arguments.end(),
-            value
-        ) != arguments.end();
+        return std::find(arguments.begin(), arguments.end(), value) !=
+               arguments.end();
     };
-    require(
-        arguments.front() == "gst-launch-test" &&
-            contains("port=5601") &&
-            contains("latency=75") &&
-            contains(
-                "caps=application/x-rtp,media=video,"
-                "clock-rate=90000,encoding-name=H264,payload=96"
-            ) &&
-            contains(
-                "video/x-raw,format=I420,width=640,height=480"
-            ) &&
-            contains("fdsink"),
-        "GStreamer camera pipeline must decode RTP/H.264 into I420"
-    );
+    require(arguments.front() == "gst-launch-test" && contains("port=5601") &&
+                contains("latency=75") &&
+                contains("caps=application/x-rtp,media=video,"
+                         "clock-rate=90000,encoding-name=H264,payload=96") &&
+                contains("video/x-raw,format=I420,width=640,height=480") &&
+                contains("fdsink"),
+        "GStreamer camera pipeline must decode RTP/H.264 into I420");
 }
 
 void recovery_timings_must_be_non_zero() {
-    onboard_autonomy::adapters::camera::GStreamerCameraConfig
-        gstreamer;
+    onboard_autonomy::adapters::camera::GStreamerCameraConfig gstreamer;
     gstreamer.frame_timeout_ms = 0;
     bool gstreamer_rejected = false;
     try {
         static_cast<void>(
-            onboard_autonomy::adapters::camera::
-                make_gstreamer_camera_arguments(gstreamer)
-        );
+            onboard_autonomy::adapters::camera::make_gstreamer_camera_arguments(
+                gstreamer));
     } catch (const std::invalid_argument&) {
         gstreamer_rejected = true;
     }
@@ -273,38 +224,27 @@ void recovery_timings_must_be_non_zero() {
     bool rpicam_rejected = false;
     try {
         static_cast<void>(
-            onboard_autonomy::adapters::camera::
-                make_rpicam_camera_source(rpicam)
-        );
+            onboard_autonomy::adapters::camera::make_rpicam_camera_source(
+                rpicam));
     } catch (const std::invalid_argument&) {
         rpicam_rejected = true;
     }
 
-    require(
-        gstreamer_rejected && rpicam_rejected,
-        "camera recovery timeouts must reject zero-duration loops"
-    );
+    require(gstreamer_rejected && rpicam_rejected,
+        "camera recovery timeouts must reject zero-duration loops");
 }
 
 void monitor_exposes_camera_recovery_state() {
     FakeCameraSource source;
     onboard_autonomy::application::CameraMonitor monitor{source};
-    source.reconnecting(
-        "GStreamer frame stalled for 2000 ms",
-        3
-    );
+    source.reconnecting("GStreamer frame stalled for 2000 ms", 3);
 
-    const auto snapshot = monitor.snapshot(
-        onboard_autonomy::domain::TimePoint{}
-    );
-    require(
-        snapshot.phase ==
-                onboard_autonomy::application::ports::
-                    CameraSourcePhase::reconnecting &&
-            snapshot.camera_restarts == 3U &&
-            !snapshot.error.empty(),
-        "camera monitor must preserve visible recovery evidence"
-    );
+    const auto snapshot =
+        monitor.snapshot(onboard_autonomy::domain::TimePoint{});
+    require(snapshot.phase == onboard_autonomy::application::ports::
+                                  CameraSourcePhase::reconnecting &&
+                snapshot.camera_restarts == 3U && !snapshot.error.empty(),
+        "camera monitor must preserve visible recovery evidence");
 }
 
 void monitor_forwards_the_processed_frame_to_preview() {
@@ -317,65 +257,18 @@ void monitor_forwards_the_processed_frame_to_preview() {
         &preview,
     };
 
-    source.emit(
-        frame(
-            21,
-            std::chrono::system_clock::time_point{},
-            10.0
-        )
-    );
+    source.emit(frame(21, std::chrono::system_clock::time_point{}, 10.0));
     monitor.poll(onboard_autonomy::domain::TimePoint{});
 
-    require(
-        preview.sequence == 21U &&
-            preview.luma_size == 640U * 480U &&
-            preview.targets.size() == 1U &&
-            preview.targets.front().id == 12 &&
-            preview.target_track.phase ==
-                onboard_autonomy::application::
-                    TargetTrackPhase::searching,
-        "camera preview must receive the frame and its detections"
-    );
+    require(preview.sequence == 21U && preview.luma_size == 640U * 480U &&
+                preview.targets.size() == 1U &&
+                preview.targets.front().id == 12 &&
+                preview.target_track.phase ==
+                    onboard_autonomy::application::TargetTrackPhase::searching,
+        "camera preview must receive the frame and its detections");
 }
 
-void app_snapshot_json_preserves_vehicle_and_adds_camera() {
-    onboard_autonomy::application::AppSnapshot snapshot;
-    snapshot.camera = onboard_autonomy::application::CameraSnapshot{
-        .phase =
-            onboard_autonomy::application::ports::
-                CameraSourcePhase::streaming,
-        .source = "Camera Module 3 \"Wide\"",
-        .error = "",
-        .width = 640,
-        .height = 480,
-        .received_frames = 5,
-        .dropped_before_processing = 0,
-        .camera_restarts = 2,
-        .frames_with_capture_timestamp = 5,
-        .measured_fps = std::nullopt,
-        .latest_latency_ms = 21.5,
-        .average_latency_ms = std::nullopt,
-        .maximum_latency_ms = std::nullopt,
-        .latest_frame_age_ms = std::nullopt,
-    };
-
-    const std::string json = snapshot.to_json();
-    require(
-        json.find("\"connected\":false") != std::string::npos &&
-            json.find("\"camera\":{") != std::string::npos &&
-            json.find("\"phase\":\"streaming\"") !=
-                std::string::npos &&
-            json.find("Camera Module 3 \\\"Wide\\\"") !=
-                std::string::npos &&
-            json.find("\"camera_restarts\":2") !=
-                std::string::npos &&
-            json.find("\"latest_latency_ms\":21.500") !=
-                std::string::npos,
-        "application JSON must remain backward compatible and add camera"
-    );
-}
-
-}  // namespace
+} // namespace
 
 void run_camera_monitor_tests() {
     monitor_calculates_frame_rate_latency_and_gaps();
@@ -384,5 +277,4 @@ void run_camera_monitor_tests() {
     recovery_timings_must_be_non_zero();
     monitor_exposes_camera_recovery_state();
     monitor_forwards_the_processed_frame_to_preview();
-    app_snapshot_json_preserves_vehicle_and_adds_camera();
 }

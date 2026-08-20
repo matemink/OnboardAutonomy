@@ -144,6 +144,18 @@ void simulated_wind_is_typed_and_sitl_only() {
         "direction must be in [0, 360)");
 }
 
+void diagnostic_log_is_independent_from_console_output() {
+    const auto options =
+        parse({"--interactive", "--diagnostic-log", "artifacts/flight.jsonl"});
+    const auto* hardware = std::get_if<HardwareLaunchOptions>(&options);
+    require(hardware != nullptr && hardware->operator_interface.interactive &&
+                !hardware->operator_interface.json_output &&
+                hardware->operator_interface.diagnostic_log_file ==
+                    "artifacts/flight.jsonl",
+        "structured diagnostics must be independently configurable");
+    require_rejected({"--diagnostic-log", ""}, "cannot be empty");
+}
+
 void removed_options_provide_migration_guidance() {
     require_rejected({"--serial", "/dev/ttyACM0"},
         "--transport serial --serial-device DEVICE");
@@ -157,5 +169,6 @@ void run_command_line_tests() {
     transport_groups_are_explicit_and_exclusive();
     camera_and_autonomy_dependencies_are_validated();
     simulated_wind_is_typed_and_sitl_only();
+    diagnostic_log_is_independent_from_console_output();
     removed_options_provide_migration_guidance();
 }

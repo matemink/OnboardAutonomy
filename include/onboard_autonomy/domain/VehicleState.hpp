@@ -52,88 +52,61 @@ struct VehicleSnapshot {
     std::optional<double> battery_arming_voltage_v;
     std::optional<AutopilotMetadata> autopilot_metadata;
     std::vector<std::string> warnings;
-
-    [[nodiscard]] std::string to_json() const;
 };
 
 class VehicleState {
-public:
-    void on_heartbeat(
-        std::uint8_t system_id,
+  public:
+    void on_heartbeat(std::uint8_t system_id,
         std::uint8_t component_id,
         std::uint8_t vehicle_type,
         std::uint8_t autopilot_type,
         std::uint8_t base_mode,
         std::uint32_t custom_mode,
         std::uint8_t system_status,
-        TimePoint now
-    );
+        TimePoint now);
 
-    void on_gps(
-        std::uint8_t fix_type,
+    void on_gps(std::uint8_t fix_type,
         std::uint8_t satellites_visible,
-        TimePoint now
-    );
+        TimePoint now);
 
-    void on_global_position(
-        std::int32_t relative_altitude_mm,
-        TimePoint now
-    );
+    void on_global_position(std::int32_t relative_altitude_mm, TimePoint now);
 
-    void on_local_position(
-        float north_m,
-        float east_m,
-        float down_m,
-        TimePoint now
-    );
+    void
+    on_local_position(float north_m, float east_m, float down_m, TimePoint now);
 
-    void on_attitude(
-        float roll_rad,
-        float pitch_rad,
-        float yaw_rad,
-        TimePoint now
-    );
+    void
+    on_attitude(float roll_rad, float pitch_rad, float yaw_rad, TimePoint now);
 
-    void on_battery(
-        std::optional<double> voltage_v,
+    void on_battery(std::optional<double> voltage_v,
         std::optional<double> current_a,
         std::optional<std::int8_t> remaining_pct,
-        TimePoint now
-    );
+        TimePoint now);
 
     void on_battery_arming_voltage(double voltage_v, TimePoint now);
 
     void on_autopilot_metadata(AutopilotMetadata metadata);
 
-    void on_system_status(
-        std::uint32_t sensors_enabled,
+    void on_system_status(std::uint32_t sensors_enabled,
         std::uint32_t sensors_healthy,
         std::optional<double> voltage_v,
         std::optional<double> current_a,
         std::optional<std::int8_t> remaining_pct,
-        TimePoint now
-    );
+        TimePoint now);
 
-    void on_status_text(
-        std::uint8_t severity,
-        std::string text,
-        TimePoint now
-    );
+    void on_status_text(std::uint8_t severity, std::string text, TimePoint now);
 
     [[nodiscard]] VehicleSnapshot snapshot(TimePoint now);
 
-private:
+  private:
     struct WarningEntry {
         std::string text;
         TimePoint last_seen;
     };
 
-    void update_battery_locked(
-        std::optional<double> voltage_v,
+    void update_battery_locked(std::optional<double> voltage_v,
         std::optional<double> current_a,
         std::optional<std::int8_t> remaining_pct,
-        TimePoint now
-    );
+        TimePoint now);
 
     std::mutex mutex_;
     std::optional<TimePoint> last_heartbeat_;
@@ -169,4 +142,4 @@ private:
     std::vector<WarningEntry> warnings_;
 };
 
-}  // namespace onboard_autonomy::domain
+} // namespace onboard_autonomy::domain

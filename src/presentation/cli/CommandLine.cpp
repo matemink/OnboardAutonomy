@@ -22,28 +22,29 @@ enum class CameraBackend {
 
 // Temporary parser buffer. Only validated launch states leave this file.
 struct LaunchArgumentsDraft {
-    TransportBackend transport{TransportBackend::udp};
+    std::optional<double> apriltag_tag_size_m;
     std::string udp_bind{defaults::kUdpBindAddress};
-    std::uint16_t udp_port{defaults::kMavlinkUdpPort};
     std::string serial_device;
-    std::uint32_t baud_rate{defaults::kSerialBaudRate};
-    std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
-    bool camera_enabled{};
-    CameraBackend camera_backend{CameraBackend::rpicam};
-    std::uint16_t camera_udp_port{defaults::kCameraUdpPort};
-    bool apriltag_enabled{};
     std::string camera_calibration_file;
     std::string camera_extrinsics_file;
-    std::optional<double> apriltag_tag_size_m;
-    bool camera_preview_enabled{};
-    std::uint16_t camera_preview_port{defaults::kCameraPreviewPort};
+    std::string board_types_file;
+    std::string diagnostic_log_file;
+    std::optional<application::SimulatedWindProfile> simulated_wind;
+    TransportBackend transport{TransportBackend::udp};
+    std::uint32_t baud_rate{defaults::kSerialBaudRate};
+    std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
+    CameraBackend camera_backend{CameraBackend::rpicam};
     std::uint32_t camera_width{defaults::kCameraFrameWidth};
     std::uint32_t camera_height{defaults::kCameraFrameHeight};
     std::uint32_t camera_fps{defaults::kCameraFramesPerSecond};
-    std::string board_types_file;
+    std::uint16_t udp_port{defaults::kMavlinkUdpPort};
+    std::uint16_t camera_udp_port{defaults::kCameraUdpPort};
+    std::uint16_t camera_preview_port{defaults::kCameraPreviewPort};
+    bool camera_enabled{};
+    bool apriltag_enabled{};
+    bool camera_preview_enabled{};
     bool json_output{};
     bool sitl_mode{};
-    std::optional<application::SimulatedWindProfile> simulated_wind;
     bool autonomous{};
     bool exit_after_autonomy{};
     bool interactive{};
@@ -60,6 +61,7 @@ struct ExplicitOptions {
     bool camera_height{false};
     bool camera_fps{false};
     bool camera_preview_port{false};
+    bool diagnostic_log_file{false};
 };
 
 template <typename T>
@@ -201,6 +203,10 @@ void validate_options(const LaunchArgumentsDraft& options,
         throw std::invalid_argument(
             "--interactive cannot be combined with --json");
     }
+    if (options.diagnostic_log_file.empty() &&
+        explicit_options.diagnostic_log_file) {
+        throw std::invalid_argument("--diagnostic-log cannot be empty");
+    }
     if (options.simulated_wind.has_value()) {
         const auto& wind = *options.simulated_wind;
         if (!options.sitl_mode) {
@@ -291,6 +297,7 @@ CommandLineOptions make_command_line_options(
     const OperatorInterfaceOptions operator_interface{
         .interactive = draft.interactive,
         .json_output = draft.json_output,
+        .diagnostic_log_file = draft.diagnostic_log_file,
         .snapshot_interval_ms = draft.snapshot_interval_ms,
         .board_types_file = draft.board_types_file,
     };
@@ -433,6 +440,9 @@ class ArgumentParser {
             draft_.board_types_file = value_after(argument);
         } else if (argument == "--json") {
             draft_.json_output = true;
+        } else if (argument == "--diagnostic-log") {
+            draft_.diagnostic_log_file = value_after(argument);
+            explicit_.diagnostic_log_file = true;
         } else if (argument == "--sitl") {
             draft_.sitl_mode = true;
         } else if (argument == "--sim-wind") {

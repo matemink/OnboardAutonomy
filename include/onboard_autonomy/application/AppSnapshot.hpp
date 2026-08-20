@@ -53,9 +53,7 @@ enum class TelemetrySetupState {
 };
 
 struct TelemetryStatus {
-    TelemetrySetupState state{
-        TelemetrySetupState::waiting_for_vehicle
-    };
+    TelemetrySetupState state{TelemetrySetupState::waiting_for_vehicle};
     std::size_t completed_requests{0};
     std::size_t total_requests{0};
     std::string current_stream;
@@ -78,8 +76,6 @@ struct AppSnapshot {
     std::chrono::milliseconds elapsed{};
     std::optional<LinkActivity> tx_activity;
     std::optional<LinkActivity> rx_activity;
-
-    [[nodiscard]] std::string to_json() const;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

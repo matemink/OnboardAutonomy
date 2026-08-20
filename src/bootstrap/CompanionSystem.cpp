@@ -246,10 +246,7 @@ class CompanionSystem::Impl {
         const std::filesystem::path& executable)
         : safety_(evaluate_safety(options)),
           camera_extrinsics_(load_camera_extrinsics(options)),
-          board_type_catalog_(
-              operator_options(options).json_output
-                  ? nullptr
-                  : load_board_type_catalog(options, executable)),
+          board_type_catalog_(load_board_type_catalog(options, executable)),
           target_detector_(make_target_detector(options)),
           transport_(make_transport(options)),
           camera_source_(make_camera_source(options)),
