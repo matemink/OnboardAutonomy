@@ -92,30 +92,6 @@ class FakeTargetDetector final
     }
 };
 
-class FakeCameraPreviewSink final
-    : public onboard_autonomy::application::ports::CameraPreviewSink {
-  public:
-    void publish(const onboard_autonomy::application::ports::CameraFrame& input,
-        const std::span<const onboard_autonomy::domain::TargetObservation>
-            input_targets,
-        const onboard_autonomy::application::TargetTrackSnapshot&
-            input_target_track) override {
-        sequence = input.sequence;
-        luma_size = static_cast<std::size_t>(input.width) * input.height;
-        targets.assign(input_targets.begin(), input_targets.end());
-        target_track = input_target_track;
-    }
-
-    [[nodiscard]] std::string description() const override {
-        return "fake camera preview";
-    }
-
-    std::uint64_t sequence{0};
-    std::size_t luma_size{0};
-    std::vector<onboard_autonomy::domain::TargetObservation> targets;
-    onboard_autonomy::application::TargetTrackSnapshot target_track;
-};
-
 onboard_autonomy::application::ports::CameraFrame frame(
     const std::uint64_t sequence,
     const std::chrono::system_clock::time_point captured_at,
@@ -247,25 +223,27 @@ void monitor_exposes_camera_recovery_state() {
         "camera monitor must preserve visible recovery evidence");
 }
 
-void monitor_forwards_the_processed_frame_to_preview() {
+void monitor_exposes_processed_frames_without_a_preview_dependency() {
     FakeCameraSource source;
     FakeTargetDetector detector;
-    FakeCameraPreviewSink preview;
     onboard_autonomy::application::CameraMonitor monitor{
         source,
         &detector,
-        &preview,
     };
 
     source.emit(frame(21, std::chrono::system_clock::time_point{}, 10.0));
     monitor.poll(onboard_autonomy::domain::TimePoint{});
+    const auto processed = monitor.take_latest_processed_frame();
 
-    require(preview.sequence == 21U && preview.luma_size == 640U * 480U &&
-                preview.targets.size() == 1U &&
-                preview.targets.front().id == 12 &&
-                preview.target_track.phase ==
+    require(processed.has_value() && processed->frame.sequence == 21U &&
+                processed->frame.yuv420.size() == 640U * 480U * 3U / 2U &&
+                processed->targets.size() == 1U &&
+                processed->targets.front().id == 12 &&
+                processed->target_track.phase ==
                     onboard_autonomy::application::TargetTrackPhase::searching,
-        "camera preview must receive the frame and its detections");
+        "camera monitor must expose processed data to optional consumers");
+    require(!monitor.take_latest_processed_frame().has_value(),
+        "processed camera output must be consumed only once");
 }
 
 } // namespace
@@ -276,5 +254,5 @@ void run_camera_monitor_tests() {
     gstreamer_pipeline_is_explicit_and_machine_readable();
     recovery_timings_must_be_non_zero();
     monitor_exposes_camera_recovery_state();
-    monitor_forwards_the_processed_frame_to_preview();
+    monitor_exposes_processed_frames_without_a_preview_dependency();
 }

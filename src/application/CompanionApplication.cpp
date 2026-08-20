@@ -388,12 +388,9 @@ class CompanionApplication::Impl {
         }
         if (options.camera_source != nullptr) {
             camera_monitor_.emplace(*options.camera_source,
-                options.target_detector,
-                options.camera_preview_sink);
-        } else if (options.target_detector != nullptr ||
-                   options.camera_preview_sink != nullptr) {
-            throw std::invalid_argument(
-                "vision and preview require a camera source");
+                options.target_detector);
+        } else if (options.target_detector != nullptr) {
+            throw std::invalid_argument("vision requires a camera source");
         }
         if (camera_extrinsics_.has_value() &&
             options.target_detector == nullptr) {
@@ -709,6 +706,14 @@ class CompanionApplication::Impl {
         };
     }
 
+    [[nodiscard]] std::optional<ProcessedCameraFrame>
+    take_latest_processed_camera_frame() {
+        if (!camera_monitor_.has_value()) {
+            return std::nullopt;
+        }
+        return camera_monitor_->take_latest_processed_frame();
+    }
+
   private:
     [[nodiscard]] std::optional<domain::BodyFramePosition>
     current_landing_target(const domain::TimePoint now) const {
@@ -928,6 +933,11 @@ bool CompanionApplication::request_autonomy_start(const domain::TimePoint now) {
 
 AppSnapshot CompanionApplication::snapshot(const domain::TimePoint now) {
     return impl_->snapshot(now);
+}
+
+std::optional<ProcessedCameraFrame>
+CompanionApplication::take_latest_processed_camera_frame() {
+    return impl_->take_latest_processed_camera_frame();
 }
 
 } // namespace onboard_autonomy::application

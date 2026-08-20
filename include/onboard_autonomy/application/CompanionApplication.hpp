@@ -1,7 +1,7 @@
 #pragma once
 
 #include "onboard_autonomy/application/AppSnapshot.hpp"
-#include "onboard_autonomy/application/ports/CameraPreviewSink.hpp"
+#include "onboard_autonomy/application/CameraMonitor.hpp"
 #include "onboard_autonomy/application/ports/Transport.hpp"
 #include "onboard_autonomy/domain/TargetTransform.hpp"
 
@@ -16,17 +16,14 @@ struct CompanionApplicationOptions {
     bool motion_commands_allowed{false};
     ports::CameraSource* camera_source{nullptr};
     ports::TargetDetector* target_detector{nullptr};
-    ports::CameraPreviewSink* camera_preview_sink{nullptr};
     std::optional<domain::CameraExtrinsics> camera_extrinsics;
     std::optional<SimulatedWindProfile> simulated_wind;
 };
 
 class CompanionApplication {
-public:
-    explicit CompanionApplication(
-        ports::Transport& transport,
-        CompanionApplicationOptions options = {}
-    );
+  public:
+    explicit CompanionApplication(ports::Transport& transport,
+        CompanionApplicationOptions options = {});
     ~CompanionApplication();
 
     CompanionApplication(const CompanionApplication&) = delete;
@@ -41,10 +38,12 @@ public:
     void poll(domain::TimePoint now);
     [[nodiscard]] bool request_autonomy_start(domain::TimePoint now);
     [[nodiscard]] AppSnapshot snapshot(domain::TimePoint now);
+    [[nodiscard]] std::optional<ProcessedCameraFrame>
+    take_latest_processed_camera_frame();
 
-private:
+  private:
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

@@ -50,7 +50,6 @@ struct CameraOptions {
     std::uint32_t frame_width{defaults::kCameraFrameWidth};
     std::uint32_t frame_height{defaults::kCameraFrameHeight};
     std::optional<AprilTagOptions> apriltag;
-    std::optional<CameraPreviewOptions> preview;
 };
 
 struct AutonomyOptions {
@@ -61,9 +60,13 @@ struct AutonomyOptions {
 struct OperatorInterfaceOptions {
     bool interactive{};
     bool json_output{};
-    std::string diagnostic_log_file;
     std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
     std::string board_types_file;
+};
+
+struct DiagnosticsOptions {
+    std::optional<CameraPreviewOptions> camera_preview;
+    std::string log_file;
 };
 
 struct HardwareLaunchOptions {
@@ -71,6 +74,7 @@ struct HardwareLaunchOptions {
     std::optional<CameraOptions> camera;
     AutonomyOptions autonomy;
     OperatorInterfaceOptions operator_interface;
+    DiagnosticsOptions diagnostics;
 };
 
 struct SimulationLaunchOptions {
@@ -79,6 +83,7 @@ struct SimulationLaunchOptions {
     std::optional<application::SimulatedWindProfile> wind;
     AutonomyOptions autonomy;
     OperatorInterfaceOptions operator_interface;
+    DiagnosticsOptions diagnostics;
 };
 
 using CommandLineOptions =

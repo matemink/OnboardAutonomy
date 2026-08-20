@@ -273,17 +273,11 @@ std::optional<CameraOptions> make_camera_options(
         };
     }
 
-    std::optional<CameraPreviewOptions> preview;
-    if (draft.camera_preview_enabled) {
-        preview = CameraPreviewOptions{.port = draft.camera_preview_port};
-    }
-
     return CameraOptions{
         .source = make_camera_source_options(draft),
         .frame_width = draft.camera_width,
         .frame_height = draft.camera_height,
         .apriltag = std::move(apriltag),
-        .preview = preview,
     };
 }
 
@@ -297,9 +291,16 @@ CommandLineOptions make_command_line_options(
     const OperatorInterfaceOptions operator_interface{
         .interactive = draft.interactive,
         .json_output = draft.json_output,
-        .diagnostic_log_file = draft.diagnostic_log_file,
         .snapshot_interval_ms = draft.snapshot_interval_ms,
         .board_types_file = draft.board_types_file,
+    };
+    const DiagnosticsOptions diagnostics{
+        .camera_preview = draft.camera_preview_enabled
+                              ? std::optional{CameraPreviewOptions{
+                                    .port = draft.camera_preview_port,
+                                }}
+                              : std::nullopt,
+        .log_file = draft.diagnostic_log_file,
     };
 
     if (draft.sitl_mode) {
@@ -313,6 +314,7 @@ CommandLineOptions make_command_line_options(
             .wind = draft.simulated_wind,
             .autonomy = autonomy,
             .operator_interface = operator_interface,
+            .diagnostics = diagnostics,
         };
     }
 
@@ -321,6 +323,7 @@ CommandLineOptions make_command_line_options(
         .camera = std::move(camera),
         .autonomy = autonomy,
         .operator_interface = operator_interface,
+        .diagnostics = diagnostics,
     };
 }
 

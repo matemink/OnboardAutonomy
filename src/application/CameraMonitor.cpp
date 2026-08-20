@@ -8,14 +8,10 @@
 namespace onboard_autonomy::application {
 
 class CameraMonitor::Impl {
-public:
-    explicit Impl(
-        ports::CameraSource& source,
-        ports::TargetDetector* target_detector,
-        ports::CameraPreviewSink* preview_sink
-    )
-        : source_(source),
-          preview_sink_(preview_sink) {
+  public:
+    explicit Impl(ports::CameraSource& source,
+        ports::TargetDetector* target_detector)
+        : source_(source) {
         if (target_detector != nullptr) {
             vision_monitor_.emplace(*target_detector);
         }
@@ -41,17 +37,8 @@ public:
         TargetTrackSnapshot target_track;
         if (vision_monitor_.has_value()) {
             targets = vision_monitor_->process(*frame, now);
-            target_track =
-                vision_monitor_->snapshot(now).target_track;
+            target_track = vision_monitor_->snapshot(now).target_track;
         }
-        if (preview_sink_ != nullptr) {
-            preview_sink_->publish(
-                *frame,
-                targets,
-                target_track
-            );
-        }
-
         if (frame->captured_at.has_value()) {
             ++frames_with_capture_timestamp_;
             if (!first_capture_at_.has_value()) {
@@ -59,27 +46,25 @@ public:
             }
             last_capture_at_ = frame->captured_at;
 
-            const auto latency =
-                frame->received_at - *frame->captured_at;
+            const auto latency = frame->received_at - *frame->captured_at;
             const double latency_ms =
-                std::chrono::duration<double, std::milli>(
-                    latency
-                ).count();
+                std::chrono::duration<double, std::milli>(latency).count();
             if (latency_ms >= 0.0) {
                 ++valid_latency_samples_;
                 latest_latency_ms_ = latency_ms;
                 total_latency_ms_ += latency_ms;
-                maximum_latency_ms_ = std::max(
-                    maximum_latency_ms_,
-                    latency_ms
-                );
+                maximum_latency_ms_ = std::max(maximum_latency_ms_, latency_ms);
             }
         }
+
+        latest_processed_frame_ = ProcessedCameraFrame{
+            .frame = std::move(*frame),
+            .targets = {targets.begin(), targets.end()},
+            .target_track = target_track,
+        };
     }
 
-    [[nodiscard]] CameraSnapshot snapshot(
-        const domain::TimePoint now
-    ) const {
+    [[nodiscard]] CameraSnapshot snapshot(const domain::TimePoint now) const {
         const auto source_status = source_.status();
         CameraSnapshot result{
             .phase = source_status.phase,
@@ -88,14 +73,10 @@ public:
             .width = width_,
             .height = height_,
             .received_frames = received_frames_,
-            .dropped_before_processing =
-                std::max(
-                    dropped_before_processing_,
-                    source_status.overwritten_frames
-                ),
+            .dropped_before_processing = std::max(dropped_before_processing_,
+                source_status.overwritten_frames),
             .camera_restarts = source_status.restart_count,
-            .frames_with_capture_timestamp =
-                frames_with_capture_timestamp_,
+            .frames_with_capture_timestamp = frames_with_capture_timestamp_,
             .measured_fps = std::nullopt,
             .latest_latency_ms = std::nullopt,
             .average_latency_ms = std::nullopt,
@@ -103,18 +84,14 @@ public:
             .latest_frame_age_ms = std::nullopt,
         };
 
-        if (first_capture_at_.has_value() &&
-            last_capture_at_.has_value() &&
+        if (first_capture_at_.has_value() && last_capture_at_.has_value() &&
             frames_with_capture_timestamp_ > 1U) {
-            const double elapsed_seconds =
-                std::chrono::duration<double>(
-                    *last_capture_at_ - *first_capture_at_
-                ).count();
+            const double elapsed_seconds = std::chrono::duration<double>(
+                *last_capture_at_ - *first_capture_at_)
+                                               .count();
             if (elapsed_seconds > 0.0) {
                 result.measured_fps =
-                    static_cast<double>(
-                        frames_with_capture_timestamp_ - 1U
-                    ) /
+                    static_cast<double>(frames_with_capture_timestamp_ - 1U) /
                     elapsed_seconds;
             }
         }
@@ -122,35 +99,38 @@ public:
         result.latest_latency_ms = latest_latency_ms_;
         if (valid_latency_samples_ > 0U) {
             result.average_latency_ms =
-                total_latency_ms_ /
-                static_cast<double>(
-                    valid_latency_samples_
-                );
+                total_latency_ms_ / static_cast<double>(valid_latency_samples_);
             result.maximum_latency_ms = maximum_latency_ms_;
         }
         if (last_frame_observed_at_.has_value() &&
             now >= *last_frame_observed_at_) {
             result.latest_frame_age_ms =
                 std::chrono::duration<double, std::milli>(
-                    now - *last_frame_observed_at_
-                ).count();
+                    now - *last_frame_observed_at_)
+                    .count();
         }
         return result;
     }
 
     [[nodiscard]] std::optional<VisionSnapshot> vision_snapshot(
-        const domain::TimePoint now
-    ) const {
+        const domain::TimePoint now) const {
         if (!vision_monitor_.has_value()) {
             return std::nullopt;
         }
         return vision_monitor_->snapshot(now);
     }
 
-private:
+    [[nodiscard]] std::optional<ProcessedCameraFrame>
+    take_latest_processed_frame() {
+        auto frame = std::move(latest_processed_frame_);
+        latest_processed_frame_.reset();
+        return frame;
+    }
+
+  private:
     ports::CameraSource& source_;
-    ports::CameraPreviewSink* preview_sink_;
     std::optional<VisionMonitor> vision_monitor_;
+    std::optional<ProcessedCameraFrame> latest_processed_frame_;
     std::uint64_t received_frames_{0};
     std::uint64_t dropped_before_processing_{0};
     std::uint64_t frames_with_capture_timestamp_{0};
@@ -159,47 +139,35 @@ private:
     std::uint32_t height_{0};
     std::optional<std::uint64_t> last_sequence_;
     std::optional<domain::TimePoint> last_frame_observed_at_;
-    std::optional<std::chrono::system_clock::time_point>
-        first_capture_at_;
-    std::optional<std::chrono::system_clock::time_point>
-        last_capture_at_;
+    std::optional<std::chrono::system_clock::time_point> first_capture_at_;
+    std::optional<std::chrono::system_clock::time_point> last_capture_at_;
     std::optional<double> latest_latency_ms_;
     double total_latency_ms_{0.0};
     double maximum_latency_ms_{0.0};
 };
 
-CameraMonitor::CameraMonitor(
-    ports::CameraSource& source,
-    ports::TargetDetector* target_detector,
-    ports::CameraPreviewSink* preview_sink
-)
-    : impl_(
-          std::make_unique<Impl>(
-              source,
-              target_detector,
-              preview_sink
-          )
-      ) {}
+CameraMonitor::CameraMonitor(ports::CameraSource& source,
+    ports::TargetDetector* target_detector)
+    : impl_(std::make_unique<Impl>(source, target_detector)) {}
 
 CameraMonitor::~CameraMonitor() = default;
 CameraMonitor::CameraMonitor(CameraMonitor&&) noexcept = default;
-CameraMonitor& CameraMonitor::operator=(CameraMonitor&&) noexcept =
-    default;
+CameraMonitor& CameraMonitor::operator=(CameraMonitor&&) noexcept = default;
 
-void CameraMonitor::poll(const domain::TimePoint now) {
-    impl_->poll(now);
-}
+void CameraMonitor::poll(const domain::TimePoint now) { impl_->poll(now); }
 
-CameraSnapshot CameraMonitor::snapshot(
-    const domain::TimePoint now
-) const {
+CameraSnapshot CameraMonitor::snapshot(const domain::TimePoint now) const {
     return impl_->snapshot(now);
 }
 
 std::optional<VisionSnapshot> CameraMonitor::vision_snapshot(
-    const domain::TimePoint now
-) const {
+    const domain::TimePoint now) const {
     return impl_->vision_snapshot(now);
 }
 
-}  // namespace onboard_autonomy::application
+std::optional<ProcessedCameraFrame>
+CameraMonitor::take_latest_processed_frame() {
+    return impl_->take_latest_processed_frame();
+}
+
+} // namespace onboard_autonomy::application
