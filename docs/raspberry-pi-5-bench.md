@@ -280,10 +280,6 @@ distortion, records input hashes and per-view reprojection errors, and
 fails when the quality gate is not met. Do not commit guessed or generic
 Camera Module 3 intrinsics as if they belonged to the physical camera.
 
-See the
-[camera calibration learning note](learning/29-camera-calibration.uk.md)
-for the geometry, quality thresholds, and code path.
-
 ## Windows launcher
 
 `StartOnboardAutonomyPixhawk.cmd` opens the Raspberry Pi runtime over SSH

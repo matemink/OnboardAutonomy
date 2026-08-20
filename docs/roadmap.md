@@ -107,8 +107,7 @@ Experiment note: a project-owned decorative airfield was implemented,
 tested, and rolled back because the Gazebo GUI displayed only its
 background instead of the scene entities. The server-side world,
 camera, physics, and automated flight continued to run, but the
-user-visible result did not satisfy the acceptance criterion. See
-`docs/learning/14-gazebo-airfield-failed-experiment.uk.md`.
+user-visible result did not satisfy the acceptance criterion.
 
 Recovery acceptance evidence: the same process consumed 11 frames, exposed a
 2-second stream stall and reconnect state, then consumed 22 frames after the
