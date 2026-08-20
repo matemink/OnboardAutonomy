@@ -53,9 +53,17 @@ bash scripts/run_static_analysis.sh
 
 Every finding from an enabled `clang-tidy` check fails the command and the CI
 job. This includes correctness, concurrency, performance, portability,
-function-size, and cognitive-complexity checks. The enabled checks and limits
-are defined in `.clang-tidy`; changing them requires an explicit review rather
-than silently accepting a violation.
+function-size, cognitive-complexity, and the enforceable C++ Core Guidelines
+checks provided by clang-tidy 18. The enabled checks and limits are defined in
+`.clang-tidy`; changing them requires an explicit review rather than silently
+accepting a violation.
+
+The Core Guidelines profile excludes checks that conflict with required C API
+boundaries (POSIX, GStreamer, AprilTag, MAVLink, and `argc`/`argv`), intentional
+non-owning reference members, and matrix indexing. Magic numbers are blocking:
+domain, protocol, timing, and configuration values must be expressed as named
+constants. Local suppressions are allowed only at an unavoidable boundary and
+must state the reason next to the suppression.
 
 Install the Python development dependencies and run the same Ruff analysis as
 CI:

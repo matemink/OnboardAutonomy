@@ -28,6 +28,12 @@
 namespace onboard_autonomy::adapters::camera {
 namespace {
 
+constexpr int kChildSetupFailureExitCode = 126;
+constexpr int kChildExecFailureExitCode = 127;
+constexpr std::size_t kLineReadBufferSize = 4096;
+constexpr int kPipePollTimeoutMs = 100;
+constexpr auto kRestartPollInterval = std::chrono::milliseconds{25};
+
 std::size_t checked_frame_size(const GStreamerCameraConfig& config) {
     if (config.width == 0U || config.height == 0U || config.udp_port == 0U ||
         config.frame_timeout_ms == 0U || config.restart_delay_ms == 0U ||
@@ -64,6 +70,9 @@ class GStreamerCameraSource final : public application::ports::CameraSource {
         worker_.request_stop();
         stop_child();
     }
+
+    GStreamerCameraSource(const GStreamerCameraSource&) = delete;
+    GStreamerCameraSource& operator=(const GStreamerCameraSource&) = delete;
 
     [[nodiscard]] std::optional<application::ports::CameraFrame>
     take_latest_frame() override {
@@ -141,12 +150,12 @@ class GStreamerCameraSource final : public application::ports::CameraSource {
             ::close(error_pipe[0]);
             if (::dup2(video_pipe[1], STDOUT_FILENO) == -1 ||
                 ::dup2(error_pipe[1], STDERR_FILENO) == -1) {
-                _exit(126);
+                _exit(kChildSetupFailureExitCode);
             }
             ::close(video_pipe[1]);
             ::close(error_pipe[1]);
             ::execvp(argv[0], argv.data());
-            _exit(127);
+            _exit(kChildExecFailureExitCode);
         }
 
         child_pid_.store(child);
@@ -240,7 +249,7 @@ class GStreamerCameraSource final : public application::ports::CameraSource {
     template <typename Consumer>
     static void read_lines(const int fd, Consumer consume) {
         std::string pending;
-        std::vector<char> buffer(4096);
+        std::vector<char> buffer(kLineReadBufferSize);
         while (true) {
             const ssize_t count = ::read(fd, buffer.data(), buffer.size());
             if (count == 0) {
@@ -279,7 +288,7 @@ class GStreamerCameraSource final : public application::ports::CameraSource {
                 .events = POLLIN,
                 .revents = 0,
             };
-            const int ready = ::poll(&descriptor, 1, 100);
+            const int ready = ::poll(&descriptor, 1, kPipePollTimeoutMs);
             if (ready == 0) {
                 if (std::chrono::steady_clock::now() - last_progress >=
                     frame_timeout) {
@@ -326,7 +335,7 @@ class GStreamerCameraSource final : public application::ports::CameraSource {
             if (stop_token.stop_requested()) {
                 return false;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds{25});
+            std::this_thread::sleep_for(kRestartPollInterval);
         }
         return !stop_token.stop_requested();
     }

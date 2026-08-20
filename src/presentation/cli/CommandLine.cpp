@@ -5,9 +5,49 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace onboard_autonomy::presentation::cli {
 namespace {
+
+enum class TransportBackend {
+    udp,
+    serial,
+};
+
+enum class CameraBackend {
+    rpicam,
+    gstreamer,
+};
+
+// Temporary parser buffer. Only validated launch states leave this file.
+struct LaunchArgumentsDraft {
+    TransportBackend transport{TransportBackend::udp};
+    std::string udp_bind{defaults::kUdpBindAddress};
+    std::uint16_t udp_port{defaults::kMavlinkUdpPort};
+    std::string serial_device;
+    std::uint32_t baud_rate{defaults::kSerialBaudRate};
+    std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
+    bool camera_enabled{};
+    CameraBackend camera_backend{CameraBackend::rpicam};
+    std::uint16_t camera_udp_port{defaults::kCameraUdpPort};
+    bool apriltag_enabled{};
+    std::string camera_calibration_file;
+    std::string camera_extrinsics_file;
+    std::optional<double> apriltag_tag_size_m;
+    bool camera_preview_enabled{};
+    std::uint16_t camera_preview_port{defaults::kCameraPreviewPort};
+    std::uint32_t camera_width{defaults::kCameraFrameWidth};
+    std::uint32_t camera_height{defaults::kCameraFrameHeight};
+    std::uint32_t camera_fps{defaults::kCameraFramesPerSecond};
+    std::string board_types_file;
+    bool json_output{};
+    bool sitl_mode{};
+    std::optional<application::SimulatedWindProfile> simulated_wind;
+    bool autonomous{};
+    bool exit_after_autonomy{};
+    bool interactive{};
+};
 
 struct ExplicitOptions {
     bool udp_bind{false};
@@ -34,7 +74,7 @@ T parse_number(const std::string_view text, const std::string_view option) {
     return value;
 }
 
-void validate_transport(const CommandLineOptions& options,
+void validate_transport(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
     if (options.transport == TransportBackend::udp) {
         if (explicit_options.serial_device || explicit_options.baud_rate) {
@@ -67,7 +107,7 @@ void validate_transport(const CommandLineOptions& options,
     }
 }
 
-void validate_camera(const CommandLineOptions& options,
+void validate_camera(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
     const bool camera_setting_used =
         explicit_options.camera_source || explicit_options.camera_udp_port ||
@@ -117,7 +157,7 @@ void validate_camera(const CommandLineOptions& options,
     }
 }
 
-void validate_vision(const CommandLineOptions& options) {
+void validate_vision(const LaunchArgumentsDraft& options) {
     if (!options.camera_enabled) {
         return;
     }
@@ -148,11 +188,8 @@ void validate_vision(const CommandLineOptions& options) {
     }
 }
 
-void validate_options(const CommandLineOptions& options,
+void validate_options(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
-    if (options.show_help) {
-        return;
-    }
     if (options.snapshot_interval_ms == 0) {
         throw std::invalid_argument("--snapshot-ms must be positive");
     }
@@ -174,7 +211,8 @@ void validate_options(const CommandLineOptions& options,
                 "--sim-wind speed must be finite and non-negative");
         }
         if (!std::isfinite(wind.direction_from_deg) ||
-            wind.direction_from_deg < 0.0 || wind.direction_from_deg >= 360.0) {
+            wind.direction_from_deg < 0.0 ||
+            wind.direction_from_deg >= defaults::kDegreesPerCircle) {
             throw std::invalid_argument(
                 "--sim-wind direction must be in [0, 360)");
         }
@@ -186,6 +224,97 @@ void validate_options(const CommandLineOptions& options,
     validate_transport(options, explicit_options);
     validate_camera(options, explicit_options);
     validate_vision(options);
+}
+
+MavlinkConnectionOptions make_connection_options(
+    const LaunchArgumentsDraft& draft) {
+    if (draft.transport == TransportBackend::udp) {
+        return UdpConnectionOptions{
+            .bind_address = draft.udp_bind,
+            .port = draft.udp_port,
+        };
+    }
+    return SerialConnectionOptions{
+        .device = draft.serial_device,
+        .baud_rate = draft.baud_rate,
+    };
+}
+
+CameraSourceOptions make_camera_source_options(
+    const LaunchArgumentsDraft& draft) {
+    if (draft.camera_backend == CameraBackend::rpicam) {
+        return RpicamOptions{
+            .frames_per_second = draft.camera_fps,
+        };
+    }
+    return GStreamerCameraOptions{
+        .udp_port = draft.camera_udp_port,
+    };
+}
+
+std::optional<CameraOptions> make_camera_options(
+    const LaunchArgumentsDraft& draft) {
+    if (!draft.camera_enabled) {
+        return std::nullopt;
+    }
+
+    std::optional<AprilTagOptions> apriltag;
+    if (draft.apriltag_enabled) {
+        apriltag = AprilTagOptions{
+            .calibration_file = draft.camera_calibration_file,
+            .extrinsics_file = draft.camera_extrinsics_file,
+            .tag_size_m = draft.apriltag_tag_size_m,
+        };
+    }
+
+    std::optional<CameraPreviewOptions> preview;
+    if (draft.camera_preview_enabled) {
+        preview = CameraPreviewOptions{.port = draft.camera_preview_port};
+    }
+
+    return CameraOptions{
+        .source = make_camera_source_options(draft),
+        .frame_width = draft.camera_width,
+        .frame_height = draft.camera_height,
+        .apriltag = std::move(apriltag),
+        .preview = preview,
+    };
+}
+
+CommandLineOptions make_command_line_options(
+    const LaunchArgumentsDraft& draft) {
+    auto camera = make_camera_options(draft);
+    const AutonomyOptions autonomy{
+        .enabled = draft.autonomous,
+        .exit_when_finished = draft.exit_after_autonomy,
+    };
+    const OperatorInterfaceOptions operator_interface{
+        .interactive = draft.interactive,
+        .json_output = draft.json_output,
+        .snapshot_interval_ms = draft.snapshot_interval_ms,
+        .board_types_file = draft.board_types_file,
+    };
+
+    if (draft.sitl_mode) {
+        return SimulationLaunchOptions{
+            .connection =
+                {
+                    .bind_address = draft.udp_bind,
+                    .port = draft.udp_port,
+                },
+            .camera = std::move(camera),
+            .wind = draft.simulated_wind,
+            .autonomy = autonomy,
+            .operator_interface = operator_interface,
+        };
+    }
+
+    return HardwareLaunchOptions{
+        .connection = make_connection_options(draft),
+        .camera = std::move(camera),
+        .autonomy = autonomy,
+        .operator_interface = operator_interface,
+    };
 }
 
 class ArgumentParser {
@@ -201,8 +330,8 @@ class ArgumentParser {
                 reject(argument);
             }
         }
-        validate_options(options_, explicit_);
-        return options_;
+        validate_options(draft_, explicit_);
+        return make_command_line_options(draft_);
     }
 
   private:
@@ -218,25 +347,25 @@ class ArgumentParser {
         if (argument == "--transport") {
             const auto value = value_after(argument);
             if (value == "udp") {
-                options_.transport = TransportBackend::udp;
+                draft_.transport = TransportBackend::udp;
             } else if (value == "serial") {
-                options_.transport = TransportBackend::serial;
+                draft_.transport = TransportBackend::serial;
             } else {
                 throw std::invalid_argument(
                     "--transport must be udp or serial");
             }
         } else if (argument == "--udp-bind") {
-            options_.udp_bind = value_after(argument);
+            draft_.udp_bind = value_after(argument);
             explicit_.udp_bind = true;
         } else if (argument == "--udp-port") {
-            options_.udp_port =
+            draft_.udp_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
             explicit_.udp_port = true;
         } else if (argument == "--serial-device") {
-            options_.serial_device = value_after(argument);
+            draft_.serial_device = value_after(argument);
             explicit_.serial_device = true;
         } else if (argument == "--baud") {
-            options_.baud_rate =
+            draft_.baud_rate =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.baud_rate = true;
         } else {
@@ -247,46 +376,47 @@ class ArgumentParser {
 
     bool parse_camera(const std::string_view argument) {
         if (argument == "--camera") {
-            options_.camera_enabled = true;
+            draft_.camera_enabled = true;
         } else if (argument == "--camera-source") {
             const auto source = value_after(argument);
             if (source != "rpicam" && source != "gstreamer") {
                 throw std::invalid_argument(
                     "--camera-source must be rpicam or gstreamer");
             }
-            options_.camera_backend = source == "rpicam"
-                                          ? CameraBackend::rpicam
-                                          : CameraBackend::gstreamer;
+            draft_.camera_backend = source == "rpicam"
+                                        ? CameraBackend::rpicam
+                                        : CameraBackend::gstreamer;
             explicit_.camera_source = true;
         } else if (argument == "--camera-udp-port") {
-            options_.camera_udp_port =
+            draft_.camera_udp_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
             explicit_.camera_udp_port = true;
         } else if (argument == "--camera-width") {
-            options_.camera_width =
+            draft_.camera_width =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.camera_width = true;
         } else if (argument == "--camera-height") {
-            options_.camera_height =
+            draft_.camera_height =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.camera_height = true;
         } else if (argument == "--camera-fps") {
-            options_.camera_fps =
+            draft_.camera_fps =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.camera_fps = true;
         } else if (argument == "--apriltag") {
-            options_.apriltag_enabled = true;
+            draft_.apriltag_enabled = true;
         } else if (argument == "--camera-calibration") {
-            options_.camera_calibration_file = value_after(argument);
+            draft_.camera_calibration_file = value_after(argument);
         } else if (argument == "--camera-extrinsics") {
-            options_.camera_extrinsics_file = value_after(argument);
+            draft_.camera_extrinsics_file = value_after(argument);
         } else if (argument == "--apriltag-size-mm") {
-            options_.apriltag_tag_size_m =
-                parse_number<double>(value_after(argument), argument) / 1000.0;
+            draft_.apriltag_tag_size_m =
+                parse_number<double>(value_after(argument), argument) /
+                defaults::kMillimetresPerMetre;
         } else if (argument == "--camera-preview") {
-            options_.camera_preview_enabled = true;
+            draft_.camera_preview_enabled = true;
         } else if (argument == "--camera-preview-port") {
-            options_.camera_preview_port =
+            draft_.camera_preview_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
             explicit_.camera_preview_port = true;
         } else {
@@ -297,16 +427,16 @@ class ArgumentParser {
 
     bool parse_runtime(const std::string_view argument) {
         if (argument == "--snapshot-ms") {
-            options_.snapshot_interval_ms =
+            draft_.snapshot_interval_ms =
                 parse_number<std::uint32_t>(value_after(argument), argument);
         } else if (argument == "--board-types") {
-            options_.board_types_file = value_after(argument);
+            draft_.board_types_file = value_after(argument);
         } else if (argument == "--json") {
-            options_.json_output = true;
+            draft_.json_output = true;
         } else if (argument == "--sitl") {
-            options_.sitl_mode = true;
+            draft_.sitl_mode = true;
         } else if (argument == "--sim-wind") {
-            options_.simulated_wind = application::SimulatedWindProfile{
+            draft_.simulated_wind = application::SimulatedWindProfile{
                 .speed_m_s =
                     parse_number<double>(value_after(argument), argument),
                 .direction_from_deg =
@@ -315,13 +445,11 @@ class ArgumentParser {
                     parse_number<double>(value_after(argument), argument),
             };
         } else if (argument == "--autonomous") {
-            options_.autonomous = true;
+            draft_.autonomous = true;
         } else if (argument == "--exit-after-autonomy") {
-            options_.exit_after_autonomy = true;
+            draft_.exit_after_autonomy = true;
         } else if (argument == "--interactive") {
-            options_.interactive = true;
-        } else if (argument == "--help" || argument == "-h") {
-            options_.show_help = true;
+            draft_.interactive = true;
         } else {
             return false;
         }
@@ -344,7 +472,7 @@ class ArgumentParser {
 
     const std::vector<std::string_view>& arguments_;
     std::size_t index_{0};
-    CommandLineOptions options_;
+    LaunchArgumentsDraft draft_;
     ExplicitOptions explicit_;
 };
 
@@ -353,43 +481,6 @@ class ArgumentParser {
 CommandLineOptions parse_command_line(
     const std::vector<std::string_view>& arguments) {
     return ArgumentParser{arguments}.parse();
-}
-
-std::string command_line_help() {
-    return "OnboardAutonomy companion service\n\n"
-           "Usage:\n"
-           "  onboard_autonomy [options]\n\n"
-           "Transport (default: udp):\n"
-           "  --transport udp|serial       MAVLink transport\n"
-           "  --udp-bind ADDRESS           UDP bind address, default 0.0.0.0\n"
-           "  --udp-port N                 UDP port, default 14550\n"
-           "  --serial-device DEVICE       Linux serial device\n"
-           "  --baud N                     Serial baud, default 115200\n\n"
-           "Camera source:\n"
-           "  --camera                     Enable camera capture\n"
-           "  --camera-source SOURCE       rpicam (default) or gstreamer\n"
-           "  --camera-width N             Frame width, default 640\n"
-           "  --camera-height N            Frame height, default 480\n"
-           "  --camera-fps N               rpicam FPS, default 30\n"
-           "  --camera-udp-port N          GStreamer RTP port, default 5601\n\n"
-           "Vision and preview:\n"
-           "  --apriltag                   Detect tagStandard41h12 targets\n"
-           "  --camera-calibration FILE    Verified calibration JSON\n"
-           "  --camera-extrinsics FILE     Camera-to-body-FRD JSON\n"
-           "  --apriltag-size-mm N         Detection-corner span\n"
-           "  --camera-preview             Serve grayscale HTTP preview\n"
-           "  --camera-preview-port N      HTTP port, default 8080\n\n"
-           "Autonomy and safety:\n"
-           "  --sitl                       Assert UDP peer is SITL\n"
-           "  --sim-wind MPS DEG GUST      Show configured SITL wind profile\n"
-           "  --autonomous                 Run startup and vision autonomy\n"
-           "  --exit-after-autonomy        Exit after completion or failure\n\n"
-           "Output and interaction:\n"
-           "  --interactive                Enable LAND and quit keys\n"
-           "  --json                       Print JSON snapshots\n"
-           "  --snapshot-ms N              Output interval, default 1000\n"
-           "  --board-types FILE           Override ArduPilot board table\n"
-           "  --help, -h                   Show this help\n";
 }
 
 } // namespace onboard_autonomy::presentation::cli

@@ -17,41 +17,40 @@
 namespace onboard_autonomy::adapters::transport {
 namespace {
 
+constexpr std::uint32_t kBaud57600 = 57'600;
+constexpr std::uint32_t kBaud115200 = 115'200;
+constexpr std::uint32_t kBaud460800 = 460'800;
+constexpr std::uint32_t kBaud921600 = 921'600;
+
 #ifndef _WIN32
 
 speed_t to_posix_baud(const std::uint32_t baud_rate) {
     switch (baud_rate) {
-        case 57600:
-            return B57600;
-        case 115200:
-            return B115200;
+    case kBaud57600:
+        return B57600;
+    case kBaud115200:
+        return B115200;
 #ifdef B460800
-        case 460800:
-            return B460800;
+    case kBaud460800:
+        return B460800;
 #endif
 #ifdef B921600
-        case 921600:
-            return B921600;
+    case kBaud921600:
+        return B921600;
 #endif
-        default:
-            throw std::invalid_argument("Unsupported serial baud rate");
+    default:
+        throw std::invalid_argument("Unsupported serial baud rate");
     }
 }
 
-int open_serial_device(
-    const std::string& device,
-    const std::uint32_t baud_rate
-) {
+int open_serial_device(const std::string& device,
+    const std::uint32_t baud_rate) {
     const speed_t baud = to_posix_baud(baud_rate);
-    const int file_descriptor = open(
-        device.c_str(),
-        O_RDWR | O_NOCTTY | O_CLOEXEC | O_NONBLOCK
-    );
+    const int file_descriptor =
+        open(device.c_str(), O_RDWR | O_NOCTTY | O_CLOEXEC | O_NONBLOCK);
     if (file_descriptor < 0) {
-        throw std::runtime_error(
-            "Unable to open serial device " + device + ": " +
-            posix_error_message(errno)
-        );
+        throw std::runtime_error("Unable to open serial device " + device +
+                                 ": " + posix_error_message(errno));
     }
 
     termios options{};
@@ -59,9 +58,7 @@ int open_serial_device(
         const std::string error = posix_error_message(errno);
         close(file_descriptor);
         throw std::runtime_error(
-            "Unable to read serial settings for " + device + ": " +
-            error
-        );
+            "Unable to read serial settings for " + device + ": " + error);
     }
 
     cfmakeraw(&options);
@@ -83,27 +80,21 @@ int open_serial_device(
         const std::string error = posix_error_message(errno);
         close(file_descriptor);
         throw std::runtime_error(
-            "Unable to configure serial device " + device + ": " +
-            error
-        );
+            "Unable to configure serial device " + device + ": " + error);
     }
     return file_descriptor;
 }
 
 class PosixSerialTransport final : public application::ports::Transport {
-public:
-    PosixSerialTransport(
-        std::string device,
+  public:
+    PosixSerialTransport(std::string device,
         const std::uint32_t baud_rate,
-        const std::chrono::milliseconds reconnect_interval
-    )
-        : device_(std::move(device)),
-          baud_rate_(baud_rate),
+        const std::chrono::milliseconds reconnect_interval)
+        : device_(std::move(device)), baud_rate_(baud_rate),
           reconnect_interval_(reconnect_interval) {
         if (reconnect_interval_ < std::chrono::milliseconds::zero()) {
             throw std::invalid_argument(
-                "Serial reconnect interval cannot be negative"
-            );
+                "Serial reconnect interval cannot be negative");
         }
         file_descriptor_ = open_serial_device(device_, baud_rate_);
     }
@@ -113,6 +104,9 @@ public:
             close(file_descriptor_);
         }
     }
+
+    PosixSerialTransport(const PosixSerialTransport&) = delete;
+    PosixSerialTransport& operator=(const PosixSerialTransport&) = delete;
 
     std::size_t read(std::span<std::uint8_t> destination) override {
         if (!ensure_connected()) {
@@ -145,11 +139,8 @@ public:
             return 0;
         }
 
-        const auto received = ::read(
-            file_descriptor_,
-            destination.data(),
-            destination.size()
-        );
+        const auto received =
+            ::read(file_descriptor_, destination.data(), destination.size());
         if (received < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 return 0;
@@ -164,11 +155,8 @@ public:
         if (!ensure_connected()) {
             return 0;
         }
-        const auto sent = ::write(
-            file_descriptor_,
-            source.data(),
-            source.size()
-        );
+        const auto sent =
+            ::write(file_descriptor_, source.data(), source.size());
         if (sent < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 return 0;
@@ -180,11 +168,10 @@ public:
     }
 
     [[nodiscard]] std::string description() const override {
-        return "serial://" + device_ + "?baud=" +
-               std::to_string(baud_rate_);
+        return "serial://" + device_ + "?baud=" + std::to_string(baud_rate_);
     }
 
-private:
+  private:
     bool ensure_connected() {
         if (file_descriptor_ >= 0) {
             return true;
@@ -221,27 +208,23 @@ private:
 
 #endif
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<application::ports::Transport> make_serial_transport(
     const std::string& device,
     const std::uint32_t baud_rate,
-    const std::chrono::milliseconds reconnect_interval
-) {
+    const std::chrono::milliseconds reconnect_interval) {
 #ifdef _WIN32
     static_cast<void>(device);
     static_cast<void>(baud_rate);
     static_cast<void>(reconnect_interval);
     throw std::runtime_error(
-        "Serial transport is currently supported on Linux only"
-    );
+        "Serial transport is currently supported on Linux only");
 #else
-    return std::make_unique<PosixSerialTransport>(
-        device,
+    return std::make_unique<PosixSerialTransport>(device,
         baud_rate,
-        reconnect_interval
-    );
+        reconnect_interval);
 #endif
 }
 
-}  // namespace onboard_autonomy::adapters::transport
+} // namespace onboard_autonomy::adapters::transport

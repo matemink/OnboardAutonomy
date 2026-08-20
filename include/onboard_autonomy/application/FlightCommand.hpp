@@ -5,6 +5,7 @@
 namespace onboard_autonomy::application {
 
 enum class FlightAction {
+    invalid,
     set_guided_mode,
     arm,
     takeoff,
@@ -20,7 +21,7 @@ enum class FlightCommandAckOutcome {
 };
 
 struct FlightActionRequest {
-    FlightAction action;
+    FlightAction action{FlightAction::invalid};
     std::uint8_t vehicle_system_id{0};
     std::uint8_t confirmation{0};
     double altitude_m{0.0};
@@ -30,4 +31,4 @@ struct FlightActionRequest {
     std::uint64_t time_usec{0};
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

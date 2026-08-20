@@ -11,7 +11,7 @@
 namespace onboard_autonomy::presentation::console {
 
 class ConsoleInput::Impl {
-public:
+  public:
     explicit Impl(const bool enabled) {
         if (!enabled || isatty(STDIN_FILENO) != 1) {
             return;
@@ -34,16 +34,8 @@ public:
             return;
         }
 
-        if (fcntl(
-                STDIN_FILENO,
-                F_SETFL,
-                original_flags_ | O_NONBLOCK
-            ) != 0) {
-            tcsetattr(
-                STDIN_FILENO,
-                TCSANOW,
-                &original_termios_
-            );
+        if (fcntl(STDIN_FILENO, F_SETFL, original_flags_ | O_NONBLOCK) != 0) {
+            tcsetattr(STDIN_FILENO, TCSANOW, &original_termios_);
             return;
         }
 
@@ -56,16 +48,13 @@ public:
         }
 
         fcntl(STDIN_FILENO, F_SETFL, original_flags_);
-        tcsetattr(
-            STDIN_FILENO,
-            TCSANOW,
-            &original_termios_
-        );
+        tcsetattr(STDIN_FILENO, TCSANOW, &original_termios_);
     }
 
-    [[nodiscard]] bool active() const {
-        return active_;
-    }
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
+
+    [[nodiscard]] bool active() const { return active_; }
 
     [[nodiscard]] std::optional<char> poll() const {
         if (!active_) {
@@ -77,16 +66,14 @@ public:
         if (received == 1) {
             return input;
         }
-        if (received < 0 &&
-            errno != EAGAIN &&
-            errno != EWOULDBLOCK &&
+        if (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
             errno != EINTR) {
             return std::nullopt;
         }
         return std::nullopt;
     }
 
-private:
+  private:
     termios original_termios_{};
     int original_flags_{-1};
     bool active_{false};
@@ -97,12 +84,8 @@ ConsoleInput::ConsoleInput(const bool enabled)
 
 ConsoleInput::~ConsoleInput() = default;
 
-bool ConsoleInput::active() const {
-    return impl_->active();
-}
+bool ConsoleInput::active() const { return impl_->active(); }
 
-std::optional<char> ConsoleInput::poll() {
-    return impl_->poll();
-}
+std::optional<char> ConsoleInput::poll() { return impl_->poll(); }
 
-}  // namespace onboard_autonomy::presentation::console
+} // namespace onboard_autonomy::presentation::console

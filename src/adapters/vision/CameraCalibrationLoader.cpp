@@ -23,8 +23,7 @@ void require_quality_pass(const Json& document) {
         !checks.at("rms_error_within_limit").get<bool>() ||
         !checks.at("every_view_error_within_limit").get<bool>()) {
         throw std::runtime_error(
-            "camera calibration did not pass its quality gates"
-        );
+            "camera calibration did not pass its quality gates");
     }
 }
 
@@ -33,28 +32,26 @@ void require_supported_schema(const Json& document) {
         document.at("model").get<std::string>() !=
             "opencv_pinhole_brown_conrady_5") {
         throw std::runtime_error(
-            "unsupported camera calibration schema or model"
-        );
+            "unsupported camera calibration schema or model");
     }
 
-    const std::array<std::string, 5> expected_order{
-        "k1", "k2", "p1", "p2", "k3"
-    };
+    const std::array<std::string,
+        domain::CameraCalibration::kDistortionCoefficientCount>
+        expected_order{"k1", "k2", "p1", "p2", "k3"};
     if (document.at("distortion")
             .at("coefficient_order")
-            .get<std::array<std::string, 5>>() != expected_order) {
+            .get<std::array<std::string,
+                domain::CameraCalibration::kDistortionCoefficientCount>>() !=
+        expected_order) {
         throw std::runtime_error(
-            "unsupported camera distortion coefficient order"
-        );
+            "unsupported camera distortion coefficient order");
     }
 }
 
-void require_consistent_matrix(
-    const Json& intrinsics,
-    const domain::CameraCalibration& calibration
-) {
+void require_consistent_matrix(const Json& intrinsics,
+    const domain::CameraCalibration& calibration) {
     const auto matrix = intrinsics.at("camera_matrix")
-        .get<std::array<std::array<double, 3>, 3>>();
+                            .get<std::array<std::array<double, 3>, 3>>();
     const auto close = [](const double left, const double right) {
         return std::abs(left - right) <= kMatrixTolerance;
     };
@@ -62,15 +59,11 @@ void require_consistent_matrix(
     if (!close(matrix[0][0], calibration.fx_px) ||
         !close(matrix[1][1], calibration.fy_px) ||
         !close(matrix[0][2], calibration.cx_px) ||
-        !close(matrix[1][2], calibration.cy_px) ||
-        !close(matrix[0][1], 0.0) ||
-        !close(matrix[1][0], 0.0) ||
-        !close(matrix[2][0], 0.0) ||
-        !close(matrix[2][1], 0.0) ||
-        !close(matrix[2][2], 1.0)) {
+        !close(matrix[1][2], calibration.cy_px) || !close(matrix[0][1], 0.0) ||
+        !close(matrix[1][0], 0.0) || !close(matrix[2][0], 0.0) ||
+        !close(matrix[2][1], 0.0) || !close(matrix[2][2], 1.0)) {
         throw std::runtime_error(
-            "camera matrix disagrees with scalar intrinsics"
-        );
+            "camera matrix disagrees with scalar intrinsics");
     }
 }
 
@@ -85,46 +78,42 @@ domain::CameraCalibration parse_document(const Json& document) {
         .image_width = camera.at("width").get<std::uint32_t>(),
         .image_height = camera.at("height").get<std::uint32_t>(),
         .focus_mode = camera.at("focus_mode").get<std::string>(),
-        .lens_position =
-            camera.at("lens_position").get<std::string>(),
+        .lens_position = camera.at("lens_position").get<std::string>(),
         .fx_px = intrinsics.at("fx_px").get<double>(),
         .fy_px = intrinsics.at("fy_px").get<double>(),
         .cx_px = intrinsics.at("cx_px").get<double>(),
         .cy_px = intrinsics.at("cy_px").get<double>(),
-        .distortion = document.at("distortion")
-            .at("coefficients")
-            .get<std::array<double, 5>>(),
+        .distortion =
+            document.at("distortion")
+                .at("coefficients")
+                .get<std::array<double,
+                    domain::CameraCalibration::kDistortionCoefficientCount>>(),
     };
     require_consistent_matrix(intrinsics, calibration);
     domain::validate_camera_calibration(calibration);
     return calibration;
 }
 
-}  // namespace
+} // namespace
 
 domain::CameraCalibration CameraCalibrationLoader::from_file(
-    const std::filesystem::path& path
-) {
+    const std::filesystem::path& path) {
     std::ifstream input{path};
     if (!input) {
         throw std::runtime_error(
-            "cannot open camera calibration: " + path.string()
-        );
+            "cannot open camera calibration: " + path.string());
     }
     return from_stream(input);
 }
 
 domain::CameraCalibration CameraCalibrationLoader::from_stream(
-    std::istream& input
-) {
+    std::istream& input) {
     try {
         return parse_document(Json::parse(input));
     } catch (const nlohmann::json::exception& error) {
         throw std::runtime_error(
-            "invalid camera calibration JSON: " +
-            std::string(error.what())
-        );
+            "invalid camera calibration JSON: " + std::string(error.what()));
     }
 }
 
-}  // namespace onboard_autonomy::adapters::vision
+} // namespace onboard_autonomy::adapters::vision

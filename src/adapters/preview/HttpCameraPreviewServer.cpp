@@ -23,6 +23,13 @@
 namespace onboard_autonomy::adapters::preview {
 namespace {
 
+constexpr std::uint32_t kMaximumSupportedPreviewFps = 60;
+constexpr auto kMicrosecondsPerSecond =
+    std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::seconds{1})
+        .count();
+constexpr int kHttpNoContent = 204;
+
 struct PreviewFrame {
     std::uint64_t sequence{0};
     std::uint32_t width{0};
@@ -34,12 +41,13 @@ struct PreviewFrame {
 
 std::chrono::microseconds checked_frame_interval(
     const std::uint32_t maximum_frames_per_second) {
-    if (maximum_frames_per_second == 0U || maximum_frames_per_second > 60U) {
+    if (maximum_frames_per_second == 0U ||
+        maximum_frames_per_second > kMaximumSupportedPreviewFps) {
         throw std::invalid_argument(
             "preview frame rate must be between 1 and 60");
     }
     return std::chrono::microseconds{
-        1'000'000 / maximum_frames_per_second,
+        kMicrosecondsPerSecond / maximum_frames_per_second,
     };
 }
 
@@ -163,7 +171,7 @@ class HttpCameraPreviewServer final
                 {
                     std::scoped_lock lock(frame_mutex_);
                     if (!latest_frame_.has_value()) {
-                        response.status = 204;
+                        response.status = kHttpNoContent;
                         response.set_header("Cache-Control", "no-store");
                         return;
                     }
@@ -202,6 +210,9 @@ class HttpCameraPreviewServer final
         stopping_.store(true);
         server_.stop();
     }
+
+    HttpCameraPreviewServer(const HttpCameraPreviewServer&) = delete;
+    HttpCameraPreviewServer& operator=(const HttpCameraPreviewServer&) = delete;
 
     void publish(const application::ports::CameraFrame& frame,
         const std::span<const domain::TargetObservation> targets,

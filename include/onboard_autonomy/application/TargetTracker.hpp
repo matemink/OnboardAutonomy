@@ -17,10 +17,16 @@ enum class TargetTrackPhase {
 };
 
 struct TargetTrackerConfig {
-    std::uint32_t required_consecutive_observations{3};
-    std::chrono::milliseconds loss_timeout{500};
-    double position_smoothing_factor{1.0};
-    double minimum_decision_margin{20.0};
+    static constexpr std::uint32_t kDefaultRequiredObservations = 3;
+    static constexpr auto kDefaultLossTimeout = std::chrono::milliseconds{500};
+    static constexpr double kDefaultPositionSmoothingFactor = 1.0;
+    static constexpr double kDefaultMinimumDecisionMargin = 20.0;
+
+    std::uint32_t required_consecutive_observations{
+        kDefaultRequiredObservations};
+    std::chrono::milliseconds loss_timeout{kDefaultLossTimeout};
+    double position_smoothing_factor{kDefaultPositionSmoothingFactor};
+    double minimum_decision_margin{kDefaultMinimumDecisionMargin};
 };
 
 struct TargetTrackSnapshot {
@@ -35,18 +41,14 @@ struct TargetTrackSnapshot {
 };
 
 class TargetTracker {
-public:
+  public:
     explicit TargetTracker(const TargetTrackerConfig& config = {});
 
-    void update(
-        std::span<const domain::TargetObservation> observations,
-        domain::TimePoint now
-    );
-    [[nodiscard]] TargetTrackSnapshot snapshot(
-        domain::TimePoint now
-    ) const;
+    void update(std::span<const domain::TargetObservation> observations,
+        domain::TimePoint now);
+    [[nodiscard]] TargetTrackSnapshot snapshot(domain::TimePoint now) const;
 
-private:
+  private:
     [[nodiscard]] bool expired(domain::TimePoint now) const;
     void reset();
 
@@ -59,4 +61,4 @@ private:
     std::optional<domain::CameraFramePosition> position_;
 };
 
-}  // namespace onboard_autonomy::application
+} // namespace onboard_autonomy::application

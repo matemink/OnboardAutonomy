@@ -14,6 +14,13 @@
 namespace onboard_autonomy::adapters::mavlink {
 namespace {
 
+constexpr double kMillivoltsPerVolt = 1000.0;
+constexpr double kCentiamperesPerAmpere = 100.0;
+constexpr std::uint32_t kFirmwareMajorShift = 24;
+constexpr std::uint32_t kFirmwareMinorShift = 16;
+constexpr std::uint32_t kFirmwarePatchShift = 8;
+constexpr std::uint32_t kPackedByteMask = 0xFFU;
+
 std::optional<double> battery_voltage(const mavlink_battery_status_t& battery) {
     double total_voltage = 0.0;
     bool has_voltage = false;
@@ -22,7 +29,8 @@ std::optional<double> battery_voltage(const mavlink_battery_status_t& battery) {
                                  const std::uint16_t millivolts) {
         if (millivolts > 0 &&
             millivolts != std::numeric_limits<std::uint16_t>::max()) {
-            total_voltage += static_cast<double>(millivolts) / 1000.0;
+            total_voltage +=
+                static_cast<double>(millivolts) / kMillivoltsPerVolt;
             has_voltage = true;
         }
     };
@@ -44,7 +52,7 @@ std::optional<double> current_from_centiampere(const std::int16_t value) {
     if (value < 0) {
         return std::nullopt;
     }
-    return static_cast<double>(value) / 100.0;
+    return static_cast<double>(value) / kCentiamperesPerAmpere;
 }
 
 std::optional<std::int8_t> remaining_percent(const std::int8_t value) {
@@ -234,10 +242,14 @@ void MavlinkDecoder::handle_autopilot_version(
     mavlink_msg_autopilot_version_decode(&message, &version);
     const auto packed = version.flight_sw_version;
     state_.on_autopilot_metadata({
-        .firmware_major = static_cast<std::uint8_t>((packed >> 24U) & 0xFFU),
-        .firmware_minor = static_cast<std::uint8_t>((packed >> 16U) & 0xFFU),
-        .firmware_patch = static_cast<std::uint8_t>((packed >> 8U) & 0xFFU),
-        .firmware_release_type = static_cast<std::uint8_t>(packed & 0xFFU),
+        .firmware_major = static_cast<std::uint8_t>(
+            (packed >> kFirmwareMajorShift) & kPackedByteMask),
+        .firmware_minor = static_cast<std::uint8_t>(
+            (packed >> kFirmwareMinorShift) & kPackedByteMask),
+        .firmware_patch = static_cast<std::uint8_t>(
+            (packed >> kFirmwarePatchShift) & kPackedByteMask),
+        .firmware_release_type =
+            static_cast<std::uint8_t>(packed & kPackedByteMask),
         .capabilities = version.capabilities,
         .board_version = version.board_version,
         .vendor_id = version.vendor_id,

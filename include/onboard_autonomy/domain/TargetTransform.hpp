@@ -14,7 +14,7 @@ struct BodyFramePosition {
 
 struct CameraExtrinsics {
     // Row-major rotation from [camera right, down, forward] to body FRD.
-    std::array<double, 9> rotation_camera_to_body{};
+    RotationMatrix rotation_camera_to_body{};
     BodyFramePosition camera_origin_in_body;
 };
 
@@ -22,7 +22,6 @@ void validate_camera_extrinsics(const CameraExtrinsics& extrinsics);
 
 [[nodiscard]] BodyFramePosition camera_to_body_frd(
     const CameraFramePosition& camera_position,
-    const CameraExtrinsics& extrinsics
-);
+    const CameraExtrinsics& extrinsics);
 
-}  // namespace onboard_autonomy::domain
+} // namespace onboard_autonomy::domain

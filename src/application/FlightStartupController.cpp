@@ -13,7 +13,14 @@ namespace {
 
 constexpr std::uint8_t kArduPilotAutopilotType = 3;
 constexpr std::uint32_t kCopterGuidedMode = 4;
+constexpr std::uint8_t kMavTypeQuadrotor = 2;
+constexpr std::uint8_t kMavTypeCoaxial = 3;
+constexpr std::uint8_t kMavTypeHelicopter = 4;
+constexpr std::uint8_t kMavTypeHexarotor = 13;
+constexpr std::uint8_t kMavTypeOctorotor = 14;
+constexpr std::uint8_t kMavTypeTricopter = 15;
 constexpr std::size_t kMaximumActionAttempts = 3;
+constexpr int kMaximumPhaseTransitionsPerUpdate = 8;
 constexpr auto kAcknowledgementTimeout = std::chrono::seconds(2);
 constexpr auto kReadinessTimeout = std::chrono::seconds(90);
 constexpr auto kModeChangeTimeout = std::chrono::seconds(10);
@@ -27,12 +34,12 @@ bool is_multicopter(const std::optional<std::uint8_t> vehicle_type) {
     }
 
     switch (*vehicle_type) {
-    case 2:
-    case 3:
-    case 4:
-    case 13:
-    case 14:
-    case 15:
+    case kMavTypeQuadrotor:
+    case kMavTypeCoaxial:
+    case kMavTypeHelicopter:
+    case kMavTypeHexarotor:
+    case kMavTypeOctorotor:
+    case kMavTypeTricopter:
         return true;
     default:
         return false;
@@ -41,6 +48,8 @@ bool is_multicopter(const std::optional<std::uint8_t> vehicle_type) {
 
 std::string action_name(const FlightAction action) {
     switch (action) {
+    case FlightAction::invalid:
+        return "invalid action";
     case FlightAction::set_guided_mode:
         return "GUIDED mode";
     case FlightAction::arm:
@@ -99,7 +108,8 @@ std::vector<FlightActionRequest> FlightStartupController::update(
         return actions;
     }
 
-    for (int transition = 0; transition < 8; ++transition) {
+    for (int transition = 0; transition < kMaximumPhaseTransitionsPerUpdate;
+         ++transition) {
         if (update_current_phase(vehicle,
                 telemetry_ready,
                 companion_link_failsafe,

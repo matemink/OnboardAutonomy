@@ -20,6 +20,28 @@ constexpr std::size_t kDeviceWidth = 22;
 constexpr std::size_t kLinkWidth = 40;
 constexpr auto kActivityVisibleFor = std::chrono::milliseconds(550);
 constexpr auto kBlinkHalfPeriod = std::chrono::milliseconds(120);
+constexpr std::uint8_t kGpsUnavailable = 0;
+constexpr std::uint8_t kGpsNoFix = 1;
+constexpr std::uint8_t kGps2dFix = 2;
+constexpr std::uint8_t kGps3dFix = 3;
+constexpr std::uint8_t kGpsDgpsFix = 4;
+constexpr std::uint8_t kGpsRtkFloat = 5;
+constexpr std::uint8_t kGpsRtkFixed = 6;
+constexpr std::uint8_t kGpsStaticFixed = 7;
+constexpr std::uint8_t kGpsPppFix = 8;
+constexpr std::uint32_t kStabilizeMode = 0;
+constexpr std::uint32_t kAutoMode = 3;
+constexpr std::uint32_t kGuidedMode = 4;
+constexpr std::uint32_t kLoiterMode = 5;
+constexpr std::uint32_t kReturnToLaunchMode = 6;
+constexpr std::uint32_t kLandMode = 9;
+constexpr std::uint32_t kPositionHoldMode = 16;
+constexpr std::uint8_t kArduPilotAutopilotType = 3;
+constexpr std::uint8_t kOfficialReleaseType = 255;
+constexpr std::uint8_t kReleaseCandidateTypeStart = 192;
+constexpr std::uint8_t kBetaReleaseTypeStart = 128;
+constexpr std::uint8_t kAlphaReleaseTypeStart = 64;
+constexpr std::uint32_t kBoardTypeBitShift = 16;
 
 enum class Tone {
     normal,
@@ -159,23 +181,23 @@ std::string gps_fix_name(const std::optional<std::uint8_t> fix_type) {
     }
 
     switch (*fix_type) {
-    case 0:
+    case kGpsUnavailable:
         return "UNAVAILABLE";
-    case 1:
+    case kGpsNoFix:
         return "NO FIX";
-    case 2:
+    case kGps2dFix:
         return "2D";
-    case 3:
+    case kGps3dFix:
         return "3D";
-    case 4:
+    case kGpsDgpsFix:
         return "DGPS";
-    case 5:
+    case kGpsRtkFloat:
         return "RTK FLOAT";
-    case 6:
+    case kGpsRtkFixed:
         return "RTK FIXED";
-    case 7:
+    case kGpsStaticFixed:
         return "STATIC FIXED";
-    case 8:
+    case kGpsPppFix:
         return "PPP";
     default:
         return "UNKNOWN";
@@ -188,19 +210,19 @@ std::string flight_mode_name(const std::optional<std::uint32_t> mode) {
     }
 
     switch (*mode) {
-    case 0:
+    case kStabilizeMode:
         return "STABILIZE";
-    case 3:
+    case kAutoMode:
         return "AUTO";
-    case 4:
+    case kGuidedMode:
         return "GUIDED";
-    case 5:
+    case kLoiterMode:
         return "LOITER";
-    case 6:
+    case kReturnToLaunchMode:
         return "RTL";
-    case 9:
+    case kLandMode:
         return "LAND";
-    case 16:
+    case kPositionHoldMode:
         return "POSITION HOLD";
     default:
         return "MODE " + std::to_string(*mode);
@@ -211,23 +233,23 @@ std::string autopilot_name(const std::optional<std::uint8_t> type) {
     if (!type.has_value()) {
         return "WAITING";
     }
-    if (*type == 3) {
+    if (*type == kArduPilotAutopilotType) {
         return "ARDUPILOT";
     }
     return "AUTOPILOT " + std::to_string(*type);
 }
 
 std::string firmware_release_name(const std::uint8_t release_type) {
-    if (release_type == 255U) {
+    if (release_type == kOfficialReleaseType) {
         return "OFFICIAL";
     }
-    if (release_type >= 192U) {
+    if (release_type >= kReleaseCandidateTypeStart) {
         return "RC";
     }
-    if (release_type >= 128U) {
+    if (release_type >= kBetaReleaseTypeStart) {
         return "BETA";
     }
-    if (release_type >= 64U) {
+    if (release_type >= kAlphaReleaseTypeStart) {
         return "ALPHA";
     }
     return "DEV";
@@ -249,7 +271,7 @@ std::string firmware_detail(const domain::VehicleSnapshot& vehicle) {
 }
 
 std::uint16_t board_type_id(const std::uint32_t board_version) {
-    return static_cast<std::uint16_t>(board_version >> 16U);
+    return static_cast<std::uint16_t>(board_version >> kBoardTypeBitShift);
 }
 
 std::optional<BoardTypeMatch> resolve_board_type(

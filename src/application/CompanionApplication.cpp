@@ -6,6 +6,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <iomanip>
@@ -19,6 +20,15 @@
 
 namespace onboard_autonomy::application {
 namespace {
+
+constexpr std::uint32_t kStabilizeMode = 0;
+constexpr std::uint32_t kAutoMode = 3;
+constexpr std::uint32_t kGuidedMode = 4;
+constexpr std::uint32_t kLoiterMode = 5;
+constexpr std::uint32_t kReturnToLaunchMode = 6;
+constexpr std::uint32_t kLandMode = 9;
+constexpr std::uint32_t kPositionHoldMode = 16;
+constexpr std::size_t kTransportReceiveBufferSize = 4096;
 
 TelemetrySetupState map_telemetry_state(
     const adapters::mavlink::TelemetrySetupPhase phase) {
@@ -128,6 +138,8 @@ std::string command_ack_activity_detail(const std::uint16_t command,
 
 std::string flight_action_name(const FlightAction action) {
     switch (action) {
+    case FlightAction::invalid:
+        return "INVALID";
     case FlightAction::set_guided_mode:
         return "SET_MODE";
     case FlightAction::arm:
@@ -146,6 +158,8 @@ std::string flight_action_name(const FlightAction action) {
 
 std::string flight_action_message_name(const FlightAction action) {
     switch (action) {
+    case FlightAction::invalid:
+        return "INVALID";
     case FlightAction::landing_target:
         return "LANDING_TARGET";
     case FlightAction::set_guided_mode:
@@ -159,12 +173,15 @@ std::string flight_action_message_name(const FlightAction action) {
 }
 
 bool action_expects_ack(const FlightAction action) {
-    return action != FlightAction::landing_target;
+    return action != FlightAction::invalid &&
+           action != FlightAction::landing_target;
 }
 
 std::string flight_action_detail(const FlightActionRequest& request) {
     std::string detail;
     switch (request.action) {
+    case FlightAction::invalid:
+        return "INVALID ACTION";
     case FlightAction::set_guided_mode:
         detail = "GUIDED";
         break;
@@ -202,19 +219,19 @@ std::string flight_action_detail(const FlightActionRequest& request) {
 
 std::string flight_mode_name(const std::uint32_t mode) {
     switch (mode) {
-    case 0:
+    case kStabilizeMode:
         return "STABILIZE";
-    case 3:
+    case kAutoMode:
         return "AUTO";
-    case 4:
+    case kGuidedMode:
         return "GUIDED";
-    case 5:
+    case kLoiterMode:
         return "LOITER";
-    case 6:
+    case kReturnToLaunchMode:
         return "RTL";
-    case 9:
+    case kLandMode:
         return "LAND";
-    case 16:
+    case kPositionHoldMode:
         return "POSITION HOLD";
     default:
         return "MODE " + std::to_string(mode);
@@ -224,6 +241,8 @@ std::string flight_mode_name(const std::uint32_t mode) {
 std::vector<std::uint8_t> encode_flight_action(
     const FlightActionRequest& request) {
     switch (request.action) {
+    case FlightAction::invalid:
+        return {};
     case FlightAction::set_guided_mode:
         return adapters::mavlink::encode_set_guided_mode(
             request.vehicle_system_id,
@@ -872,7 +891,7 @@ class CompanionApplication::Impl {
     std::optional<CameraMonitor> camera_monitor_;
     std::optional<domain::CameraExtrinsics> camera_extrinsics_;
     adapters::mavlink::MavlinkDecoder decoder_;
-    std::array<std::uint8_t, 4096> receive_buffer_{};
+    std::array<std::uint8_t, kTransportReceiveBufferSize> receive_buffer_{};
     domain::TimePoint next_heartbeat_{};
     domain::TimePoint next_battery_parameter_request_{};
     domain::TimePoint next_failsafe_parameter_request_{};
