@@ -2,12 +2,18 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace onboard_autonomy::domain {
+
+inline constexpr std::size_t kRotationMatrixDimension = 3;
+inline constexpr std::size_t kRotationMatrixElementCount =
+    kRotationMatrixDimension * kRotationMatrixDimension;
+using RotationMatrix = std::array<double, kRotationMatrixElementCount>;
 
 struct ImagePoint {
     double x_px{0.0};
@@ -22,7 +28,7 @@ struct CameraFramePosition {
 
 struct TargetPose {
     CameraFramePosition position;
-    std::array<double, 9> rotation_tag_to_camera{};
+    RotationMatrix rotation_tag_to_camera{};
     double object_space_error{0.0};
 };
 
@@ -44,4 +50,4 @@ struct TargetDetectionBatch {
     std::vector<TargetObservation> targets;
 };
 
-}  // namespace onboard_autonomy::domain
+} // namespace onboard_autonomy::domain

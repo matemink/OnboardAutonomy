@@ -13,15 +13,21 @@ dependencies і створював runtime adapters. Transport визначав�
 `CommandLineOptions` до створення socket, serial port або camera process.
 
 ```cpp
-enum class TransportBackend {
-    udp,
-    serial,
-};
+using CommandLineOptions =
+    std::variant<HardwareLaunchOptions, SimulationLaunchOptions>;
 ```
 
-Це схоже на Kotlin `enum class`, але значення не має неявного переходу в
-integer. `main.cpp` тепер робить явний `switch`-подібний вибір за типом, а не
-виводить transport зі стороннього string field.
+Це C++-аналог Kotlin `sealed class`: після парсингу існує рівно два допустимі
+стани запуску. `HardwareLaunchOptions` містить UDP або serial connection,
+камеру, autonomy та UI settings. `SimulationLaunchOptions` містить лише UDP,
+камеру, simulated wind, autonomy та UI settings. Тому стан `SITL + serial`
+неможливо створити через публічну модель.
+
+Плоский `LaunchArgumentsDraft` існує тільки всередині parser implementation.
+Він потрібен як тимчасовий mutable buffer, бо CLI arguments можуть надходити в
+довільному порядку. Після validation назовні повертається один із двох
+типізованих launch states. Усі числові та мережеві defaults зібрані в
+`CommandLineDefaults.hpp`.
 
 ## Що перевіряється
 

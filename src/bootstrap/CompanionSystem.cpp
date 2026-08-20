@@ -1,4 +1,4 @@
-#include "onboard_autonomy/bootstrap/RuntimeAssembly.hpp"
+#include "onboard_autonomy/bootstrap/CompanionSystem.hpp"
 
 #include "onboard_autonomy/adapters/ardupilot/BoardTypeCatalog.hpp"
 #include "onboard_autonomy/adapters/camera/GStreamerCameraSource.hpp"
@@ -17,17 +17,55 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace onboard_autonomy::bootstrap {
 namespace {
 
+const std::optional<presentation::cli::CameraOptions>& camera_options(
+    const presentation::cli::CommandLineOptions& options) {
+    return std::visit(
+        [](const auto& launch)
+            -> const std::optional<presentation::cli::CameraOptions>& {
+            return launch.camera;
+        },
+        options);
+}
+
+const presentation::cli::AutonomyOptions& autonomy_options(
+    const presentation::cli::CommandLineOptions& options) {
+    return std::visit(
+        [](const auto& launch) -> const presentation::cli::AutonomyOptions& {
+            return launch.autonomy;
+        },
+        options);
+}
+
+const presentation::cli::OperatorInterfaceOptions& operator_options(
+    const presentation::cli::CommandLineOptions& options) {
+    return std::visit(
+        [](const auto& launch)
+            -> const presentation::cli::OperatorInterfaceOptions& {
+            return launch.operator_interface;
+        },
+        options);
+}
+
+std::optional<application::SimulatedWindProfile> simulated_wind(
+    const presentation::cli::CommandLineOptions& options) {
+    const auto* simulation =
+        std::get_if<presentation::cli::SimulationLaunchOptions>(&options);
+    return simulation == nullptr ? std::nullopt : simulation->wind;
+}
+
 std::unique_ptr<adapters::ardupilot::BoardTypeCatalog> load_board_type_catalog(
     const presentation::cli::CommandLineOptions& options,
     const std::filesystem::path& executable) {
     std::vector<std::filesystem::path> candidates;
-    if (!options.board_types_file.empty()) {
-        candidates.emplace_back(options.board_types_file);
+    const auto& override_file = operator_options(options).board_types_file;
+    if (!override_file.empty()) {
+        candidates.emplace_back(override_file);
     } else {
         candidates.push_back((executable.parent_path() / ".." / "share" /
                               "onboard_autonomy" / "ardupilot-board-types.txt")
@@ -43,9 +81,9 @@ std::unique_ptr<adapters::ardupilot::BoardTypeCatalog> load_board_type_catalog(
         }
     }
 
-    if (!options.board_types_file.empty()) {
+    if (!override_file.empty()) {
         throw std::runtime_error(
-            "board type table not found: " + options.board_types_file);
+            "board type table not found: " + override_file);
     }
     return nullptr;
 }
@@ -68,52 +106,78 @@ std::filesystem::path find_camera_preview_page(
     throw std::runtime_error("camera preview page was not found");
 }
 
+std::unique_ptr<application::ports::Transport> make_transport_for(
+    const presentation::cli::HardwareLaunchOptions& options) {
+    if (const auto* udp = std::get_if<presentation::cli::UdpConnectionOptions>(
+            &options.connection)) {
+        return adapters::transport::make_udp_transport(udp->bind_address,
+            udp->port);
+    }
+    const auto& serial = std::get<presentation::cli::SerialConnectionOptions>(
+        options.connection);
+    return adapters::transport::make_serial_transport(serial.device,
+        serial.baud_rate);
+}
+
+std::unique_ptr<application::ports::Transport> make_transport_for(
+    const presentation::cli::SimulationLaunchOptions& options) {
+    return adapters::transport::make_udp_transport(
+        options.connection.bind_address,
+        options.connection.port);
+}
+
 std::unique_ptr<application::ports::Transport> make_transport(
     const presentation::cli::CommandLineOptions& options) {
-    if (options.transport == presentation::cli::TransportBackend::udp) {
-        return adapters::transport::make_udp_transport(options.udp_bind,
-            options.udp_port);
-    }
-    return adapters::transport::make_serial_transport(options.serial_device,
-        options.baud_rate);
+    return std::visit(
+        [](const auto& launch) { return make_transport_for(launch); },
+        options);
 }
 
 std::unique_ptr<application::ports::CameraSource> make_camera_source(
     const presentation::cli::CommandLineOptions& options) {
-    if (!options.camera_enabled) {
+    const auto& configured_camera = camera_options(options);
+    if (!configured_camera.has_value()) {
         return nullptr;
     }
-    if (options.camera_backend == presentation::cli::CameraBackend::rpicam) {
+    const auto& camera = *configured_camera;
+    if (const auto* rpicam =
+            std::get_if<presentation::cli::RpicamOptions>(&camera.source)) {
         return adapters::camera::make_rpicam_camera_source({
-            .width = options.camera_width,
-            .height = options.camera_height,
-            .frames_per_second = options.camera_fps,
+            .width = camera.frame_width,
+            .height = camera.frame_height,
+            .frames_per_second = rpicam->frames_per_second,
         });
     }
+    const auto& gstreamer =
+        std::get<presentation::cli::GStreamerCameraOptions>(camera.source);
     return adapters::camera::make_gstreamer_camera_source({
-        .width = options.camera_width,
-        .height = options.camera_height,
-        .udp_port = options.camera_udp_port,
+        .width = camera.frame_width,
+        .height = camera.frame_height,
+        .udp_port = gstreamer.udp_port,
     });
 }
 
 std::unique_ptr<application::ports::TargetDetector> make_target_detector(
     const presentation::cli::CommandLineOptions& options) {
-    if (!options.apriltag_enabled) {
+    const auto& configured_camera = camera_options(options);
+    if (!configured_camera.has_value() ||
+        !configured_camera->apriltag.has_value()) {
         return nullptr;
     }
 
+    const auto& camera = *configured_camera;
+    const auto& apriltag = *camera.apriltag;
     adapters::vision::AprilTagDetectorConfig detector_config;
-    if (!options.camera_calibration_file.empty()) {
-        const auto tag_size = options.apriltag_tag_size_m;
+    if (!apriltag.calibration_file.empty()) {
+        const auto tag_size = apriltag.tag_size_m;
         if (!tag_size.has_value()) {
             throw std::invalid_argument(
                 "camera calibration requires AprilTag size");
         }
         auto calibration = adapters::vision::CameraCalibrationLoader::from_file(
-            options.camera_calibration_file);
-        if (calibration.image_width != options.camera_width ||
-            calibration.image_height != options.camera_height) {
+            apriltag.calibration_file);
+        if (calibration.image_width != camera.frame_width ||
+            calibration.image_height != camera.frame_height) {
             throw std::invalid_argument(
                 "camera runtime resolution does not match calibration");
         }
@@ -127,37 +191,47 @@ std::unique_ptr<application::ports::TargetDetector> make_target_detector(
 
 std::optional<domain::CameraExtrinsics> load_camera_extrinsics(
     const presentation::cli::CommandLineOptions& options) {
-    if (options.camera_extrinsics_file.empty()) {
+    const auto& camera = camera_options(options);
+    if (!camera.has_value() || !camera->apriltag.has_value() ||
+        camera->apriltag->extrinsics_file.empty()) {
         return std::nullopt;
     }
     return adapters::vision::CameraExtrinsicsLoader::from_file(
-        options.camera_extrinsics_file);
+        camera->apriltag->extrinsics_file);
 }
 
 std::unique_ptr<application::ports::CameraPreviewSink> make_camera_preview(
     const presentation::cli::CommandLineOptions& options,
     const std::filesystem::path& executable) {
-    if (!options.camera_preview_enabled) {
+    const auto& camera = camera_options(options);
+    if (!camera.has_value() || !camera->preview.has_value()) {
         return nullptr;
     }
     return adapters::preview::make_http_camera_preview_server({
         .bind_address = "0.0.0.0",
-        .port = options.camera_preview_port,
-        .maximum_frames_per_second = 10,
+        .port = camera->preview->port,
+        .maximum_frames_per_second = adapters::preview::
+            HttpCameraPreviewConfig::kDefaultMaximumFramesPerSecond,
         .page_file = find_camera_preview_page(executable),
     });
 }
 
 application::MotionSafetyDecision evaluate_safety(
     const presentation::cli::CommandLineOptions& options) {
+    const auto& autonomy = autonomy_options(options);
+    const auto& operator_interface = operator_options(options);
+    const auto* hardware =
+        std::get_if<presentation::cli::HardwareLaunchOptions>(&options);
     const auto decision = application::evaluate_motion_safety(
-        options.sitl_mode
+        hardware == nullptr
             ? application::RuntimeEnvironment::sitl
             : application::RuntimeEnvironment::hardware_or_unknown,
-        options.transport == presentation::cli::TransportBackend::udp
+        hardware == nullptr ||
+                std::holds_alternative<presentation::cli::UdpConnectionOptions>(
+                    hardware->connection)
             ? application::MavlinkTransport::udp
             : application::MavlinkTransport::serial,
-        options.autonomous || options.interactive);
+        autonomy.enabled || operator_interface.interactive);
     if (!decision.configuration_valid) {
         throw std::invalid_argument(std::string(decision.reason));
     }
@@ -166,40 +240,42 @@ application::MotionSafetyDecision evaluate_safety(
 
 } // namespace
 
-class RuntimeAssembly::Impl {
+class CompanionSystem::Impl {
   public:
     Impl(const presentation::cli::CommandLineOptions& options,
         const std::filesystem::path& executable)
         : safety_(evaluate_safety(options)),
           camera_extrinsics_(load_camera_extrinsics(options)),
           board_type_catalog_(
-              options.json_output
+              operator_options(options).json_output
                   ? nullptr
                   : load_board_type_catalog(options, executable)),
           target_detector_(make_target_detector(options)),
           transport_(make_transport(options)),
           camera_source_(make_camera_source(options)),
           camera_preview_(make_camera_preview(options, executable)) {
+        const auto& autonomy = autonomy_options(options);
         // CompanionApplication stores non-owning adapter pointers. The
-        // assembly owns every adapter and destroys the application first.
+        // system owns every adapter and destroys the application first.
         application_ =
             std::make_unique<application::CompanionApplication>(*transport_,
                 application::CompanionApplicationOptions{
                     .flight_startup =
                         {
-                            .enabled = options.autonomous,
-                            .takeoff_altitude_m = 8.0,
+                            .enabled = autonomy.enabled,
+                            .takeoff_altitude_m = application::
+                                FlightStartupConfig::kDefaultTakeoffAltitudeM,
                         },
                     .autonomy_runtime =
                         {
-                            .enabled = options.autonomous,
+                            .enabled = autonomy.enabled,
                         },
                     .motion_commands_allowed = safety_.motion_commands_allowed,
                     .camera_source = camera_source_.get(),
                     .target_detector = target_detector_.get(),
                     .camera_preview_sink = camera_preview_.get(),
                     .camera_extrinsics = camera_extrinsics_,
-                    .simulated_wind = options.simulated_wind,
+                    .simulated_wind = simulated_wind(options),
                 });
     }
 
@@ -219,23 +295,23 @@ class RuntimeAssembly::Impl {
     std::unique_ptr<application::CompanionApplication> application_;
 };
 
-RuntimeAssembly::RuntimeAssembly(
+CompanionSystem::CompanionSystem(
     const presentation::cli::CommandLineOptions& options,
     const std::filesystem::path& executable)
     : impl_(std::make_unique<Impl>(options, executable)) {}
 
-RuntimeAssembly::~RuntimeAssembly() = default;
+CompanionSystem::~CompanionSystem() = default;
 
-application::CompanionApplication& RuntimeAssembly::application() {
+application::CompanionApplication& CompanionSystem::application() {
     return *impl_->application_;
 }
 
-application::ports::Transport& RuntimeAssembly::transport() {
+application::ports::Transport& CompanionSystem::transport() {
     return *impl_->transport_;
 }
 
 const presentation::BoardTypeResolver*
-RuntimeAssembly::board_type_resolver() const {
+CompanionSystem::board_type_resolver() const {
     return impl_->board_type_resolver();
 }
 

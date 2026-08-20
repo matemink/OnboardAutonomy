@@ -23,8 +23,10 @@ enum class FlightStartupPhase {
 };
 
 struct FlightStartupConfig {
+    static constexpr double kDefaultTakeoffAltitudeM = 8.0;
+
     bool enabled{false};
-    double takeoff_altitude_m{8.0};
+    double takeoff_altitude_m{kDefaultTakeoffAltitudeM};
 };
 
 struct FlightStartupSnapshot {

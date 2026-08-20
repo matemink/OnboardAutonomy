@@ -231,6 +231,9 @@ class AprilTagTargetDetector final : public application::ports::TargetDetector {
         }
     }
 
+    AprilTagTargetDetector(const AprilTagTargetDetector&) = delete;
+    AprilTagTargetDetector& operator=(const AprilTagTargetDetector&) = delete;
+
     [[nodiscard]] domain::TargetDetectionBatch detect(
         const application::ports::CameraFrame& frame) override {
         const std::uint64_t luma_bytes =

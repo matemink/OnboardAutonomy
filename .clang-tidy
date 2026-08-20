@@ -4,11 +4,20 @@ Checks: >-
   clang-analyzer-*,
   bugprone-*,
   concurrency-*,
+  cppcoreguidelines-*,
   performance-*,
   -performance-enum-size,
   portability-*,
   readability-function-cognitive-complexity,
   readability-function-size,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-const-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-vararg,
   -bugprone-easily-swappable-parameters
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/(include/onboard_autonomy|src)/.*'
@@ -22,4 +31,7 @@ CheckOptions:
   readability-function-size.ParameterThreshold: '8'
   readability-function-size.NestingThreshold: '4'
   readability-function-size.VariableThreshold: '25'
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions: 'true'
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: 'true'
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: 'true'
 ...

@@ -25,12 +25,19 @@ enum class AutonomyRuntimePhase {
 };
 
 struct AutonomyRuntimeConfig {
+    static constexpr auto kDefaultTargetLossLandAfter = std::chrono::seconds{5};
+    static constexpr double kDefaultTerminalDescentAltitudeM = 1.5;
+    static constexpr double kDefaultTerminalAlignmentRadiusM = 0.25;
+    static constexpr auto kDefaultTerminalAlignmentDuration =
+        std::chrono::milliseconds{500};
+
     bool enabled{false};
-    std::chrono::milliseconds target_loss_land_after{std::chrono::seconds(5)};
-    double terminal_descent_altitude_m{1.5};
-    double terminal_alignment_radius_m{0.25};
+    std::chrono::milliseconds target_loss_land_after{
+        kDefaultTargetLossLandAfter};
+    double terminal_descent_altitude_m{kDefaultTerminalDescentAltitudeM};
+    double terminal_alignment_radius_m{kDefaultTerminalAlignmentRadiusM};
     std::chrono::milliseconds terminal_alignment_duration{
-        std::chrono::milliseconds(500)};
+        kDefaultTerminalAlignmentDuration};
 };
 
 struct AutonomyRuntimeSnapshot {

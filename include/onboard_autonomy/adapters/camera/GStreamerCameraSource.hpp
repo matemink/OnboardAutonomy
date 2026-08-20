@@ -10,24 +10,26 @@
 namespace onboard_autonomy::adapters::camera {
 
 struct GStreamerCameraConfig {
-    std::uint32_t width{640};
-    std::uint32_t height{480};
-    std::uint16_t udp_port{5601};
-    std::uint32_t jitter_latency_ms{50};
-    std::uint32_t frame_timeout_ms{2000};
-    std::uint32_t restart_delay_ms{500};
+    static constexpr std::uint32_t kDefaultWidth = 640;
+    static constexpr std::uint32_t kDefaultHeight = 480;
+    static constexpr std::uint16_t kDefaultUdpPort = 5601;
+    static constexpr std::uint32_t kDefaultJitterLatencyMs = 50;
+    static constexpr std::uint32_t kDefaultFrameTimeoutMs = 2000;
+    static constexpr std::uint32_t kDefaultRestartDelayMs = 500;
+
+    std::uint32_t width{kDefaultWidth};
+    std::uint32_t height{kDefaultHeight};
+    std::uint16_t udp_port{kDefaultUdpPort};
+    std::uint32_t jitter_latency_ms{kDefaultJitterLatencyMs};
+    std::uint32_t frame_timeout_ms{kDefaultFrameTimeoutMs};
+    std::uint32_t restart_delay_ms{kDefaultRestartDelayMs};
     std::string command{"gst-launch-1.0"};
 };
 
-[[nodiscard]] std::vector<std::string>
-make_gstreamer_camera_arguments(
-    const GStreamerCameraConfig& config
-);
+[[nodiscard]] std::vector<std::string> make_gstreamer_camera_arguments(
+    const GStreamerCameraConfig& config);
 
-[[nodiscard]] std::unique_ptr<
-    application::ports::CameraSource
-> make_gstreamer_camera_source(
-    GStreamerCameraConfig config = {}
-);
+[[nodiscard]] std::unique_ptr<application::ports::CameraSource>
+make_gstreamer_camera_source(GStreamerCameraConfig config = {});
 
-}  // namespace onboard_autonomy::adapters::camera
+} // namespace onboard_autonomy::adapters::camera

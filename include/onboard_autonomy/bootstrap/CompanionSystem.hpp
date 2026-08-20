@@ -19,28 +19,26 @@ class BoardTypeResolver;
 
 namespace onboard_autonomy::bootstrap {
 
-// Owns the runtime adapters and wires them into CompanionApplication.
-class RuntimeAssembly {
-public:
-    RuntimeAssembly(
-        const presentation::cli::CommandLineOptions& options,
-        const std::filesystem::path& executable
-    );
-    ~RuntimeAssembly();
+// Owns the companion-computer adapters and their application instance.
+class CompanionSystem {
+  public:
+    CompanionSystem(const presentation::cli::CommandLineOptions& options,
+        const std::filesystem::path& executable);
+    ~CompanionSystem();
 
-    RuntimeAssembly(const RuntimeAssembly&) = delete;
-    RuntimeAssembly& operator=(const RuntimeAssembly&) = delete;
-    RuntimeAssembly(RuntimeAssembly&&) = delete;
-    RuntimeAssembly& operator=(RuntimeAssembly&&) = delete;
+    CompanionSystem(const CompanionSystem&) = delete;
+    CompanionSystem& operator=(const CompanionSystem&) = delete;
+    CompanionSystem(CompanionSystem&&) = delete;
+    CompanionSystem& operator=(CompanionSystem&&) = delete;
 
     [[nodiscard]] application::CompanionApplication& application();
     [[nodiscard]] application::ports::Transport& transport();
     [[nodiscard]] const presentation::BoardTypeResolver*
     board_type_resolver() const;
 
-private:
+  private:
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace onboard_autonomy::bootstrap
+} // namespace onboard_autonomy::bootstrap
