@@ -251,8 +251,9 @@ weighted campaigns should run 80-90% of missions in that profile.
   while keeping evaluation scenes separate from training scenes.
 - [ ] Train and evaluate the detector in Python, then run inference through a
   typed C++ mission adapter.
-- [ ] Report bounding box, bearing, confidence, capture time, and track ID
-  without claiming monocular range that has not been measured.
+- [ ] Report bounding box, bearing, confidence, capture time, and track ID;
+  keep range unavailable until a calibrated relative-position estimator can
+  provide it with explicit uncertainty.
 - [ ] Add temporal tracking, target-loss detection, and bounded reacquisition.
 - [ ] Compare detections with evaluator-only ground truth for precision,
   recall, bearing error, continuity, and processing latency.
@@ -267,6 +268,9 @@ weighted campaigns should run 80-90% of missions in that profile.
   separated from the later visual estimator.
 - [ ] Add visual odometry or optical-flow-based local motion estimation and
   validate drift before allowing it to command flight.
+- [ ] Estimate target-relative position by combining calibrated camera bearings
+  across measured ego-motion; expose range, covariance, and freshness without
+  using evaluator-only target ground truth.
 - [ ] Test GPS available, denied-from-start, lost, recovered, and inconsistent
   profiles without unsafe source switching.
 
@@ -278,6 +282,9 @@ weighted campaigns should run 80-90% of missions in that profile.
   minimum separation before commands reach the flight controller.
 - [ ] Stop approach on stale or ambiguous observations and enter a bounded
   hold, return, or landing fallback.
+- [ ] Permit approach only while target range is fresh and its uncertainty stays
+  below a configured bound; otherwise fall back before minimum separation can
+  be violated.
 - [ ] Complete one repeatable GPS-denied tracking scenario without collision.
 
 ### Phase 6: Independent second SITL vehicle
