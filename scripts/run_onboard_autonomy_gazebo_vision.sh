@@ -5,6 +5,8 @@ set -euo pipefail
 readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly downward_enable_topic="${ONBOARD_AUTONOMY_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide/sensor/Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming}"
 readonly forward_enable_topic="${ONBOARD_AUTONOMY_FORWARD_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide_Forward/sensor/Raspberry_Pi_Camera_Module_3_Wide_Forward/image/enable_streaming}"
+readonly downward_camera_udp_port="5601"
+readonly forward_camera_udp_port="5602"
 
 export GZ_VERSION="${GZ_VERSION:-harmonic}"
 
@@ -44,10 +46,10 @@ trap cleanup EXIT INT TERM
 printf 'Enabling Gazebo cameras\n'
 printf '  Downward topic: %s\n' "${downward_enable_topic}"
 printf '  Downward stream: RTP/H.264 UDP %s\n' \
-    "${ONBOARD_AUTONOMY_CAMERA_UDP_PORT:-5601}"
+    "${downward_camera_udp_port}"
 printf '  Forward topic: %s\n' "${forward_enable_topic}"
 printf '  Forward stream: RTP/H.264 UDP %s\n' \
-    "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-5602}"
+    "${forward_camera_udp_port}"
 printf '  Preview: http://localhost:%s/\n\n' \
     "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
 
@@ -57,6 +59,7 @@ set_camera_streaming "${downward_enable_topic}" true
 set_camera_streaming "${forward_enable_topic}" true
 
 ONBOARD_AUTONOMY_GAZEBO_VISION=1 \
-ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT="${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-5602}" \
+ONBOARD_AUTONOMY_CAMERA_UDP_PORT="${downward_camera_udp_port}" \
+ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT="${forward_camera_udp_port}" \
 ONBOARD_AUTONOMY_SIM_WIND_PROFILE="${ONBOARD_AUTONOMY_SIM_WIND_PROFILE:-0.0 0.0 0.0}" \
     "${script_dir}/run_onboard_autonomy_sitl.sh"

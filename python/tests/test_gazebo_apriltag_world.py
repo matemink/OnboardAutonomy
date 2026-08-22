@@ -371,6 +371,12 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn("Raspberry_Pi_Camera_Module_3_Wide_Forward", gazebo_runner)
         self.assertIn("ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT", gazebo_runner)
         self.assertIn("--forward-camera-udp-port", sitl_runner)
+        self.assertIn('readonly downward_camera_udp_port="5601"', gazebo_runner)
+        self.assertIn('readonly forward_camera_udp_port="5602"', gazebo_runner)
+        self.assertNotIn(
+            "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-5602}",
+            gazebo_runner,
+        )
 
     def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
         demo_launcher = (

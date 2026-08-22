@@ -31,11 +31,13 @@ constexpr auto kMicrosecondsPerSecond =
         .count();
 constexpr int kHttpNoContent = 204;
 constexpr std::size_t kPreviewStreamCount = 2;
+constexpr auto kMaximumFrameAge = std::chrono::seconds{2};
 
 struct PreviewFrame {
     std::uint64_t sequence{0};
     std::uint32_t width{0};
     std::uint32_t height{0};
+    std::chrono::steady_clock::time_point published_at{};
     std::vector<std::uint8_t> luma;
     std::vector<mission::TargetObservation> targets;
     mission::TargetTrackSnapshot target_track;
@@ -239,6 +241,7 @@ class HttpCameraPreviewServer final
             .sequence = frame.sequence,
             .width = frame.width,
             .height = frame.height,
+            .published_at = now,
             .luma = {frame.yuv420.begin(), end},
             .targets = {targets.begin(), targets.end()},
             .target_track = target_track,
@@ -273,7 +276,13 @@ class HttpCameraPreviewServer final
                 response.set_header("Cache-Control", "no-store");
                 return;
             }
-            frame = *latest;
+            frame = latest.value();
+            if (std::chrono::steady_clock::now() - frame.published_at >
+                kMaximumFrameAge) {
+                response.status = kHttpNoContent;
+                response.set_header("Cache-Control", "no-store");
+                return;
+            }
         }
 
         response.set_header("Cache-Control", "no-store");
