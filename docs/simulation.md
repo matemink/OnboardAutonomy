@@ -39,9 +39,16 @@ client so camera processing does not depend on the GUI lifecycle.
 The simulated Holybro S500 carries two visible and functional Camera Module 3
 representations. The downward camera streams H.264/RTP to UDP `5601` and feeds
 AprilTag landing detection. The forward camera streams independently to UDP
-`5602`; it appears beside the landing view in the HTML preview but has no
-detector overlay until the fixed-wing detector milestone is implemented. A
-failure of either stream is reported independently in the preview.
+`5602` and can feed an OpenCV DNN detector. Download the pinned OpenCV Zoo
+YOLOX-S model once before enabling its preview overlay:
+
+```bash
+bash scripts/download_yolox_model.sh
+```
+
+The launcher verifies the model SHA-256 and loads it from the gitignored
+`.local/models` directory. A failure of either camera stream is reported
+independently in the preview.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
 spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
@@ -49,8 +56,9 @@ radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
 Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
 `ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
 to the model. This is still a visual Phase 1 stimulus, not a second ArduPlane
-SITL instance: OnboardAutonomy does not receive its pose, detect it, or command
-the vehicle toward it yet.
+SITL instance. OnboardAutonomy detects the small rendered object with generic
+COCO labels such as `kite`, `bird`, or `airplane`; it does not receive the
+scripted model pose, infer 3D range, or turn detections into flight commands.
 
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to

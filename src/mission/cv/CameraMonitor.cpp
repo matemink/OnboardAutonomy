@@ -127,6 +127,8 @@ class CameraMonitor::Impl {
         return frame;
     }
 
+    void disable_target_detection() { vision_monitor_.reset(); }
+
   private:
     ports::CameraSource& source_;
     std::optional<VisionMonitor> vision_monitor_;
@@ -168,6 +170,10 @@ std::optional<VisionSnapshot> CameraMonitor::vision_snapshot(
 std::optional<ProcessedCameraFrame>
 CameraMonitor::take_latest_processed_frame() {
     return impl_->take_latest_processed_frame();
+}
+
+void CameraMonitor::disable_target_detection() {
+    impl_->disable_target_detection();
 }
 
 } // namespace onboard_autonomy::mission

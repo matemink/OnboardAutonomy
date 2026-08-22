@@ -9,6 +9,15 @@ project(
 
 find_package(Threads REQUIRED)
 
+option(
+    ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
+    "Enable OpenCV DNN object detection"
+    ON
+)
+if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
+    find_package(OpenCV 4.6 REQUIRED COMPONENTS core dnn imgproc)
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -155,6 +164,9 @@ add_library(
     onboard_autonomy_mission_cv_detection
     src/mission/cv/detection/AprilTagTargetDetector.cpp
     src/mission/cv/detection/CameraGeometry.cpp
+    src/mission/cv/detection/OpenCvDnnTargetDetector.cpp
+    src/mission/cv/detection/YoloXImagePreprocessor.cpp
+    src/mission/cv/detection/YoloXOutputDecoder.cpp
 )
 target_link_libraries(
     onboard_autonomy_mission_cv_detection
@@ -163,6 +175,20 @@ target_link_libraries(
     PRIVATE
         apriltag
 )
+if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
+    target_compile_definitions(
+        onboard_autonomy_mission_cv_detection
+        PRIVATE ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=1
+    )
+    target_link_libraries(
+        onboard_autonomy_mission_cv_detection
+        PRIVATE ${OpenCV_LIBS}
+    )
+    target_include_directories(
+        onboard_autonomy_mission_cv_detection
+        SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS}
+    )
+endif()
 target_include_directories(
     onboard_autonomy_mission_cv_detection
     SYSTEM PRIVATE
@@ -249,6 +275,7 @@ onboard_autonomy_enable_warnings(onboard_autonomy_operator_screen)
 add_library(
     onboard_autonomy_mission
     src/mission/autonomy/AutonomyRuntime.cpp
+    src/mission/cv/AsyncCameraMonitor.cpp
     src/mission/cv/CameraMonitor.cpp
     src/mission/safety/CompanionLinkFailsafe.cpp
     src/mission/autonomy/DecisionEngine.cpp
@@ -426,6 +453,8 @@ if(BUILD_TESTING)
         tests/TargetTransformTests.cpp
         tests/TransportTests.cpp
         tests/VehicleStateTests.cpp
+        tests/YoloXImagePreprocessorTests.cpp
+        tests/YoloXOutputDecoderTests.cpp
         tests/TestMain.cpp
     )
     target_link_libraries(

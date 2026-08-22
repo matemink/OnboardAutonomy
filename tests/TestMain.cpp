@@ -26,6 +26,8 @@ int main() {
         run_autonomy_core_tests();
         run_flight_startup_controller_tests();
         run_autonomy_runtime_tests();
+        run_yolox_image_preprocessor_tests();
+        run_yolox_output_decoder_tests();
         std::cout << "All OnboardAutonomy tests passed\n";
         return 0;
     } catch (const std::exception& error) {

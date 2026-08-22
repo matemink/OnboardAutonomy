@@ -61,6 +61,12 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
             "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT}"
         )
     fi
+    if [[ -n "${ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL:-}" ]]; then
+        arguments+=(
+            --forward-detector-model
+            "${ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL}"
+        )
+    fi
 fi
 
 if [[ "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" ]]; then

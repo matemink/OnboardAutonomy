@@ -43,7 +43,7 @@ Status: implemented and verified on Ubuntu 24.04 under WSL2.
 - [x] Freshness-aware vehicle state.
 - [x] Native tests and Python scenario generator.
 - [x] End-to-end Python-to-C++ UDP integration check.
-- [x] ARM64 cross-build workflow.
+- [x] Native ARM64 build workflow.
 
 Engineering focus: C++, MAVLink integration, architecture, testing, Git.
 
@@ -317,8 +317,8 @@ guidance, Embedded Linux, ARM performance, and measurable autonomy.
 These investigations are useful but do not block version 1.0 or the visual
 course vertical slice:
 
-- [ ] Build natively on Raspberry Pi 5 as a toolchain comparison with the
-  established ARM64 cross-build.
+- [ ] Build directly on Raspberry Pi 5 as a hardware-specific comparison with
+  the hosted native ARM64 build.
 - [ ] Add a documented I2C or GPIO peripheral only when it serves a concrete
   system function.
 - [ ] Add a reproducible deployment image or a bounded Yocto proof of concept.

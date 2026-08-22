@@ -97,9 +97,9 @@ std::string targets_json(
             output << ',';
         }
         first_target = false;
-        output << "{\"id\":" << target.id << ",\"center\":["
-               << target.center.x_px << ',' << target.center.y_px << ']'
-               << ",\"corners\":[";
+        output << "{\"id\":" << target.id << ",\"family\":\"" << target.family
+               << "\",\"center\":[" << target.center.x_px << ','
+               << target.center.y_px << ']' << ",\"corners\":[";
         bool first_corner = true;
         for (const auto& corner : target.corners) {
             if (!first_corner) {

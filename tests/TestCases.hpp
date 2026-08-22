@@ -21,3 +21,5 @@ void run_motion_safety_policy_tests();
 void run_autonomy_core_tests();
 void run_flight_startup_controller_tests();
 void run_autonomy_runtime_tests();
+void run_yolox_image_preprocessor_tests();
+void run_yolox_output_decoder_tests();
