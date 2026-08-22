@@ -16,7 +16,6 @@ class SitlHarnessTests(unittest.TestCase):
     def test_complete_snapshot_requires_every_health_source(self) -> None:
         complete = {
             "connected": True,
-            "gps_fix_type": 3,
             "battery_voltage_v": 15.2,
             "system_health_known": True,
         }
@@ -35,10 +34,10 @@ class SitlHarnessTests(unittest.TestCase):
     def test_ready_snapshot_requires_all_readiness_checks(self) -> None:
         ready = {
             "connected": True,
-            "gps_fix_type": 3,
             "battery_voltage_v": 12.6,
             "system_health_known": True,
-            "gps_ready": True,
+            "gps_ready": False,
+            "navigation_ready": True,
             "battery_ready": True,
             "system_health_ok": True,
             "armable": True,
@@ -46,7 +45,7 @@ class SitlHarnessTests(unittest.TestCase):
         self.assertTrue(SITL_HARNESS.snapshot_is_ready(ready))
 
         for readiness_key in (
-            "gps_ready",
+            "navigation_ready",
             "battery_ready",
             "system_health_ok",
             "armable",

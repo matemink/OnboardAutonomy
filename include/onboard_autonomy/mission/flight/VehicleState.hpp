@@ -26,6 +26,7 @@ struct AutopilotMetadata {
 struct VehicleSnapshot {
     bool connected{false};
     bool gps_ready{false};
+    bool navigation_ready{false};
     bool battery_ready{false};
     bool system_health_known{false};
     bool system_health_ok{false};

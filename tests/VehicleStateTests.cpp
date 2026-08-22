@@ -42,6 +42,8 @@ void healthy_vehicle_is_armable() {
     const auto snapshot = state.snapshot(now);
     require(snapshot.connected, "heartbeat should establish connection");
     require(snapshot.gps_ready, "3D GPS fix should be ready");
+    require(snapshot.navigation_ready,
+        "GPS should provide the initial navigation estimate");
     require(snapshot.battery_ready, "healthy battery should be ready");
     require(snapshot.system_health_ok, "healthy sensors should be ready");
     require(snapshot.armable, "healthy vehicle should be armable");
@@ -118,6 +120,8 @@ void missing_data_remains_unknown() {
 
     const auto snapshot = state.snapshot(now);
     require(!snapshot.gps_ready, "missing GPS must not pass");
+    require(!snapshot.navigation_ready,
+        "missing position sources must not provide navigation readiness");
     require(!snapshot.battery_ready, "missing battery must not pass");
     require(!snapshot.system_health_ok, "missing SYS_STATUS must not pass");
 }

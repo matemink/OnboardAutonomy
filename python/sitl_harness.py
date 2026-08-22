@@ -154,7 +154,6 @@ def snapshot_has_required_telemetry(
 ) -> bool:
     return (
         snapshot.get("connected") is True
-        and snapshot.get("gps_fix_type") is not None
         and snapshot.get("battery_voltage_v") is not None
         and snapshot.get("system_health_known") is True
     )
@@ -163,7 +162,7 @@ def snapshot_has_required_telemetry(
 def snapshot_is_ready(snapshot: dict[str, object]) -> bool:
     return (
         snapshot_has_required_telemetry(snapshot)
-        and snapshot.get("gps_ready") is True
+        and snapshot.get("navigation_ready") is True
         and snapshot.get("battery_ready") is True
         and snapshot.get("system_health_ok") is True
         and snapshot.get("armable") is True

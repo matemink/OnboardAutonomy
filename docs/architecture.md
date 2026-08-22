@@ -259,10 +259,15 @@ state machine.
 
 `FlightStartupController` owns the finite startup sequence: verify an
 ArduPilot multicopter, complete telemetry, validate the ArduPilot-owned
-link-loss LAND policy, wait for pre-arm readiness,
+link-loss LAND policy, wait for source-neutral navigation and pre-arm readiness,
 enter GUIDED, arm, take off, and confirm each transition from both
 `COMMAND_ACK` and vehicle telemetry. Commands use bounded retries and phase
 deadlines. The controller does not own landing guidance.
+
+`VehicleSnapshot` reports GPS health independently from `navigation_ready`.
+GPS currently supplies that navigation estimate, while the source-neutral
+contract allows a later ExternalNav adapter to satisfy startup without making
+the startup state machine depend on a specific position source.
 
 After startup, `WorldState` is the immutable input for one decision cycle.
 `DecisionEngine` may create a short-lived `DesiredMotion`, but it never sends

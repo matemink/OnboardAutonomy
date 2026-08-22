@@ -240,6 +240,8 @@ void minimum_message_set_updates_vehicle_state() {
     require(snapshot.connected, "HEARTBEAT must update connection");
     require(snapshot.flight_mode == 4, "HEARTBEAT must update flight mode");
     require(snapshot.gps_ready, "GPS_RAW_INT must update GPS state");
+    require(snapshot.navigation_ready,
+        "GPS must currently provide the navigation estimate");
     require(snapshot.battery_remaining_pct == 88,
         "SYS_STATUS must update battery state");
     require(snapshot.battery_arming_voltage_v == 10.5,

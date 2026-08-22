@@ -230,6 +230,7 @@ VehicleSnapshot VehicleState::snapshot(const TimePoint now) {
         result.gps_fix_type = gps_fix_type_;
         result.satellites_visible = satellites_visible_;
         result.gps_ready = gps_fix_type_.has_value() && *gps_fix_type_ >= 3;
+        result.navigation_ready = result.gps_ready;
     }
 
     if (is_fresh(last_global_position_, now, kGlobalPositionTimeout)) {
@@ -287,7 +288,7 @@ VehicleSnapshot VehicleState::snapshot(const TimePoint now) {
             return now - warning.last_seen <= kBlockingWarningTimeout;
         });
 
-    result.armable = result.gps_ready && result.battery_ready &&
+    result.armable = result.navigation_ready && result.battery_ready &&
                      result.system_health_ok && !has_recent_warning;
     return result;
 }
