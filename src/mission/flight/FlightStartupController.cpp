@@ -396,8 +396,8 @@ void FlightStartupController::update_readiness_detail(
         detail_ = "Autonomy blocked: " + companion_link_failsafe.detail;
     } else if (vehicle.armed) {
         detail_ = "Waiting for the vehicle to be disarmed";
-    } else if (!vehicle.gps_ready) {
-        detail_ = "Waiting for a 3D GPS fix";
+    } else if (!vehicle.navigation_ready) {
+        detail_ = "Waiting for a navigation estimate";
     } else if (!vehicle.battery_ready) {
         detail_ = "Waiting for valid battery data";
     } else if (!vehicle.system_health_ok) {

@@ -29,6 +29,7 @@ VehicleSnapshot ready_vehicle() {
     VehicleSnapshot vehicle;
     vehicle.connected = true;
     vehicle.gps_ready = true;
+    vehicle.navigation_ready = true;
     vehicle.battery_ready = true;
     vehicle.system_health_known = true;
     vehicle.system_health_ok = true;
@@ -168,6 +169,37 @@ void startup_waits_for_accepted_link_failsafe() {
         "startup must expose the failsafe rejection reason");
 }
 
+void startup_uses_source_neutral_navigation_readiness() {
+    FlightStartupController controller{
+        {.enabled = true, .takeoff_altitude_m = 5.0}};
+    auto vehicle = ready_vehicle();
+    vehicle.gps_ready = false;
+
+    const auto action = only_action(
+        controller.update(vehicle, true, accepted_failsafe(), TimePoint{}),
+        FlightAction::set_guided_mode,
+        "ready external navigation must not require GPS");
+    require(action.action == FlightAction::set_guided_mode,
+        "source-neutral navigation must allow startup to advance");
+}
+
+void startup_reports_missing_navigation_estimate() {
+    FlightStartupController controller{
+        {.enabled = true, .takeoff_altitude_m = 5.0}};
+    auto vehicle = ready_vehicle();
+    vehicle.gps_ready = false;
+    vehicle.navigation_ready = false;
+    vehicle.armable = false;
+
+    require(controller
+                .update(vehicle, true, accepted_failsafe(), TimePoint{})
+                .empty(),
+        "missing navigation must block startup commands");
+    require(controller.snapshot().detail ==
+                "Waiting for a navigation estimate",
+        "startup must describe the source-neutral navigation requirement");
+}
+
 void restart_clears_terminal_startup_state() {
     FlightStartupController controller{
         {.enabled = true, .takeoff_altitude_m = 5.0}};
@@ -197,5 +229,7 @@ void run_flight_startup_controller_tests() {
     startup_fails_after_three_missing_acknowledgements();
     startup_stops_on_heartbeat_loss();
     startup_waits_for_accepted_link_failsafe();
+    startup_uses_source_neutral_navigation_readiness();
+    startup_reports_missing_navigation_estimate();
     restart_clears_terminal_startup_state();
 }

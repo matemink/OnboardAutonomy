@@ -150,6 +150,7 @@ Json vehicle_json(const mission::VehicleSnapshot& vehicle) {
     Json result{
         {"connected", vehicle.connected},
         {"gps_ready", vehicle.gps_ready},
+        {"navigation_ready", vehicle.navigation_ready},
         {"battery_ready", vehicle.battery_ready},
         {"system_health_known", vehicle.system_health_known},
         {"system_health_ok", vehicle.system_health_ok},
