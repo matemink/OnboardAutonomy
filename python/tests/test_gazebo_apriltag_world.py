@@ -83,6 +83,7 @@ TARGET_MODEL = (
     / "scripted_fixed_wing_target"
     / "model.sdf"
 )
+TARGET_MODEL_DIR = TARGET_MODEL.parent
 TARGET_SPAWNER = (
     PROJECT_ROOT / "scripts" / "spawn_gazebo_aerial_target.sh"
 )
@@ -256,8 +257,19 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertEqual(model.attrib["name"], "scripted_fixed_wing_target")
 
         pose = [float(value) for value in model.findtext("pose").split()]
-        self.assertEqual(pose[2], 8.0)
+        self.assertEqual(pose[2], 12.0)
         self.assertEqual(model.findtext("link/gravity"), "false")
+
+        mesh_uri = model.findtext("link/visual/geometry/mesh/uri")
+        self.assertEqual(mesh_uri, "meshes/wing.dae")
+        self.assertTrue((TARGET_MODEL_DIR / mesh_uri).is_file())
+        self.assertTrue(
+            (TARGET_MODEL_DIR / "materials" / "textures" / "wing.png").is_file()
+        )
+        self.assertTrue((TARGET_MODEL_DIR / "NOTICE.md").is_file())
+        self.assertTrue(
+            (TARGET_MODEL_DIR / "LICENSE.ardupilot-gazebo.md").is_file()
+        )
 
         plugin = model.find("plugin")
         self.assertIsNotNone(plugin)
@@ -271,9 +283,9 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         angular = [
             float(value) for value in plugin.findtext("initial_angular").split()
         ]
-        self.assertEqual(linear, [2.0, 0.0, 0.0])
+        self.assertEqual(linear, [12.0, 0.0, 0.0])
         self.assertEqual(angular[:2], [0.0, 0.0])
-        self.assertAlmostEqual(linear[0] / angular[2], 12.0)
+        self.assertAlmostEqual(linear[0] / angular[2], 20.0)
 
     def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
         world = element_tree.parse(WORLD).getroot()
@@ -290,7 +302,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("/world/${world_name}/create", spawner)
         self.assertIn("gz.msgs.EntityFactory", spawner)
-        self.assertIn('readonly target_name="Generic_Fixed_Wing_Target"', spawner)
+        self.assertIn('readonly target_name="Zephyr_Fixed_Wing_Target"', spawner)
         self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
         self.assertIn("ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET=1", launcher)
         self.assertNotIn("spawn_gazebo_aerial_target.sh", launcher)
