@@ -102,6 +102,8 @@ void camera_and_autonomy_dependencies_are_validated() {
         "--camera-preview",
         "--forward-camera-udp-port",
         "5602",
+        "--forward-detector-model",
+        "model.onnx",
         "--apriltag",
         "--camera-calibration",
         "camera.json",
@@ -116,7 +118,10 @@ void camera_and_autonomy_dependencies_are_validated() {
     require(simulation != nullptr && simulation->camera.has_value() &&
                 std::holds_alternative<GStreamerCameraOptions>(
                     simulation->camera->source) &&
-                simulation->diagnostics.forward_camera_udp_port == 5602 &&
+                simulation->diagnostics.forward_camera.has_value() &&
+                simulation->diagnostics.forward_camera->udp_port == 5602 &&
+                simulation->diagnostics.forward_camera->detector_model_file ==
+                    "model.onnx" &&
                 simulation->autonomy.enabled &&
                 simulation->autonomy.exit_when_finished,
         "valid Gazebo autonomy group must parse");
@@ -131,6 +136,11 @@ void camera_and_autonomy_dependencies_are_validated() {
         "requires --camera-preview");
     require_rejected({"--camera", "--forward-camera-udp-port", "5602"},
         "requires --camera-preview");
+    require_rejected({"--camera",
+                         "--camera-preview",
+                         "--forward-detector-model",
+                         "model.onnx"},
+        "requires --forward-camera-udp-port");
     require_rejected({"--camera",
                          "--camera-source",
                          "gstreamer",

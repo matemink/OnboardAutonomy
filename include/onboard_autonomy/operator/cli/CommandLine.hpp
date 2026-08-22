@@ -45,6 +45,11 @@ struct CameraPreviewOptions {
     std::uint16_t port{defaults::kCameraPreviewPort};
 };
 
+struct ForwardCameraOptions {
+    std::uint16_t udp_port{defaults::kForwardCameraUdpPort};
+    std::string detector_model_file;
+};
+
 struct CameraOptions {
     CameraSourceOptions source{RpicamOptions{}};
     std::uint32_t frame_width{defaults::kCameraFrameWidth};
@@ -66,7 +71,7 @@ struct OperatorInterfaceOptions {
 
 struct DiagnosticsOptions {
     std::optional<CameraPreviewOptions> camera_preview;
-    std::optional<std::uint16_t> forward_camera_udp_port;
+    std::optional<ForwardCameraOptions> forward_camera;
     std::string log_file;
 };
 

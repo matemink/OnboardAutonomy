@@ -53,7 +53,8 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
   USB/UART serial transport.
 - Readiness-gated takeoff and AprilTag landing with target-loss and link-loss
   fallbacks.
-- One YUV420/OpenCV pipeline for Gazebo H.264 and Raspberry Pi Camera Module 3.
+- Dual-camera YUV420/OpenCV processing for AprilTag landing and forward ONNX
+  aerial-object detection.
 - Automatic serial and camera recovery after disconnects or process stalls.
 - Motion is SITL-gated; physical endpoints remain observation-only. CI covers
   C++ tests, Python integration and fault injection, plus an ARM64 cross-build.

@@ -13,7 +13,7 @@ jobs:
       - name: Install clang-tidy
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy-18 ninja-build
+          sudo apt-get install -y clang-tidy-18 libopencv-dev ninja-build
       - name: Analyze project sources
         env:
           CLANG_TIDY_JOBS: "2"
@@ -24,6 +24,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev ninja-build
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -76,6 +80,7 @@ jobs:
           cmake -S . -B build-arm64 -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/aarch64-linux-gnu.cmake
+          -DONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=OFF
           -DBUILD_TESTING=OFF
       - name: Build ARM64
         run: cmake --build build-arm64

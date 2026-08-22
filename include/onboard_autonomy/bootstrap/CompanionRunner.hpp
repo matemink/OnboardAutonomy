@@ -7,6 +7,7 @@
 
 namespace onboard_autonomy::mission {
 class CompanionApplication;
+class AsyncCameraMonitor;
 struct AppSnapshot;
 } // namespace onboard_autonomy::mission
 
@@ -44,7 +45,7 @@ class CompanionRunner {
   public:
     CompanionRunner(CompanionRunnerOptions options,
         mission::CompanionApplication& application,
-        mission::ports::CameraSource* forward_preview_camera,
+        mission::AsyncCameraMonitor* forward_camera_monitor,
         RuntimeCommandSource* command_source,
         std::vector<RuntimeSnapshotSink*> snapshot_sinks,
         std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks);
@@ -61,7 +62,7 @@ class CompanionRunner {
 
     CompanionRunnerOptions options_;
     mission::CompanionApplication& application_;
-    mission::ports::CameraSource* forward_preview_camera_;
+    mission::AsyncCameraMonitor* forward_camera_monitor_;
     RuntimeCommandSource* command_source_;
     std::vector<RuntimeSnapshotSink*> snapshot_sinks_;
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks_;

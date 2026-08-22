@@ -3,6 +3,7 @@
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/hardware/camera/RpicamCameraSource.hpp"
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 #include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 
 #include <algorithm>
@@ -11,6 +12,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -243,6 +245,30 @@ void monitor_exposes_processed_frames_without_a_preview_dependency() {
         "processed camera output must be consumed only once");
 }
 
+void async_monitor_processes_frames_off_the_caller_thread() {
+    using namespace std::chrono_literals;
+
+    FakeCameraSource source;
+    FakeTargetDetector detector;
+    source.emit(frame(31, std::chrono::system_clock::time_point{}, 10.0));
+    onboard_autonomy::mission::AsyncCameraMonitor monitor{source, &detector};
+
+    std::optional<onboard_autonomy::mission::ProcessedCameraFrame> processed;
+    const auto deadline = std::chrono::steady_clock::now() + 500ms;
+    while (
+        !processed.has_value() && std::chrono::steady_clock::now() < deadline) {
+        processed = monitor.take_latest_processed_frame();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    require(processed.has_value() && processed->frame.sequence == 31U &&
+                processed->targets.size() == 1U &&
+                processed->targets.front().family == "fake",
+        "async camera monitor must publish the latest processed frame");
+    require(!monitor.take_latest_processed_frame().has_value(),
+        "async camera output must be consumed only once");
+}
+
 } // namespace
 
 void run_camera_monitor_tests() {
@@ -252,4 +278,5 @@ void run_camera_monitor_tests() {
     recovery_timings_must_be_non_zero();
     monitor_exposes_camera_recovery_state();
     monitor_exposes_processed_frames_without_a_preview_dependency();
+    async_monitor_processes_frames_off_the_caller_thread();
 }

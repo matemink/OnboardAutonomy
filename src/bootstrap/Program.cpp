@@ -6,6 +6,8 @@
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
+#include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
+#include "onboard_autonomy/mission/cv/detection/OpenCvDnnTargetDetector.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 #include "onboard_autonomy/bootstrap/MissionRuntime.hpp"
 #include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
@@ -252,7 +254,7 @@ std::unique_ptr<CameraPreviewSink> make_camera_preview(
 std::unique_ptr<mission::ports::CameraSource> make_forward_preview_camera(
     const operator_interface::cli::CommandLineOptions& options) {
     const auto& diagnostics = diagnostics_options(options);
-    if (!diagnostics.forward_camera_udp_port.has_value()) {
+    if (!diagnostics.forward_camera.has_value()) {
         return nullptr;
     }
 
@@ -264,8 +266,29 @@ std::unique_ptr<mission::ports::CameraSource> make_forward_preview_camera(
     return hardware::camera::make_gstreamer_camera_source({
         .width = camera->frame_width,
         .height = camera->frame_height,
-        .udp_port = *diagnostics.forward_camera_udp_port,
+        .udp_port = diagnostics.forward_camera->udp_port,
     });
+}
+
+std::unique_ptr<mission::ports::TargetDetector> make_forward_target_detector(
+    const operator_interface::cli::CommandLineOptions& options) {
+    const auto& forward_camera = diagnostics_options(options).forward_camera;
+    if (!forward_camera.has_value() ||
+        forward_camera->detector_model_file.empty()) {
+        return nullptr;
+    }
+    return mission::cv::make_opencv_dnn_target_detector({
+        .model_file = forward_camera->detector_model_file,
+    });
+}
+
+std::unique_ptr<mission::AsyncCameraMonitor> make_forward_camera_monitor(
+    mission::ports::CameraSource* source,
+    mission::ports::TargetDetector* detector) {
+    if (source == nullptr) {
+        return nullptr;
+    }
+    return std::make_unique<mission::AsyncCameraMonitor>(*source, detector);
 }
 
 std::uint32_t snapshot_interval_ms(
@@ -360,6 +383,10 @@ int run_program(const int argc, char** argv) {
         board_types.get());
     auto camera_preview = make_camera_preview(diagnostics, executable);
     auto forward_preview_camera = make_forward_preview_camera(options);
+    auto forward_target_detector = make_forward_target_detector(options);
+    auto forward_camera_monitor =
+        make_forward_camera_monitor(forward_preview_camera.get(),
+            forward_target_detector.get());
     ConsoleCommandSource operator_commands{operator_interface.interactive};
 
     std::cerr << "OnboardAutonomy listening on "
@@ -375,7 +402,7 @@ int run_program(const int argc, char** argv) {
             .snapshot_interval_ms = snapshot_interval_ms(operator_interface),
         },
         mission.application(),
-        forward_preview_camera.get(),
+        forward_camera_monitor.get(),
         operator_interface.interactive ? &operator_commands : nullptr,
         sink_pointers(snapshot_sinks),
         preview_sinks(camera_preview.get()),

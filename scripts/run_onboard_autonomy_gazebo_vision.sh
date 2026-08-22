@@ -3,10 +3,13 @@
 set -euo pipefail
 
 readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
 readonly downward_enable_topic="${ONBOARD_AUTONOMY_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide/sensor/Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming}"
 readonly forward_enable_topic="${ONBOARD_AUTONOMY_FORWARD_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide_Forward/sensor/Raspberry_Pi_Camera_Module_3_Wide_Forward/image/enable_streaming}"
 readonly downward_camera_udp_port="5601"
 readonly forward_camera_udp_port="5602"
+readonly default_forward_detector_model="${project_dir}/.local/models/object_detection_yolox_2022nov.onnx"
+readonly forward_detector_model="${ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL:-${default_forward_detector_model}}"
 
 export GZ_VERSION="${GZ_VERSION:-harmonic}"
 
@@ -50,6 +53,13 @@ printf '  Downward stream: RTP/H.264 UDP %s\n' \
 printf '  Forward topic: %s\n' "${forward_enable_topic}"
 printf '  Forward stream: RTP/H.264 UDP %s\n' \
     "${forward_camera_udp_port}"
+if [[ -f "${forward_detector_model}" ]]; then
+    printf '  Forward detector: %s\n' "${forward_detector_model}"
+    export ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL="${forward_detector_model}"
+else
+    printf '  Forward detector: disabled (run scripts/download_yolox_model.sh)\n'
+    unset ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL
+fi
 printf '  Preview: http://localhost:%s/\n\n' \
     "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
 

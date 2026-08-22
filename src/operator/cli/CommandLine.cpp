@@ -29,6 +29,7 @@ struct LaunchArgumentsDraft {
     std::string camera_extrinsics_file;
     std::string board_types_file;
     std::string diagnostic_log_file;
+    std::string forward_detector_model_file;
     std::optional<mission::SimulatedWindProfile> simulated_wind;
     std::optional<std::uint16_t> forward_camera_udp_port;
     TransportBackend transport{TransportBackend::udp};
@@ -117,6 +118,7 @@ void validate_camera(const LaunchArgumentsDraft& options,
         explicit_options.camera_width || explicit_options.camera_height ||
         explicit_options.camera_fps || explicit_options.camera_preview_port ||
         options.forward_camera_udp_port.has_value() ||
+        !options.forward_detector_model_file.empty() ||
         options.apriltag_enabled || options.camera_preview_enabled ||
         !options.camera_calibration_file.empty() ||
         !options.camera_extrinsics_file.empty() ||
@@ -173,6 +175,11 @@ void validate_camera(const LaunchArgumentsDraft& options,
             throw std::invalid_argument(
                 "forward and downward camera UDP ports must differ");
         }
+    }
+    if (!options.forward_detector_model_file.empty() &&
+        !options.forward_camera_udp_port.has_value()) {
+        throw std::invalid_argument(
+            "--forward-detector-model requires --forward-camera-udp-port");
     }
 }
 
@@ -317,7 +324,13 @@ CommandLineOptions make_command_line_options(
                                     .port = draft.camera_preview_port,
                                 }}
                               : std::nullopt,
-        .forward_camera_udp_port = draft.forward_camera_udp_port,
+        .forward_camera =
+            draft.forward_camera_udp_port.has_value()
+                ? std::optional{ForwardCameraOptions{
+                      .udp_port = *draft.forward_camera_udp_port,
+                      .detector_model_file = draft.forward_detector_model_file,
+                  }}
+                : std::nullopt,
         .log_file = draft.diagnostic_log_file,
     };
 
@@ -450,6 +463,12 @@ class ArgumentParser {
         } else if (argument == "--forward-camera-udp-port") {
             draft_.forward_camera_udp_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
+        } else if (argument == "--forward-detector-model") {
+            draft_.forward_detector_model_file = value_after(argument);
+            if (draft_.forward_detector_model_file.empty()) {
+                throw std::invalid_argument(
+                    "--forward-detector-model cannot be empty");
+            }
         } else {
             return false;
         }

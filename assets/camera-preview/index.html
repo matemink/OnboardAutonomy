@@ -298,7 +298,14 @@
       target_id: null
     };
 
-    function drawTargets(context, canvas, targets, targetTrack) {
+    function drawTargets(
+      context,
+      canvas,
+      targets,
+      targetTrack,
+      color,
+      showObjectClass
+    ) {
       context.lineWidth = Math.max(2, canvas.width / 240);
       context.font = `${Math.max(14, canvas.width / 36)}px Lucida Console`;
 
@@ -307,8 +314,8 @@
           continue;
         }
         const corners = target.corners;
-        context.strokeStyle = "#49d9ff";
-        context.fillStyle = "#49d9ff";
+        context.strokeStyle = color;
+        context.fillStyle = color;
         context.beginPath();
         context.moveTo(corners[0][0], corners[0][1]);
         for (let index = 1; index < corners.length; index += 1) {
@@ -324,8 +331,11 @@
 
         const tracked = targetTrack.target_id === target.id &&
           targetTrack.phase !== "searching";
-        const label = `TAG ${target.id}` +
-          (tracked ? ` / ${targetTrack.phase.toUpperCase()}` : "");
+        const label = showObjectClass
+          ? `${target.family.toUpperCase()} ` +
+            `${target.decision_margin.toFixed(0)}%`
+          : `TAG ${target.id}` +
+            (tracked ? ` / ${targetTrack.phase.toUpperCase()}` : "");
         const labelY = Math.max(22, corners[0][1] - 10);
         context.fillStyle = "rgb(5 12 12 / 82%)";
         context.fillRect(
@@ -334,7 +344,7 @@
           context.measureText(label).width + 14,
           25
         );
-        context.fillStyle = "#49d9ff";
+        context.fillStyle = color;
         context.fillText(label, corners[0][0] + 7, labelY);
       }
     }
@@ -353,6 +363,16 @@
       return targets
         .map((target) => `TAG ${target.id} / MARGIN ` +
           target.decision_margin.toFixed(1))
+        .join("   ");
+    }
+
+    function aerialObjectSummary(targets) {
+      if (targets.length === 0) {
+        return "SEARCHING FOR AERIAL OBJECT";
+      }
+      return targets
+        .map((target) => `${(target.family || "object").toUpperCase()} ` +
+          `${target.decision_margin.toFixed(0)}%`)
         .join("   ");
     }
 
@@ -427,8 +447,25 @@
           }
           context.putImageData(imageData, 0, 0);
           if (stream === "downward") {
-            drawTargets(context, canvas, targets, targetTrack);
+            drawTargets(
+              context,
+              canvas,
+              targets,
+              targetTrack,
+              "#49d9ff",
+              false
+            );
             analysisText.textContent = targetSummary(targets, targetTrack);
+          } else {
+            drawTargets(
+              context,
+              canvas,
+              targets,
+              targetTrack,
+              "#ffbd5c",
+              true
+            );
+            analysisText.textContent = aerialObjectSummary(targets);
           }
 
           badge.classList.add("live");
