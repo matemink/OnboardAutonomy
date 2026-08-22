@@ -36,6 +36,13 @@ the first simulated camera frame, and opens the preview in the default browser.
 The launcher keeps the rendering-sensor server separate from the WSLg GUI
 client so camera processing does not depend on the GUI lifecycle.
 
+The simulated Holybro S500 carries two visible and functional Camera Module 3
+representations. The downward camera streams H.264/RTP to UDP `5601` and feeds
+AprilTag landing detection. The forward camera streams independently to UDP
+`5602`; it appears beside the landing view in the HTML preview but has no
+detector overlay until the fixed-wing detector milestone is implemented. A
+failure of either stream is reported independently in the preview.
+
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
 spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
 radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo

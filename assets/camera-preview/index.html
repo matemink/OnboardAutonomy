@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OnboardAutonomy Camera</title>
+  <title>OnboardAutonomy Vision</title>
   <style>
     :root {
       color-scheme: dark;
@@ -11,10 +11,11 @@
       --ink: #eef3ee;
       --muted: #85918e;
       --panel: #101817;
+      --panel-strong: #0a100f;
       --line: #263532;
       --live: #53e6a8;
       --target: #49d9ff;
-      --warn: #ffbd5c;
+      --forward: #ffbd5c;
     }
 
     * {
@@ -24,8 +25,6 @@
     body {
       min-height: 100vh;
       margin: 0;
-      display: grid;
-      place-items: center;
       padding: 24px;
       background:
         radial-gradient(circle at 18% 0%, #203b35 0, transparent 36%),
@@ -34,35 +33,81 @@
     }
 
     main {
-      width: min(
-        1080px,
-        100%,
-        calc((100vh - 170px) * 4 / 3)
-      );
+      width: min(1500px, 100%);
+      margin: 0 auto;
       display: grid;
-      gap: 14px;
+      gap: 18px;
     }
 
-    header,
-    footer {
+    .page-header {
       display: flex;
-      align-items: center;
+      align-items: end;
       justify-content: space-between;
-      gap: 16px;
+      gap: 20px;
+      padding-bottom: 4px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
     }
 
     h1 {
-      margin: 0;
-      font-size: clamp(18px, 3vw, 28px);
+      font-size: clamp(20px, 3vw, 30px);
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
-    .eyebrow {
-      margin: 0 0 7px;
+    h2 {
+      font-size: 14px;
+      letter-spacing: 0.12em;
+    }
+
+    .eyebrow,
+    .page-note {
       color: var(--muted);
       font-size: 11px;
-      letter-spacing: 0.16em;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+    }
+
+    .camera-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .camera-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgb(10 16 15 / 88%);
+      box-shadow: 0 24px 70px rgb(0 0 0 / 36%);
+    }
+
+    .card-header,
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+
+    .card-header {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .camera-role {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
     }
 
@@ -70,25 +115,21 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 9px 12px;
-      border: 1px solid var(--line);
-      background: rgb(10 16 15 / 82%);
       color: var(--muted);
-      font-size: 12px;
+      font-size: 10px;
       letter-spacing: 0.08em;
+      white-space: nowrap;
     }
 
     .dot {
-      width: 9px;
-      height: 9px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--muted);
-      box-shadow: 0 0 0 transparent;
     }
 
     .badge.live {
       color: var(--live);
-      border-color: color-mix(in srgb, var(--live) 45%, transparent);
     }
 
     .badge.live .dot {
@@ -99,13 +140,11 @@
     .viewer {
       position: relative;
       overflow: hidden;
-      border: 1px solid var(--line);
       background:
         linear-gradient(rgb(255 255 255 / 2%) 1px, transparent 1px),
         linear-gradient(90deg, rgb(255 255 255 / 2%) 1px, transparent 1px),
         #050808;
       background-size: 24px 24px;
-      box-shadow: 0 24px 70px rgb(0 0 0 / 42%);
     }
 
     canvas {
@@ -113,7 +152,6 @@
       width: 100%;
       aspect-ratio: 4 / 3;
       object-fit: contain;
-      image-rendering: auto;
     }
 
     .waiting {
@@ -121,9 +159,11 @@
       inset: 0;
       display: grid;
       place-items: center;
+      padding: 20px;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       letter-spacing: 0.08em;
+      line-height: 1.6;
       text-align: center;
       pointer-events: none;
     }
@@ -144,37 +184,52 @@
       );
     }
 
-    footer {
+    .card-footer {
+      min-height: 62px;
       align-items: flex-start;
+      border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 10px;
+      line-height: 1.55;
     }
 
-    #target {
+    .camera-card[data-stream="downward"] h2,
+    .camera-card[data-stream="downward"] .analysis {
       color: var(--target);
+    }
+
+    .camera-card[data-stream="forward"] h2,
+    .camera-card[data-stream="forward"] .analysis {
+      color: var(--forward);
+    }
+
+    .analysis {
+      max-width: 58%;
       text-align: right;
     }
 
-    @media (max-width: 640px) {
-      body {
-        padding: 14px;
+    @media (max-width: 900px) {
+      .camera-grid {
+        grid-template-columns: 1fr;
       }
 
-      main {
-        width: min(
-          100%,
-          calc((100vh - 215px) * 4 / 3)
-        );
-      }
-
-      header,
-      footer {
+      .page-header {
         align-items: flex-start;
         flex-direction: column;
       }
+    }
 
-      #target {
+    @media (max-width: 520px) {
+      body {
+        padding: 12px;
+      }
+
+      .card-footer {
+        flex-direction: column;
+      }
+
+      .analysis {
+        max-width: none;
         text-align: left;
       }
     }
@@ -182,60 +237,76 @@
 </head>
 <body>
   <main>
-    <header>
+    <header class="page-header">
       <div>
-        <p class="eyebrow">Raspberry Pi 5 / Camera Module 3</p>
+        <p class="eyebrow">Raspberry Pi 5 / Dual Camera Rig</p>
         <h1>OnboardAutonomy Vision</h1>
       </div>
-      <div class="badge" id="status">
-        <span class="dot"></span>
-        <span id="status-text">WAITING FOR CAMERA</span>
-      </div>
+      <p class="page-note">Independent streams / independent health</p>
     </header>
 
-    <section class="viewer">
-      <canvas id="camera" width="640" height="480"></canvas>
-      <div class="waiting" id="waiting">
-        START ONBOARD AUTONOMY WITH CAMERA PREVIEW
-      </div>
-      <div class="scanline"></div>
-    </section>
+    <section class="camera-grid">
+      <article class="camera-card" data-stream="forward">
+        <header class="card-header">
+          <div>
+            <h2>Front Camera</h2>
+            <p class="camera-role">Forward search view / UDP 5602</p>
+          </div>
+          <div class="badge">
+            <span class="dot"></span>
+            <span class="status-text">WAITING</span>
+          </div>
+        </header>
+        <div class="viewer">
+          <canvas width="640" height="480"></canvas>
+          <div class="waiting">WAITING FOR FORWARD CAMERA</div>
+          <div class="scanline"></div>
+        </div>
+        <footer class="card-footer">
+          <div class="frame">NO FRAME</div>
+          <div class="analysis">DETECTOR NOT LOADED</div>
+        </footer>
+      </article>
 
-    <footer>
-      <div id="frame">NO FRAME</div>
-      <div id="target">APRILTAG NOT VISIBLE</div>
-    </footer>
+      <article class="camera-card" data-stream="downward">
+        <header class="card-header">
+          <div>
+            <h2>Down Camera</h2>
+            <p class="camera-role">Precision landing view / UDP 5601</p>
+          </div>
+          <div class="badge">
+            <span class="dot"></span>
+            <span class="status-text">WAITING</span>
+          </div>
+        </header>
+        <div class="viewer">
+          <canvas width="640" height="480"></canvas>
+          <div class="waiting">WAITING FOR DOWNWARD CAMERA</div>
+          <div class="scanline"></div>
+        </div>
+        <footer class="card-footer">
+          <div class="frame">NO FRAME</div>
+          <div class="analysis">APRILTAG NOT VISIBLE</div>
+        </footer>
+      </article>
+    </section>
   </main>
 
   <script>
-    const canvas = document.querySelector("#camera");
-    const context = canvas.getContext("2d");
-    const status = document.querySelector("#status");
-    const statusText = document.querySelector("#status-text");
-    const waiting = document.querySelector("#waiting");
-    const frameText = document.querySelector("#frame");
-    const targetText = document.querySelector("#target");
+    const defaultTrack = {
+      phase: "searching",
+      target_id: null
+    };
 
-    let imageData = null;
-    let nextPollDelay = 100;
-
-    function setOffline(message) {
-      status.classList.remove("live");
-      statusText.textContent = message;
-      waiting.classList.remove("hidden");
-      nextPollDelay = 600;
-    }
-
-    function drawTargets(targets, targetTrack) {
+    function drawTargets(context, canvas, targets, targetTrack) {
       context.lineWidth = Math.max(2, canvas.width / 240);
       context.font = `${Math.max(14, canvas.width / 36)}px Lucida Console`;
 
       for (const target of targets) {
-        const corners = target.corners;
-        if (corners.length !== 4) {
+        if (target.corners.length !== 4) {
           continue;
         }
-
+        const corners = target.corners;
         context.strokeStyle = "#49d9ff";
         context.fillStyle = "#49d9ff";
         context.beginPath();
@@ -253,20 +324,14 @@
 
         const tracked = targetTrack.target_id === target.id &&
           targetTrack.phase !== "searching";
-        const trackLabel = tracked
-          ? ` / ${targetTrack.phase.toUpperCase()}`
-          : "";
-        const label = target.pose === null
-          ? `TAG ${target.id}${trackLabel}`
-          : `TAG ${target.id}${trackLabel} / ` +
-            `Z ${target.pose.forward_m.toFixed(2)} M`;
-        const labelWidth = context.measureText(label).width + 14;
+        const label = `TAG ${target.id}` +
+          (tracked ? ` / ${targetTrack.phase.toUpperCase()}` : "");
         const labelY = Math.max(22, corners[0][1] - 10);
         context.fillStyle = "rgb(5 12 12 / 82%)";
         context.fillRect(
           corners[0][0],
           labelY - 20,
-          labelWidth,
+          context.measureText(label).width + 14,
           25
         );
         context.fillStyle = "#49d9ff";
@@ -274,109 +339,116 @@
       }
     }
 
-    async function update() {
-      try {
-        const response = await fetch(
-          `/api/frame?t=${Date.now()}`,
-          { cache: "no-store" }
-        );
-        if (response.status === 204) {
-          setOffline("WAITING FOR FRAME");
-          return;
-        }
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const width = Number(response.headers.get("X-Frame-Width"));
-        const height = Number(response.headers.get("X-Frame-Height"));
-        const sequence = response.headers.get("X-Frame-Sequence");
-        const targets = JSON.parse(
-          response.headers.get("X-OnboardAutonomy-Targets") || "[]"
-        );
-        const targetTrack = JSON.parse(
-          response.headers.get("X-OnboardAutonomy-Target-Track") ||
-            '{"phase":"searching","target_id":null}'
-        );
-        const luma = new Uint8Array(await response.arrayBuffer());
-        if (luma.length !== width * height) {
-          throw new Error("Incomplete camera frame");
-        }
-
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-          imageData = null;
-        }
-        if (imageData === null) {
-          imageData = context.createImageData(width, height);
-        }
-
-        const rgba = imageData.data;
-        for (
-          let source = 0, destination = 0;
-          source < luma.length;
-          source += 1, destination += 4
-        ) {
-          const value = luma[source];
-          rgba[destination] = value;
-          rgba[destination + 1] = value;
-          rgba[destination + 2] = value;
-          rgba[destination + 3] = 255;
-        }
-        context.putImageData(imageData, 0, 0);
-        drawTargets(targets, targetTrack);
-
-        status.classList.add("live");
-        statusText.textContent = "LIVE";
-        waiting.classList.add("hidden");
-        frameText.textContent =
-          `${width}x${height} Y PLANE / FRAME ${sequence}`;
-        if (targetTrack.phase !== "searching" &&
-            targetTrack.target_id !== null) {
-          const phase = targetTrack.phase === "acquiring"
-            ? `ACQUIRING ${targetTrack.consecutive_observations}/` +
-              `${targetTrack.required_observations}`
-            : "TRACKING";
-          const age = targetTrack.observation_age_ms === null
-            ? ""
-            : ` / AGE ${targetTrack.observation_age_ms.toFixed(0)} MS`;
-          const position = targetTrack.position === null
-            ? ""
-            : ` / RIGHT ${targetTrack.position.right_m.toFixed(2)} M` +
-              ` / DOWN ${targetTrack.position.down_m.toFixed(2)} M` +
-              ` / FORWARD ${targetTrack.position.forward_m.toFixed(2)} M`;
-          targetText.textContent =
-            `TAG ${targetTrack.target_id} / ${phase}${position}${age}`;
-        } else {
-          targetText.textContent = targets.length === 0
-            ? "APRILTAG NOT VISIBLE"
-            : targets
-              .map((target) => {
-                const quality =
-                  `TAG ${target.id} / MARGIN ` +
-                  target.decision_margin.toFixed(1);
-                if (target.pose === null) {
-                  return `${quality} / POSE DISABLED`;
-                }
-                return `${quality} / RIGHT ` +
-                  `${target.pose.right_m.toFixed(2)} M / DOWN ` +
-                  `${target.pose.down_m.toFixed(2)} M / FORWARD ` +
-                  `${target.pose.forward_m.toFixed(2)} M`;
-              })
-              .join("   ");
-        }
-        nextPollDelay = 100;
-      } catch (error) {
-        setOffline("PREVIEW OFFLINE");
-        frameText.textContent = error.message.toUpperCase();
-        targetText.textContent = "APRILTAG NOT VISIBLE";
-      } finally {
-        window.setTimeout(update, nextPollDelay);
+    function targetSummary(targets, track) {
+      if (track.phase !== "searching" && track.target_id !== null) {
+        const phase = track.phase === "acquiring"
+          ? `ACQUIRING ${track.consecutive_observations}/` +
+            `${track.required_observations}`
+          : "TRACKING";
+        return `TAG ${track.target_id} / ${phase}`;
       }
+      if (targets.length === 0) {
+        return "APRILTAG NOT VISIBLE";
+      }
+      return targets
+        .map((target) => `TAG ${target.id} / MARGIN ` +
+          target.decision_margin.toFixed(1))
+        .join("   ");
     }
 
-    update();
+    function createStream(card) {
+      const stream = card.dataset.stream;
+      const canvas = card.querySelector("canvas");
+      const context = canvas.getContext("2d");
+      const badge = card.querySelector(".badge");
+      const statusText = card.querySelector(".status-text");
+      const waiting = card.querySelector(".waiting");
+      const frameText = card.querySelector(".frame");
+      const analysisText = card.querySelector(".analysis");
+      let imageData = null;
+      let nextPollDelay = 100;
+
+      function setOffline(message) {
+        badge.classList.remove("live");
+        statusText.textContent = message;
+        waiting.classList.remove("hidden");
+        nextPollDelay = 600;
+      }
+
+      async function update() {
+        try {
+          const response = await fetch(
+            `/api/frame/${stream}?t=${Date.now()}`,
+            { cache: "no-store" }
+          );
+          if (response.status === 204) {
+            setOffline("WAITING FOR FRAME");
+            return;
+          }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const width = Number(response.headers.get("X-Frame-Width"));
+          const height = Number(response.headers.get("X-Frame-Height"));
+          const sequence = response.headers.get("X-Frame-Sequence");
+          const targets = JSON.parse(
+            response.headers.get("X-OnboardAutonomy-Targets") || "[]"
+          );
+          const targetTrack = JSON.parse(
+            response.headers.get("X-OnboardAutonomy-Target-Track") ||
+              JSON.stringify(defaultTrack)
+          );
+          const luma = new Uint8Array(await response.arrayBuffer());
+          if (luma.length !== width * height) {
+            throw new Error("Incomplete camera frame");
+          }
+
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+            imageData = null;
+          }
+          if (imageData === null) {
+            imageData = context.createImageData(width, height);
+          }
+
+          const rgba = imageData.data;
+          for (
+            let source = 0, destination = 0;
+            source < luma.length;
+            source += 1, destination += 4
+          ) {
+            const value = luma[source];
+            rgba[destination] = value;
+            rgba[destination + 1] = value;
+            rgba[destination + 2] = value;
+            rgba[destination + 3] = 255;
+          }
+          context.putImageData(imageData, 0, 0);
+          if (stream === "downward") {
+            drawTargets(context, canvas, targets, targetTrack);
+            analysisText.textContent = targetSummary(targets, targetTrack);
+          }
+
+          badge.classList.add("live");
+          statusText.textContent = "LIVE";
+          waiting.classList.add("hidden");
+          frameText.textContent =
+            `${width}x${height} Y PLANE / FRAME ${sequence}`;
+          nextPollDelay = 100;
+        } catch (error) {
+          setOffline("OFFLINE");
+          frameText.textContent = error.message.toUpperCase();
+        } finally {
+          window.setTimeout(update, nextPollDelay);
+        }
+      }
+
+      update();
+    }
+
+    document.querySelectorAll(".camera-card").forEach(createStream);
   </script>
 </body>
 </html>

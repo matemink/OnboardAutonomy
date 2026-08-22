@@ -2,11 +2,13 @@
 
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
 #include "onboard_autonomy/mission/CompanionApplication.hpp"
+#include "onboard_autonomy/mission/cv/CameraSource.hpp"
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
 #include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
 
 #include <chrono>
 #include <csignal>
+#include <span>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -33,10 +35,12 @@ bool terminal_phase(const mission::AutonomyRuntimePhase phase) {
 
 CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
     mission::CompanionApplication& application,
+    mission::ports::CameraSource* forward_preview_camera,
     RuntimeCommandSource* command_source,
     std::vector<bootstrap::RuntimeSnapshotSink*> snapshot_sinks,
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks)
     : options_(options), application_(application),
+      forward_preview_camera_(forward_preview_camera),
       command_source_(command_source),
       snapshot_sinks_(std::move(snapshot_sinks)),
       preview_sinks_(std::move(preview_sinks)),
@@ -59,7 +63,7 @@ int CompanionRunner::run() {
         }
 
         application_.poll();
-        publish_camera_frame();
+        publish_camera_frames();
         const auto now = std::chrono::steady_clock::now();
         if (now < next_snapshot_) {
             std::this_thread::sleep_for(kEventLoopSleep);
@@ -92,16 +96,42 @@ void CompanionRunner::handle_runtime_commands() {
     }
 }
 
-void CompanionRunner::publish_camera_frame() {
+void CompanionRunner::publish_camera_frames() {
+    publish_downward_camera_frame();
+    publish_forward_camera_frame();
+}
+
+void CompanionRunner::publish_downward_camera_frame() {
     auto processed = application_.take_latest_processed_camera_frame();
     if (!processed.has_value()) {
         return;
     }
     for (auto* sink : preview_sinks_) {
         if (sink != nullptr) {
-            sink->publish(processed->frame,
+            sink->publish(diagnostics::preview::CameraPreviewStream::downward,
+                processed->frame,
                 processed->targets,
                 processed->target_track);
+        }
+    }
+}
+
+void CompanionRunner::publish_forward_camera_frame() {
+    if (forward_preview_camera_ == nullptr) {
+        return;
+    }
+    auto frame = forward_preview_camera_->take_latest_frame();
+    if (!frame.has_value()) {
+        return;
+    }
+
+    const mission::TargetTrackSnapshot no_target_track;
+    for (auto* sink : preview_sinks_) {
+        if (sink != nullptr) {
+            sink->publish(diagnostics::preview::CameraPreviewStream::forward,
+                *frame,
+                std::span<const mission::TargetObservation>{},
+                no_target_track);
         }
     }
 }

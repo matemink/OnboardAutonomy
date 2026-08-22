@@ -30,6 +30,7 @@ struct LaunchArgumentsDraft {
     std::string board_types_file;
     std::string diagnostic_log_file;
     std::optional<mission::SimulatedWindProfile> simulated_wind;
+    std::optional<std::uint16_t> forward_camera_udp_port;
     TransportBackend transport{TransportBackend::udp};
     std::uint32_t baud_rate{defaults::kSerialBaudRate};
     std::uint32_t snapshot_interval_ms{defaults::kSnapshotIntervalMs};
@@ -115,6 +116,7 @@ void validate_camera(const LaunchArgumentsDraft& options,
         explicit_options.camera_source || explicit_options.camera_udp_port ||
         explicit_options.camera_width || explicit_options.camera_height ||
         explicit_options.camera_fps || explicit_options.camera_preview_port ||
+        options.forward_camera_udp_port.has_value() ||
         options.apriltag_enabled || options.camera_preview_enabled ||
         !options.camera_calibration_file.empty() ||
         !options.camera_extrinsics_file.empty() ||
@@ -156,6 +158,21 @@ void validate_camera(const LaunchArgumentsDraft& options,
     }
     if (options.camera_preview_enabled && options.camera_preview_port == 0) {
         throw std::invalid_argument("--camera-preview-port must be positive");
+    }
+    if (options.forward_camera_udp_port.has_value()) {
+        if (!options.camera_preview_enabled) {
+            throw std::invalid_argument(
+                "--forward-camera-udp-port requires --camera-preview");
+        }
+        if (*options.forward_camera_udp_port == 0U) {
+            throw std::invalid_argument(
+                "--forward-camera-udp-port must be positive");
+        }
+        if (options.camera_backend == CameraBackend::gstreamer &&
+            *options.forward_camera_udp_port == options.camera_udp_port) {
+            throw std::invalid_argument(
+                "forward and downward camera UDP ports must differ");
+        }
     }
 }
 
@@ -300,6 +317,7 @@ CommandLineOptions make_command_line_options(
                                     .port = draft.camera_preview_port,
                                 }}
                               : std::nullopt,
+        .forward_camera_udp_port = draft.forward_camera_udp_port,
         .log_file = draft.diagnostic_log_file,
     };
 
@@ -429,6 +447,9 @@ class ArgumentParser {
             draft_.camera_preview_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
             explicit_.camera_preview_port = true;
+        } else if (argument == "--forward-camera-udp-port") {
+            draft_.forward_camera_udp_port =
+                parse_number<std::uint16_t>(value_after(argument), argument);
         } else {
             return false;
         }

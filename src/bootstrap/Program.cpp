@@ -3,6 +3,7 @@
 #include "onboard_autonomy/operator/ui/screen/BoardTypeCatalog.hpp"
 #include "onboard_autonomy/diagnostics/preview/HttpCameraPreviewServer.hpp"
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
+#include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
@@ -71,6 +72,16 @@ const operator_interface::cli::DiagnosticsOptions& diagnostics_options(
         [](const auto& launch)
             -> const operator_interface::cli::DiagnosticsOptions& {
             return launch.diagnostics;
+        },
+        options);
+}
+
+const std::optional<operator_interface::cli::CameraOptions>& camera_options(
+    const operator_interface::cli::CommandLineOptions& options) {
+    return std::visit(
+        [](const auto& launch)
+            -> const std::optional<operator_interface::cli::CameraOptions>& {
+            return launch.camera;
         },
         options);
 }
@@ -238,6 +249,25 @@ std::unique_ptr<CameraPreviewSink> make_camera_preview(
     });
 }
 
+std::unique_ptr<mission::ports::CameraSource> make_forward_preview_camera(
+    const operator_interface::cli::CommandLineOptions& options) {
+    const auto& diagnostics = diagnostics_options(options);
+    if (!diagnostics.forward_camera_udp_port.has_value()) {
+        return nullptr;
+    }
+
+    const auto& camera = camera_options(options);
+    if (!camera.has_value()) {
+        throw std::logic_error(
+            "forward camera preview requires primary camera dimensions");
+    }
+    return hardware::camera::make_gstreamer_camera_source({
+        .width = camera->frame_width,
+        .height = camera->frame_height,
+        .udp_port = *diagnostics.forward_camera_udp_port,
+    });
+}
+
 std::uint32_t snapshot_interval_ms(
     const operator_interface::cli::OperatorInterfaceOptions& options) {
     return options.json_output ? options.snapshot_interval_ms
@@ -329,6 +359,7 @@ int run_program(const int argc, char** argv) {
         mission.transport(),
         board_types.get());
     auto camera_preview = make_camera_preview(diagnostics, executable);
+    auto forward_preview_camera = make_forward_preview_camera(options);
     ConsoleCommandSource operator_commands{operator_interface.interactive};
 
     std::cerr << "OnboardAutonomy listening on "
@@ -344,6 +375,7 @@ int run_program(const int argc, char** argv) {
             .snapshot_interval_ms = snapshot_interval_ms(operator_interface),
         },
         mission.application(),
+        forward_preview_camera.get(),
         operator_interface.interactive ? &operator_commands : nullptr,
         sink_pointers(snapshot_sinks),
         preview_sinks(camera_preview.get()),

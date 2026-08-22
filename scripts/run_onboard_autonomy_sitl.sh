@@ -55,6 +55,12 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
         --camera-preview-port
         "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
     )
+    if [[ -n "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-}" ]]; then
+        arguments+=(
+            --forward-camera-udp-port
+            "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT}"
+        )
+    fi
 fi
 
 if [[ "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" ]]; then

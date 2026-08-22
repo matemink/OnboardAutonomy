@@ -9,11 +9,17 @@
 
 namespace onboard_autonomy::diagnostics::preview {
 
+enum class CameraPreviewStream {
+    downward,
+    forward,
+};
+
 class CameraPreviewSink {
   public:
     virtual ~CameraPreviewSink() = default;
 
-    virtual void publish(const mission::ports::CameraFrame& frame,
+    virtual void publish(CameraPreviewStream stream,
+        const mission::ports::CameraFrame& frame,
         std::span<const mission::TargetObservation> targets,
         const mission::TargetTrackSnapshot& target_track) = 0;
 

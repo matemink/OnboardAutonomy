@@ -3,6 +3,7 @@
 #include <httplib.h>
 
 #include <atomic>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -29,15 +30,38 @@ constexpr auto kMicrosecondsPerSecond =
         std::chrono::seconds{1})
         .count();
 constexpr int kHttpNoContent = 204;
+constexpr std::size_t kPreviewStreamCount = 2;
+constexpr auto kMaximumFrameAge = std::chrono::seconds{2};
 
 struct PreviewFrame {
     std::uint64_t sequence{0};
     std::uint32_t width{0};
     std::uint32_t height{0};
+    std::chrono::steady_clock::time_point published_at{};
     std::vector<std::uint8_t> luma;
     std::vector<mission::TargetObservation> targets;
     mission::TargetTrackSnapshot target_track;
 };
+
+std::size_t stream_index(const CameraPreviewStream stream) {
+    switch (stream) {
+    case CameraPreviewStream::downward:
+        return 0U;
+    case CameraPreviewStream::forward:
+        return 1U;
+    }
+    throw std::invalid_argument("unknown camera preview stream");
+}
+
+std::string_view stream_name(const CameraPreviewStream stream) {
+    switch (stream) {
+    case CameraPreviewStream::downward:
+        return "downward";
+    case CameraPreviewStream::forward:
+        return "forward";
+    }
+    return "unknown";
+}
 
 std::chrono::microseconds checked_frame_interval(
     const std::uint32_t maximum_frames_per_second) {
@@ -165,37 +189,11 @@ class HttpCameraPreviewServer final
                 response.set_header("Cache-Control", "no-store");
                 response.set_content(page_, "text/html; charset=utf-8");
             });
-        server_.Get("/api/frame",
-            [this](const httplib::Request&, httplib::Response& response) {
-                PreviewFrame frame;
-                {
-                    std::scoped_lock lock(frame_mutex_);
-                    if (!latest_frame_.has_value()) {
-                        response.status = kHttpNoContent;
-                        response.set_header("Cache-Control", "no-store");
-                        return;
-                    }
-                    frame = *latest_frame_;
-                }
-
-                response.set_header("Cache-Control", "no-store");
-                response.set_header("X-Frame-Width",
-                    std::to_string(frame.width));
-                response.set_header("X-Frame-Height",
-                    std::to_string(frame.height));
-                response.set_header("X-Frame-Sequence",
-                    std::to_string(frame.sequence));
-                response.set_header("X-OnboardAutonomy-Targets",
-                    targets_json(frame.targets));
-                response.set_header("X-OnboardAutonomy-Target-Track",
-                    target_track_json(frame.target_track));
-                response.set_content(
-                    std::string{
-                        reinterpret_cast<const char*>(frame.luma.data()),
-                        frame.luma.size(),
-                    },
-                    "application/octet-stream");
-            });
+        register_frame_route("/api/frame", CameraPreviewStream::downward);
+        register_frame_route("/api/frame/downward",
+            CameraPreviewStream::downward);
+        register_frame_route("/api/frame/forward",
+            CameraPreviewStream::forward);
 
         worker_ = std::jthread([this] {
             const bool listened = server_.listen(config_.bind_address,
@@ -214,13 +212,16 @@ class HttpCameraPreviewServer final
     HttpCameraPreviewServer(const HttpCameraPreviewServer&) = delete;
     HttpCameraPreviewServer& operator=(const HttpCameraPreviewServer&) = delete;
 
-    void publish(const mission::ports::CameraFrame& frame,
+    void publish(const CameraPreviewStream stream,
+        const mission::ports::CameraFrame& frame,
         const std::span<const mission::TargetObservation> targets,
         const mission::TargetTrackSnapshot& target_track) override {
         const auto now = std::chrono::steady_clock::now();
         std::scoped_lock lock(frame_mutex_);
-        if (last_published_at_.has_value() &&
-            now - *last_published_at_ < minimum_frame_interval_) {
+        const auto index = stream_index(stream);
+        const auto last_published_at =
+            last_published_at_[index].value_or(now - minimum_frame_interval_);
+        if (now - last_published_at < minimum_frame_interval_) {
             return;
         }
 
@@ -236,15 +237,16 @@ class HttpCameraPreviewServer final
 
         const auto end =
             frame.yuv420.begin() + static_cast<std::ptrdiff_t>(luma_size);
-        latest_frame_ = PreviewFrame{
+        latest_frames_[index] = PreviewFrame{
             .sequence = frame.sequence,
             .width = frame.width,
             .height = frame.height,
+            .published_at = now,
             .luma = {frame.yuv420.begin(), end},
             .targets = {targets.begin(), targets.end()},
             .target_track = target_track,
         };
-        last_published_at_ = now;
+        last_published_at_[index] = now;
     }
 
     [[nodiscard]] std::string description() const override {
@@ -254,12 +256,61 @@ class HttpCameraPreviewServer final
     }
 
   private:
+    void register_frame_route(const std::string& path,
+        const CameraPreviewStream stream) {
+        server_.Get(path,
+            [this, stream](const httplib::Request&,
+                httplib::Response& response) {
+                serve_frame(stream, response);
+            });
+    }
+
+    void serve_frame(const CameraPreviewStream stream,
+        httplib::Response& response) {
+        PreviewFrame frame;
+        {
+            std::scoped_lock lock(frame_mutex_);
+            const auto& latest = latest_frames_[stream_index(stream)];
+            if (!latest.has_value()) {
+                response.status = kHttpNoContent;
+                response.set_header("Cache-Control", "no-store");
+                return;
+            }
+            frame = latest.value();
+            if (std::chrono::steady_clock::now() - frame.published_at >
+                kMaximumFrameAge) {
+                response.status = kHttpNoContent;
+                response.set_header("Cache-Control", "no-store");
+                return;
+            }
+        }
+
+        response.set_header("Cache-Control", "no-store");
+        response.set_header("X-Frame-Width", std::to_string(frame.width));
+        response.set_header("X-Frame-Height", std::to_string(frame.height));
+        response.set_header("X-Frame-Sequence", std::to_string(frame.sequence));
+        response.set_header("X-OnboardAutonomy-Camera",
+            std::string(stream_name(stream)));
+        response.set_header("X-OnboardAutonomy-Targets",
+            targets_json(frame.targets));
+        response.set_header("X-OnboardAutonomy-Target-Track",
+            target_track_json(frame.target_track));
+        response.set_content(
+            std::string{
+                reinterpret_cast<const char*>(frame.luma.data()),
+                frame.luma.size(),
+            },
+            "application/octet-stream");
+    }
+
     HttpCameraPreviewConfig config_;
     std::string page_;
     std::chrono::microseconds minimum_frame_interval_;
     mutable std::mutex frame_mutex_;
-    std::optional<PreviewFrame> latest_frame_;
-    std::optional<std::chrono::steady_clock::time_point> last_published_at_;
+    std::array<std::optional<PreviewFrame>, kPreviewStreamCount> latest_frames_;
+    std::array<std::optional<std::chrono::steady_clock::time_point>,
+        kPreviewStreamCount>
+        last_published_at_;
     httplib::Server server_;
     std::atomic_bool stopping_{false};
     std::atomic_bool failed_{false};

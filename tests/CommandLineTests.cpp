@@ -99,6 +99,9 @@ void camera_and_autonomy_dependencies_are_validated() {
         "640",
         "--camera-height",
         "480",
+        "--camera-preview",
+        "--forward-camera-udp-port",
+        "5602",
         "--apriltag",
         "--camera-calibration",
         "camera.json",
@@ -113,6 +116,7 @@ void camera_and_autonomy_dependencies_are_validated() {
     require(simulation != nullptr && simulation->camera.has_value() &&
                 std::holds_alternative<GStreamerCameraOptions>(
                     simulation->camera->source) &&
+                simulation->diagnostics.forward_camera_udp_port == 5602 &&
                 simulation->autonomy.enabled &&
                 simulation->autonomy.exit_when_finished,
         "valid Gazebo autonomy group must parse");
@@ -125,6 +129,15 @@ void camera_and_autonomy_dependencies_are_validated() {
         "requires --camera-extrinsics");
     require_rejected({"--camera", "--camera-preview-port", "8081"},
         "requires --camera-preview");
+    require_rejected({"--camera", "--forward-camera-udp-port", "5602"},
+        "requires --camera-preview");
+    require_rejected({"--camera",
+                         "--camera-source",
+                         "gstreamer",
+                         "--camera-preview",
+                         "--forward-camera-udp-port",
+                         "5601"},
+        "must differ");
     require_rejected({"--interactive", "--json"}, "cannot be combined");
 }
 
