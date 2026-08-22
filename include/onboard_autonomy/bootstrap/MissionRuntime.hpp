@@ -1,6 +1,7 @@
 #pragma once
 
 #include "onboard_autonomy/mission/EnvironmentProfile.hpp"
+#include "onboard_autonomy/mission/autonomy/AutonomyRuntime.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -66,6 +67,8 @@ struct MissionRuntimeConfig {
     std::optional<mission::SimulatedWindProfile> simulated_wind;
     MissionEnvironment environment{MissionEnvironment::hardware};
     bool autonomous{};
+    mission::AutonomyRuntimeMode autonomy_mode{
+        mission::AutonomyRuntimeMode::precision_landing};
     bool motion_commands_requested{};
 };
 

@@ -44,8 +44,21 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
         return {};
     }
     if (!prepare_active_runtime(startup, companion_link_failsafe, now) ||
-        !validate_runtime_context(vehicle, companion_link_failsafe) ||
-        !continue_landing_update(vehicle, now, landing_target)) {
+        !validate_runtime_context(vehicle, companion_link_failsafe)) {
+        return {};
+    }
+
+    if (config_.mode == AutonomyRuntimeMode::aerial_observation) {
+        if (!vehicle.armed) {
+            fail("Vehicle disarmed during aerial observation");
+            return {};
+        }
+        motion_safety_status_ = MotionSafetyStatus::no_intent;
+        detail_ = "Aerial observation active; holding after takeoff";
+        return {};
+    }
+
+    if (!continue_landing_update(vehicle, now, landing_target)) {
         return {};
     }
 
@@ -82,7 +95,9 @@ bool AutonomyRuntime::prepare_active_runtime(
     }
 
     phase_ = AutonomyRuntimePhase::active;
-    detail_ = "Autonomy active; waiting for vision target";
+    detail_ = config_.mode == AutonomyRuntimeMode::aerial_observation
+                  ? "Aerial observation active; holding after takeoff"
+                  : "Autonomy active; waiting for vision target";
     target_missing_since_ = now;
     next_landing_target_ = now;
     return true;
@@ -302,7 +317,9 @@ void AutonomyRuntime::restart() {
         detail_ = "Autonomy runtime disabled";
     } else {
         phase_ = AutonomyRuntimePhase::waiting_for_startup;
-        detail_ = "Waiting for verified flight startup";
+        detail_ = config_.mode == AutonomyRuntimeMode::aerial_observation
+                      ? "Preparing takeoff for aerial observation"
+                      : "Waiting for verified flight startup";
     }
     motion_safety_status_ = MotionSafetyStatus::no_intent;
     vehicle_system_id_.reset();

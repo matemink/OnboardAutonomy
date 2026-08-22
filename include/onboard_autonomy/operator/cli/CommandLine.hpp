@@ -57,8 +57,14 @@ struct CameraOptions {
     std::optional<AprilTagOptions> apriltag;
 };
 
+enum class AutonomyMode {
+    precision_landing,
+    aerial_observation,
+};
+
 struct AutonomyOptions {
     bool enabled{};
+    AutonomyMode mode{AutonomyMode::precision_landing};
     bool exit_when_finished{};
 };
 

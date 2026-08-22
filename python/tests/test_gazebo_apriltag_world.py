@@ -344,11 +344,17 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn('readonly target_name="Zephyr_Fixed_Wing_Target"', spawner)
         self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
         self.assertIn("ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET=1", launcher)
+        self.assertIn("ONBOARD_AUTONOMY_AERIAL_OBSERVATION=1", launcher)
         self.assertNotIn("spawn_gazebo_aerial_target.sh", launcher)
         self.assertIn(
             'if "%ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET%"=="1"',
             demo_launcher,
         )
+        self.assertIn(
+            'if "%ONBOARD_AUTONOMY_AERIAL_OBSERVATION%"=="1"',
+            demo_launcher,
+        )
+        self.assertIn("env %AUTONOMY_ENV%", demo_launcher)
         spawn_index = demo_launcher.index("spawn_gazebo_aerial_target.sh")
         sitl_index = demo_launcher.index("run_arducopter_gazebo_weather.sh")
         preview_index = demo_launcher.index("http://localhost:8080/api/frame")
@@ -371,6 +377,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn("Raspberry_Pi_Camera_Module_3_Wide_Forward", gazebo_runner)
         self.assertIn("ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT", gazebo_runner)
         self.assertIn("--forward-camera-udp-port", sitl_runner)
+        self.assertIn("--aerial-observation", sitl_runner)
         self.assertIn('readonly downward_camera_udp_port="5601"', gazebo_runner)
         self.assertIn('readonly forward_camera_udp_port="5602"', gazebo_runner)
         self.assertNotIn(

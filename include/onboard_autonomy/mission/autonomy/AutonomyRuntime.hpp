@@ -24,6 +24,11 @@ enum class AutonomyRuntimePhase {
     failed,
 };
 
+enum class AutonomyRuntimeMode {
+    precision_landing,
+    aerial_observation,
+};
+
 struct AutonomyRuntimeConfig {
     static constexpr auto kDefaultTargetLossLandAfter = std::chrono::seconds{5};
     static constexpr double kDefaultTerminalDescentAltitudeM = 1.5;
@@ -32,6 +37,7 @@ struct AutonomyRuntimeConfig {
         std::chrono::milliseconds{500};
 
     bool enabled{false};
+    AutonomyRuntimeMode mode{AutonomyRuntimeMode::precision_landing};
     std::chrono::milliseconds target_loss_land_after{
         kDefaultTargetLossLandAfter};
     double terminal_descent_altitude_m{kDefaultTerminalDescentAltitudeM};

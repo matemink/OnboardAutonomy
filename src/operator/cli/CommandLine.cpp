@@ -48,6 +48,7 @@ struct LaunchArgumentsDraft {
     bool json_output{};
     bool sitl_mode{};
     bool autonomous{};
+    bool aerial_observation{};
     bool exit_after_autonomy{};
     bool interactive{};
 };
@@ -64,6 +65,8 @@ struct ExplicitOptions {
     bool camera_fps{false};
     bool camera_preview_port{false};
     bool diagnostic_log_file{false};
+    bool precision_landing{false};
+    bool aerial_observation{false};
 };
 
 template <typename T>
@@ -208,7 +211,7 @@ void validate_vision(const LaunchArgumentsDraft& options) {
         throw std::invalid_argument(
             "--camera-extrinsics requires calibrated AprilTag pose");
     }
-    if (options.autonomous && !has_extrinsics) {
+    if (options.autonomous && !options.aerial_observation && !has_extrinsics) {
         throw std::invalid_argument(
             "--autonomous requires --camera-extrinsics");
     }
@@ -222,6 +225,23 @@ void validate_options(const LaunchArgumentsDraft& options,
     if (options.exit_after_autonomy && !options.autonomous) {
         throw std::invalid_argument(
             "--exit-after-autonomy requires --autonomous");
+    }
+    if (explicit_options.precision_landing &&
+        explicit_options.aerial_observation) {
+        throw std::invalid_argument(
+            "--autonomous and --aerial-observation are mutually exclusive");
+    }
+    if (options.aerial_observation && !options.sitl_mode) {
+        throw std::invalid_argument("--aerial-observation requires --sitl");
+    }
+    if (options.aerial_observation &&
+        !options.forward_camera_udp_port.has_value()) {
+        throw std::invalid_argument(
+            "--aerial-observation requires --forward-camera-udp-port");
+    }
+    if (options.aerial_observation && options.exit_after_autonomy) {
+        throw std::invalid_argument(
+            "--exit-after-autonomy is unavailable for aerial observation");
     }
     if (options.interactive && options.json_output) {
         throw std::invalid_argument(
@@ -310,6 +330,8 @@ CommandLineOptions make_command_line_options(
     auto camera = make_camera_options(draft);
     const AutonomyOptions autonomy{
         .enabled = draft.autonomous,
+        .mode = draft.aerial_observation ? AutonomyMode::aerial_observation
+                                         : AutonomyMode::precision_landing,
         .exit_when_finished = draft.exit_after_autonomy,
     };
     const OperatorInterfaceOptions operator_interface{
@@ -499,6 +521,11 @@ class ArgumentParser {
             };
         } else if (argument == "--autonomous") {
             draft_.autonomous = true;
+            explicit_.precision_landing = true;
+        } else if (argument == "--aerial-observation") {
+            draft_.autonomous = true;
+            draft_.aerial_observation = true;
+            explicit_.aerial_observation = true;
         } else if (argument == "--exit-after-autonomy") {
             draft_.exit_after_autonomy = true;
         } else if (argument == "--interactive") {
