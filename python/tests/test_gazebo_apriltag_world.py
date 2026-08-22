@@ -260,17 +260,17 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIsNotNone(plugin)
         self.assertEqual(
             plugin.attrib["filename"],
-            "gz-sim-trajectory-follower-system",
+            "gz-sim-velocity-control-system",
         )
-        self.assertEqual(plugin.findtext("loop"), "true")
-        waypoints = [
-            tuple(float(value) for value in waypoint.text.split())
-            for waypoint in plugin.findall("waypoints/waypoint")
+        linear = [
+            float(value) for value in plugin.findtext("initial_linear").split()
         ]
-        self.assertEqual(
-            waypoints,
-            [(-12.0, -8.0), (12.0, -8.0), (12.0, 8.0), (-12.0, 8.0)],
-        )
+        angular = [
+            float(value) for value in plugin.findtext("initial_angular").split()
+        ]
+        self.assertEqual(linear, [2.0, 0.0, 0.0])
+        self.assertEqual(angular[:2], [0.0, 0.0])
+        self.assertAlmostEqual(linear[0] / angular[2], 12.0)
 
     def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
         world = element_tree.parse(WORLD).getroot()

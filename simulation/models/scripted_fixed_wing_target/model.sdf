@@ -1,15 +1,11 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
   <model name="scripted_fixed_wing_target">
-    <pose>-12 -8 8 0 0 0</pose>
+    <pose>0 -12 8 0 0 0</pose>
     <enable_wind>false</enable_wind>
 
     <link name="airframe">
       <gravity>false</gravity>
-      <velocity_decay>
-        <linear>0.7</linear>
-        <angular>0.8</angular>
-      </velocity_decay>
       <inertial>
         <mass>2.5</mass>
         <inertia>
@@ -98,21 +94,10 @@
       </visual>
     </link>
 
-    <plugin filename="gz-sim-trajectory-follower-system"
-      name="gz::sim::systems::TrajectoryFollower">
-      <link_name>airframe</link_name>
-      <loop>true</loop>
-      <range_tolerance>0.8</range_tolerance>
-      <bearing_tolerance>4</bearing_tolerance>
-      <zero_vel_on_bearing_reached>true</zero_vel_on_bearing_reached>
-      <force>14</force>
-      <torque>8</torque>
-      <waypoints>
-        <waypoint>-12 -8</waypoint>
-        <waypoint>12 -8</waypoint>
-        <waypoint>12 8</waypoint>
-        <waypoint>-12 8</waypoint>
-      </waypoints>
+    <plugin filename="gz-sim-velocity-control-system"
+      name="gz::sim::systems::VelocityControl">
+      <initial_linear>2 0 0</initial_linear>
+      <initial_angular>0 0 0.1666666666666667</initial_angular>
     </plugin>
   </model>
 </sdf>

@@ -38,7 +38,7 @@ client so camera processing does not depend on the GUI lifecycle.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
 spawns `Generic_Fixed_Wing_Target` at 8 m. The project-owned target follows a
-deterministic rectangular loop through Gazebo Harmonic's `TrajectoryFollower`.
+deterministic 12 m radius loop through Gazebo Harmonic's `VelocityControl`.
 It is only a visible Phase 1 stimulus: OnboardAutonomy does not receive its pose,
 detect it, or command the vehicle toward it yet.
 

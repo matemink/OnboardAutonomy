@@ -47,4 +47,4 @@ fi
 
 printf 'Gazebo aerial target spawned: %s\n' "${target_name}"
 printf '  Altitude: 8 m\n'
-printf '  Route: (-12,-8) -> (12,-8) -> (12,8) -> (-12,8)\n'
+printf '  Route: 12 m radius circle at 2 m/s\n'
