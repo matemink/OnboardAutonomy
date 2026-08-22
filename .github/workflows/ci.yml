@@ -64,23 +64,18 @@ jobs:
           retention-days: 14
 
   arm64-build:
-    name: "ARM64 Cross-Build"
-    runs-on: ubuntu-24.04
+    name: "ARM64 Native Build"
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
-      - name: Install cross compiler
-        run: >-
-          sudo apt-get update &&
-          sudo apt-get install -y
-          g++-aarch64-linux-gnu
-          g++-12-aarch64-linux-gnu
-          ninja-build
+      - name: Install ARM64 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev ninja-build
       - name: Configure ARM64
         run: >-
           cmake -S . -B build-arm64 -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/aarch64-linux-gnu.cmake
-          -DONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=OFF
           -DBUILD_TESTING=OFF
       - name: Build ARM64
         run: cmake --build build-arm64

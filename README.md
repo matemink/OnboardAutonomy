@@ -57,7 +57,7 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
   aerial-object detection.
 - Automatic serial and camera recovery after disconnects or process stalls.
 - Motion is SITL-gated; physical endpoints remain observation-only. CI covers
-  C++ tests, Python integration and fault injection, plus an ARM64 cross-build.
+  C++ tests, Python integration and fault injection, plus a native ARM64 build.
 
 ## Built and tested with
 
