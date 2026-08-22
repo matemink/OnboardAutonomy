@@ -263,6 +263,13 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         mesh_uri = model.findtext("link/visual/geometry/mesh/uri")
         self.assertEqual(mesh_uri, "meshes/wing.dae")
         self.assertTrue((TARGET_MODEL_DIR / mesh_uri).is_file())
+
+        visual_pose = [
+            float(value) for value in model.findtext("link/visual/pose").split()
+        ]
+        self.assertEqual(visual_pose[:5], [0.0, 0.0, 0.0, 0.0, 0.0])
+        self.assertAlmostEqual(visual_pose[5], math.pi / 2.0)
+
         self.assertTrue(
             (TARGET_MODEL_DIR / "materials" / "textures" / "wing.png").is_file()
         )

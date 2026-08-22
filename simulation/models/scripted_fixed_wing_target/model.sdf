@@ -27,8 +27,8 @@
       </collision>
 
       <visual name="zephyr_airframe">
-        <!-- The source mesh points along -Y; rotate it into Gazebo's +X flight direction. -->
-        <pose>0 0 0 -0.633 0 1.5707963267948966</pose>
+        <!-- The source mesh points along -Y; yaw maps it to level +X flight. -->
+        <pose>0 0 0 0 0 1.5707963267948966</pose>
         <geometry>
           <mesh>
             <uri>meshes/wing.dae</uri>
