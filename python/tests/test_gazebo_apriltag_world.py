@@ -73,6 +73,19 @@ WIND_INDICATOR_QML = (
     PROJECT_ROOT / "simulation" / "gui" / "WindIndicator.qml"
 )
 GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
+TARGET_MODEL = (
+    PROJECT_ROOT
+    / "simulation"
+    / "models"
+    / "scripted_fixed_wing_target"
+    / "model.sdf"
+)
+TARGET_SPAWNER = (
+    PROJECT_ROOT / "scripts" / "spawn_gazebo_aerial_target.sh"
+)
+TARGET_LAUNCHER = (
+    PROJECT_ROOT / "StartOnboardAutonomyAerialTracking.cmd"
+)
 
 
 class GazeboAprilTagWorldTests(unittest.TestCase):
@@ -233,6 +246,47 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             "simulation/worlds/apriltag_showcase.sdf",
             showcase_launcher,
         )
+
+    def test_scripted_aerial_target_has_a_deterministic_route(self) -> None:
+        model = element_tree.parse(TARGET_MODEL).getroot().find("model")
+        self.assertIsNotNone(model)
+        self.assertEqual(model.attrib["name"], "scripted_fixed_wing_target")
+
+        pose = [float(value) for value in model.findtext("pose").split()]
+        self.assertEqual(pose[2], 8.0)
+        self.assertEqual(model.findtext("link/gravity"), "false")
+
+        plugin = model.find("plugin")
+        self.assertIsNotNone(plugin)
+        self.assertEqual(
+            plugin.attrib["filename"],
+            "gz-sim-trajectory-follower-system",
+        )
+        self.assertEqual(plugin.findtext("loop"), "true")
+        waypoints = [
+            tuple(float(value) for value in waypoint.text.split())
+            for waypoint in plugin.findall("waypoints/waypoint")
+        ]
+        self.assertEqual(
+            waypoints,
+            [(-12.0, -8.0), (12.0, -8.0), (12.0, 8.0), (-12.0, 8.0)],
+        )
+
+    def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
+        world = element_tree.parse(WORLD).getroot()
+        base_uris = {
+            include.findtext("uri")
+            for include in world.findall(".//world/include")
+        }
+        self.assertNotIn("model://scripted_fixed_wing_target", base_uris)
+
+        spawner = TARGET_SPAWNER.read_text(encoding="utf-8")
+        launcher = TARGET_LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn("/world/${world_name}/create", spawner)
+        self.assertIn("gz.msgs.EntityFactory", spawner)
+        self.assertIn('readonly target_name="Generic_Fixed_Wing_Target"', spawner)
+        self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
+        self.assertIn("spawn_gazebo_aerial_target.sh", launcher)
 
     def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
         demo_launcher = (
