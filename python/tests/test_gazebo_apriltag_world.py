@@ -282,11 +282,24 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
 
         spawner = TARGET_SPAWNER.read_text(encoding="utf-8")
         launcher = TARGET_LAUNCHER.read_text(encoding="utf-8")
+        demo_launcher = (
+            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+        ).read_text(encoding="utf-8")
         self.assertIn("/world/${world_name}/create", spawner)
         self.assertIn("gz.msgs.EntityFactory", spawner)
         self.assertIn('readonly target_name="Generic_Fixed_Wing_Target"', spawner)
         self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
-        self.assertIn("spawn_gazebo_aerial_target.sh", launcher)
+        self.assertIn("ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET=1", launcher)
+        self.assertNotIn("spawn_gazebo_aerial_target.sh", launcher)
+        self.assertIn(
+            'if "%ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET%"=="1"',
+            demo_launcher,
+        )
+        spawn_index = demo_launcher.index("spawn_gazebo_aerial_target.sh")
+        sitl_index = demo_launcher.index("run_arducopter_gazebo_weather.sh")
+        preview_index = demo_launcher.index("http://localhost:8080/api/frame")
+        self.assertLess(spawn_index, sitl_index)
+        self.assertLess(spawn_index, preview_index)
 
     def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
         demo_launcher = (

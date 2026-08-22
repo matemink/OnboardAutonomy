@@ -23,6 +23,15 @@ timeout /t 1 /nobreak >nul
 start "Gazebo Simulation Server" /min wsl.exe -d Ubuntu-24.04 --cd "%~dp0" -- env ONBOARD_AUTONOMY_GAZEBO_HEADLESS=1 ONBOARD_AUTONOMY_WEATHER_PROFILE="%WEATHER_PROFILE%" ONBOARD_AUTONOMY_GAZEBO_WORLD="%GAZEBO_WORLD%" bash scripts/run_gazebo_apriltag_weather.sh
 timeout /t 3 /nobreak >nul
 start "Gazebo AprilTag World" wsl.exe -d Ubuntu-24.04 --cd "%~dp0" -- env ONBOARD_AUTONOMY_GAZEBO_WEATHER=1 ONBOARD_AUTONOMY_WEATHER_PROFILE="%WEATHER_PROFILE%" bash scripts/run_gazebo_gui.sh
+if "%ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET%"=="1" (
+    echo Adding the scripted fixed-wing target...
+    wsl.exe -d Ubuntu-24.04 --cd "%~dp0" -- bash scripts/spawn_gazebo_aerial_target.sh
+    if errorlevel 1 (
+        echo Could not add the scripted aerial target.
+        pause
+        exit /b 1
+    )
+)
 timeout /t 4 /nobreak >nul
 start "ArduCopter Gazebo SITL" wsl.exe -d Ubuntu-24.04 --cd "%~dp0" -- env ONBOARD_AUTONOMY_WEATHER_PROFILE="%WEATHER_PROFILE%" bash scripts/run_arducopter_gazebo_weather.sh
 timeout /t 4 /nobreak >nul
