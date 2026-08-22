@@ -229,11 +229,11 @@ weighted campaigns should run 80-90% of missions in that profile.
 
 ### Phase 1: Visible moving target
 
-- [ ] Add a lightweight generic fixed-wing model to the existing Gazebo world.
-- [ ] Give it a deterministic scripted route and a one-command launcher.
+- [x] Add a lightweight generic fixed-wing model to the existing Gazebo world.
+- [x] Give it a deterministic scripted route and a one-command launcher.
 - [ ] Keep target ground truth available only to the acceptance evaluator,
   never to the mission runtime.
-- [ ] Verify that the current vehicle, camera, and landing regression remain
+- [x] Verify that the current vehicle, camera, and landing regression remain
   unchanged before adding perception.
 
 ### Phase 2: Forward-camera foundation
