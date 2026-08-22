@@ -15,6 +15,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core Qml Quick QuickControls2)
 find_package(gz-gui8 REQUIRED)
 
 qt5_add_resources(wind_indicator_resources wind_indicator.qrc)
+qt5_add_resources(fps_indicator_resources fps_indicator.qrc)
 
 add_library(
     WindIndicator
@@ -36,6 +37,34 @@ target_link_libraries(
 
 target_compile_options(
     WindIndicator
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wconversion
+        -Wsign-conversion
+)
+
+add_library(
+    FpsIndicator
+    SHARED
+    FpsIndicator.cc
+    FpsIndicator.hh
+    ${fps_indicator_resources}
+)
+
+target_link_libraries(
+    FpsIndicator
+    PRIVATE
+        gz-gui8::gz-gui8
+        Qt5::Core
+        Qt5::Qml
+        Qt5::Quick
+        Qt5::QuickControls2
+)
+
+target_compile_options(
+    FpsIndicator
     PRIVATE
         -Wall
         -Wextra
