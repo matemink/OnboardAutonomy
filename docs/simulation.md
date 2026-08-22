@@ -39,16 +39,32 @@ client so camera processing does not depend on the GUI lifecycle.
 The simulated Holybro S500 carries two visible and functional Camera Module 3
 representations. The downward camera streams H.264/RTP to UDP `5601` and feeds
 AprilTag landing detection. The forward camera streams independently to UDP
-`5602` and can feed an OpenCV DNN detector. Download the pinned OpenCV Zoo
-YOLOX-S model once before enabling its preview overlay:
+`5602` and can feed an OpenCV DNN detector.
+
+### Forward detector model
+
+The forward detector uses the pretrained
+[YOLOX-S ONNX model from OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/object_detection_yolox).
+The model is provided by OpenCV under the Apache 2.0 license and was evaluated
+on the COCO 2017 validation dataset. COCO defines 80 common object categories,
+including `person`, `car`, `airplane`, `bird`, and `kite`. It has no dedicated
+`drone` category, so the simulated fixed-wing target may receive one of the
+closest generic labels. This detector is therefore a reproducible integration
+baseline, not a drone-specific recognition model.
+
+The model weights are not committed to this repository. Download the pinned
+version after cloning:
 
 ```bash
 bash scripts/download_yolox_model.sh
 ```
 
-The launcher verifies the model SHA-256 and loads it from the gitignored
-`.local/models` directory. A failure of either camera stream is reported
-independently in the preview.
+The downloader fetches `object_detection_yolox_2022nov.onnx`, verifies its
+expected SHA-256 digest, and stores it in the gitignored `.local/models`
+directory. Re-running the command is safe: an existing valid file is reused.
+Without the model, the simulation and both camera streams still run, but the
+forward detection overlay is disabled. A failure of either camera stream is
+reported independently in the preview.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
 spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
