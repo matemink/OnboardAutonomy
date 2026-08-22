@@ -64,7 +64,8 @@ jobs:
           retention-days: 14
 
   arm64-build:
-    name: "ARM64 Native Build"
+    # Keep the required-check context stable; compilation runs on native ARM64.
+    name: "ARM64 Cross-Build"
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
