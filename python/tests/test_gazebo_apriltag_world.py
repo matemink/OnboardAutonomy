@@ -72,6 +72,9 @@ GAZEBO_GUI_CONFIG = (
 WIND_INDICATOR_QML = (
     PROJECT_ROOT / "simulation" / "gui" / "WindIndicator.qml"
 )
+FPS_INDICATOR_QML = (
+    PROJECT_ROOT / "simulation" / "gui" / "FpsIndicator.qml"
+)
 GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
 TARGET_MODEL = (
     PROJECT_ROOT
@@ -438,7 +441,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             4,
         )
 
-    def test_gazebo_gui_owns_the_weather_indicator(self) -> None:
+    def test_gazebo_gui_owns_the_simulation_hud(self) -> None:
         config_text = GAZEBO_GUI_CONFIG.read_text(encoding="utf-8")
         config_text = config_text.replace(
             '<?xml version="1.0"?>',
@@ -452,6 +455,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         }
 
         self.assertIn("MinimalScene", plugins)
+        self.assertIn("FpsIndicator", plugins)
         self.assertIn("WindIndicator", plugins)
         self.assertTrue(
             {
@@ -477,12 +481,22 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             )
             self.assertEqual("docked", state)
 
+        fps_gui = plugins["FpsIndicator"].find("gz-gui")
+        self.assertIsNotNone(fps_gui)
+        self.assertEqual(
+            fps_gui.find("anchors").attrib["target"],
+            "3D View",
+        )
+
         wind_gui = plugins["WindIndicator"].find("gz-gui")
         self.assertIsNotNone(wind_gui)
         self.assertEqual(
             wind_gui.find("anchors").attrib["target"],
-            "3D View",
+            "Rendering performance",
         )
+
+        fps_qml = FPS_INDICATOR_QML.read_text(encoding="utf-8")
+        self.assertIn("FpsIndicator.framesPerSecond", fps_qml)
 
         qml = WIND_INDICATOR_QML.read_text(encoding="utf-8")
         self.assertIn("WindIndicator.speedMetersPerSecond", qml)
