@@ -7,7 +7,7 @@ readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
 readonly model_file="${project_dir}/simulation/models/scripted_fixed_wing_target/model.sdf"
 readonly world_name="${ONBOARD_AUTONOMY_GAZEBO_WORLD_NAME:-apriltag_landing}"
 readonly create_service="/world/${world_name}/create"
-readonly target_name="Generic_Fixed_Wing_Target"
+readonly target_name="Zephyr_Fixed_Wing_Target"
 
 if [[ ! -f "${model_file}" ]]; then
     printf 'Aerial target model is missing: %s\n' "${model_file}" >&2
@@ -46,5 +46,5 @@ if [[ "${response}" != *'data: true'* ]]; then
 fi
 
 printf 'Gazebo aerial target spawned: %s\n' "${target_name}"
-printf '  Altitude: 8 m\n'
-printf '  Route: 12 m radius circle at 2 m/s\n'
+printf '  Altitude: 12 m\n'
+printf '  Route: 20 m radius circle at 12 m/s\n'

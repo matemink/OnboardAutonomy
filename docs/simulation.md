@@ -37,10 +37,13 @@ The launcher keeps the rendering-sensor server separate from the WSLg GUI
 client so camera processing does not depend on the GUI lifecycle.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
-spawns `Generic_Fixed_Wing_Target` at 8 m. The project-owned target follows a
-deterministic 12 m radius loop through Gazebo Harmonic's `VelocityControl`.
-It is only a visible Phase 1 stimulus: OnboardAutonomy does not receive its pose,
-detect it, or command the vehicle toward it yet.
+spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
+radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
+Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
+`ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
+to the model. This is still a visual Phase 1 stimulus, not a second ArduPlane
+SITL instance: OnboardAutonomy does not receive its pose, detect it, or command
+the vehicle toward it yet.
 
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to
