@@ -215,96 +215,95 @@ in SITL/Gazebo until a legal and safe physical flight test is possible.
 Engineering focus: physical acceptance, UART, performance evidence,
 delivery, and technical communication.
 
-## Version 1.1: Autonomous visual course
+## Version 1.1: GPS-resilient aerial-object tracking
 
-The next autonomy increment is a camera-guided course followed by the
-existing precision-landing sequence. A forward-facing camera observes
-directional course markers, while the downward-facing camera remains
-responsible for the final AprilTag landing target.
+The next autonomy increment detects and tracks a moving generic fixed-wing
+aircraft from an onboard forward camera. The vehicle may approach only to a
+configured safe standoff distance, continue observation, return, and reuse the
+existing vision-assisted landing path. Collision and neutralization behavior
+are outside the project scope.
 
-The first marker vocabulary is deliberately small: `LEFT`, `RIGHT`,
-`STRAIGHT`, and `FINISH`. Altitude changes and U-turns are deferred until
-the horizontal course is repeatable. Each course marker has a known physical
-size and a unique identity so the system can estimate range, reject duplicate
-instructions, and record deterministic progress. The nominal one-metre
-approach distance is a configurable target to be validated in simulation,
-not a hard-coded assumption.
+GPS remains observable but optional and untrusted. The primary acceptance
+profile disables GPS before startup and keeps it unavailable through landing;
+weighted campaigns should run 80-90% of missions in that profile.
 
-### Phase 1: Multi-camera foundation
+### Phase 1: Visible moving target
 
-- [ ] Add explicit forward-navigation and downward-landing camera roles.
-- [ ] Add a forward-facing Camera Module 3 Wide model to the simulated
-  Holybro S500 without changing the proven landing-camera path.
-- [ ] Route both camera streams through the same application-level camera
-  contract and expose their independent health, latency, and preview state.
-- [ ] Verify that losing either stream does not block telemetry processing or
-  silently substitute one camera for the other.
+- [ ] Add a lightweight generic fixed-wing model to the existing Gazebo world.
+- [ ] Give it a deterministic scripted route and a one-command launcher.
+- [ ] Keep target ground truth available only to the acceptance evaluator,
+  never to the mission runtime.
+- [ ] Verify that the current vehicle, camera, and landing regression remain
+  unchanged before adding perception.
 
-### Phase 2: Directional-marker perception
+### Phase 2: Forward-camera foundation
 
-- [ ] Define a project-owned, high-contrast course-marker specification with
-  known dimensions, direction, and identity.
-- [ ] Detect the marker board, rectify its perspective, classify its arrow,
-  and estimate relative pose from calibrated camera geometry.
-- [ ] Introduce a typed `CourseMarkerObservation` containing marker ID,
-  direction, relative position, confidence, and capture time.
-- [ ] Require stable agreement across multiple fresh frames before accepting
-  an instruction; a single frame must never command motion.
-- [ ] Build generated and recorded test cases for distance, perspective,
-  partial visibility, blur, lighting variation, and incorrect arrows.
+- [ ] Add explicit forward-tracking and downward-landing camera roles.
+- [ ] Mount a forward-facing simulated Camera Module 3 Wide without changing
+  the proven landing-camera path.
+- [ ] Expose independent health, latency, and preview state for both streams.
+- [ ] Verify that either camera can fail without blocking telemetry or being
+  silently substituted for the other.
 
-### Phase 3: Safe visual approach
+### Phase 3: Detection and tracking
 
-- [ ] Promote local-NED movement from the existing MAVLink encoder into a
-  typed application intent, runtime action, and safety-supervised command.
-- [ ] Add bounded position, velocity, altitude, freshness, and course-area
-  limits before any navigation command reaches the flight controller.
-- [ ] Implement `search -> acquire -> approach -> hold` for one marker without
-  executing its arrow.
-- [ ] Hold position when the marker is lost or ambiguous; never guess the
-  direction, and fall back to LAND after a bounded unrecoverable timeout.
-- [ ] Validate approach distance and lateral alignment in SITL and Gazebo,
-  then tune the nominal standoff towards one metre.
+- [ ] Build reproducible synthetic training and evaluation data from Gazebo
+  while keeping evaluation scenes separate from training scenes.
+- [ ] Train and evaluate the detector in Python, then run inference through a
+  typed C++ mission adapter.
+- [ ] Report bounding box, bearing, confidence, capture time, and track ID
+  without claiming monocular range that has not been measured.
+- [ ] Add temporal tracking, target-loss detection, and bounded reacquisition.
+- [ ] Compare detections with evaluator-only ground truth for precision,
+  recall, bearing error, continuity, and processing latency.
 
-### Phase 4: Marker manoeuvres and course state
+### Phase 4: External navigation without GPS
 
-- [ ] Execute `LEFT`, `RIGHT`, and `STRAIGHT` as bounded relative manoeuvres
-  only after a stable marker and verified approach hold.
-- [ ] Mark each instruction as consumed before searching for the next marker
-  so one sign cannot be executed twice.
-- [ ] Add a course state machine covering takeoff, search, approach, hold,
-  manoeuvre, reacquisition, finish transition, landing, completion, and
-  failsafe states.
-- [ ] Run a deterministic three-marker course before increasing track length
-  or adding altitude-changing instructions.
-- [ ] Add `UP`, `DOWN`, and `U_TURN` only after horizontal-course acceptance;
-  each requires its own altitude, clearance, and reacquisition constraints.
+- [ ] Model navigation source, freshness, quality, covariance, and estimator
+  reset independently from GPS diagnostics.
+- [ ] Add the MAVLink `ODOMETRY` path and configure ArduPilot EKF3 ExternalNav
+  in a deterministic SITL profile.
+- [ ] Prove the ExternalNav contract first with a simulator adapter, clearly
+  separated from the later visual estimator.
+- [ ] Add visual odometry or optical-flow-based local motion estimation and
+  validate drift before allowing it to command flight.
+- [ ] Test GPS available, denied-from-start, lost, recovered, and inconsistent
+  profiles without unsafe source switching.
 
-### Phase 5: Finish and precision landing
+### Phase 5: Safe visual standoff tracking
 
-- [ ] Use a distinct `FINISH` marker to transition from forward navigation to
-  the proven downward-camera landing mode.
-- [ ] Acquire the final AprilTag pad, stream `LANDING_TARGET`, and reuse the
-  existing terminal-descent handoff rather than duplicating landing logic.
-- [ ] Fail safely if the finish marker is reached but the landing target is
-  not acquired within the configured search window.
+- [ ] Implement `search -> acquire -> track -> approach -> standoff` as typed
+  intents passing through the existing safety supervisor.
+- [ ] Bound speed, acceleration, altitude, geofence, command lifetime, and
+  minimum separation before commands reach the flight controller.
+- [ ] Stop approach on stale or ambiguous observations and enter a bounded
+  hold, return, or landing fallback.
+- [ ] Complete one repeatable GPS-denied tracking scenario without collision.
 
-### Phase 6: Acceptance and transfer
+### Phase 6: Independent second SITL vehicle
 
-- [ ] Add a repeatable Gazebo course runner, timer, persistent result report,
-  and camera previews for both navigation and landing.
-- [ ] Measure completion rate, wrong-instruction rate, marker standoff error,
-  course time, and final landing error across repeated runs.
-- [ ] Inject marker loss, stale frames, camera failure, MAVLink loss, wind,
-  and misleading detections in automated acceptance tests.
-- [ ] Preserve replayable frames, telemetry, decisions, and command evidence
-  for every failed run.
-- [ ] Validate the forward-camera path on Raspberry Pi 5 before claiming
-  physical two-camera support; real hardware requires a second compatible
-  camera and mounting/calibration evidence.
+- [ ] Replace the scripted target with a separate ArduPlane SITL instance.
+- [ ] Assign independent system IDs, ports, process supervision, and route
+  control while preserving evaluator/runtime isolation.
+- [ ] Exercise route variation, speed variation, partial occlusion, target
+  exit, and re-entry without sharing target telemetry with perception.
 
-Engineering focus: multi-camera systems, visual perception, visual guidance,
-state-machine design, safety supervision, simulation, and measurable autonomy.
+### Phase 7: Acceptance and Raspberry Pi transfer
+
+- [ ] Add a repeatable campaign runner and preserve synchronized frames,
+  telemetry, decisions, commands, and evaluator truth for failed runs.
+- [ ] Inject frame delay, blur, target loss, camera restart, MAVLink loss,
+  ExternalNav drift, GPS faults, and wind.
+- [ ] Measure detection latency, tracking continuity, reacquisition time,
+  standoff error, safety-limit violations, and mission completion rate.
+- [ ] Run detector and tracker replay on Raspberry Pi 5 and publish measured
+  FPS, CPU, memory, and thermal evidence before claiming ARM readiness.
+- [ ] Keep AprilTag precision landing as a regression and recovery capability,
+  not the Version 1.1 product headline.
+
+Engineering focus: multi-vehicle simulation, multi-camera perception, object
+detection, temporal tracking, non-GPS state estimation, safety-supervised
+guidance, Embedded Linux, ARM performance, and measurable autonomy.
 
 ## Optional engineering backlog
 
