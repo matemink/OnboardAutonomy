@@ -11,6 +11,7 @@
 
 namespace {
 
+using onboard_autonomy::operator_interface::cli::AutonomyMode;
 using onboard_autonomy::operator_interface::cli::CommandLineOptions;
 using onboard_autonomy::operator_interface::cli::GStreamerCameraOptions;
 using onboard_autonomy::operator_interface::cli::HardwareLaunchOptions;
@@ -151,6 +152,39 @@ void camera_and_autonomy_dependencies_are_validated() {
     require_rejected({"--interactive", "--json"}, "cannot be combined");
 }
 
+void aerial_observation_is_a_typed_sitl_only_mode() {
+    const auto options = parse({
+        "--sitl",
+        "--camera",
+        "--camera-preview",
+        "--forward-camera-udp-port",
+        "5602",
+        "--aerial-observation",
+    });
+    const auto* simulation = std::get_if<SimulationLaunchOptions>(&options);
+    require(simulation != nullptr && simulation->autonomy.enabled &&
+                simulation->autonomy.mode == AutonomyMode::aerial_observation &&
+                !simulation->autonomy.exit_when_finished,
+        "aerial observation must map to a distinct non-terminal mission");
+
+    require_rejected({"--camera",
+                         "--camera-preview",
+                         "--forward-camera-udp-port",
+                         "5602",
+                         "--aerial-observation"},
+        "requires --sitl");
+    require_rejected({"--sitl", "--camera", "--aerial-observation"},
+        "requires --forward-camera-udp-port");
+    require_rejected({"--sitl",
+                         "--camera",
+                         "--camera-preview",
+                         "--forward-camera-udp-port",
+                         "5602",
+                         "--autonomous",
+                         "--aerial-observation"},
+        "mutually exclusive");
+}
+
 void simulated_wind_is_typed_and_sitl_only() {
     const auto options = parse({"--sitl", "--sim-wind", "3.0", "270", "0.6"});
     const auto* simulation = std::get_if<SimulationLaunchOptions>(&options);
@@ -198,6 +232,7 @@ void run_command_line_tests() {
     defaults_are_documented_udp_observation_mode();
     transport_groups_are_explicit_and_exclusive();
     camera_and_autonomy_dependencies_are_validated();
+    aerial_observation_is_a_typed_sitl_only_mode();
     simulated_wind_is_typed_and_sitl_only();
     diagnostic_log_is_independent_from_console_output();
     removed_options_provide_migration_guidance();

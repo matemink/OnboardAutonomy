@@ -139,6 +139,7 @@ class MissionRuntime::Impl {
                     .autonomy_runtime =
                         {
                             .enabled = config.autonomous,
+                            .mode = config.autonomy_mode,
                         },
                     .motion_commands_allowed = safety_.motion_commands_allowed,
                     .camera_source = camera_source_.get(),

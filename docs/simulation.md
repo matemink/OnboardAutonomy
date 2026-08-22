@@ -71,10 +71,16 @@ spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
 radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
 Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
 `ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
-to the model. This is still a visual Phase 1 stimulus, not a second ArduPlane
-SITL instance. OnboardAutonomy detects the small rendered object with generic
-COCO labels such as `kite`, `bird`, or `airplane`; it does not receive the
-scripted model pose, infer 3D range, or turn detections into flight commands.
+to the model. This launcher selects the SITL-only aerial-observation mission:
+the S500 performs the guarded GUIDED/ARM/TAKEOFF sequence and then holds while
+the forward detector remains active. It does not enter the AprilTag precision
+landing runtime.
+
+The Zephyr is still a visual Phase 1 stimulus, not a second ArduPlane SITL
+instance. OnboardAutonomy detects the small rendered object with generic COCO
+labels such as `kite`, `bird`, or `airplane`; it does not receive the scripted
+model pose, infer 3D range, or turn detections into flight commands. Target
+bearing and standoff guidance remain separate later increments.
 
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to

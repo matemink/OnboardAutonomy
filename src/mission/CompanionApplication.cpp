@@ -397,7 +397,11 @@ class CompanionApplication::Impl {
             throw std::invalid_argument(
                 "camera extrinsics require AprilTag pose detection");
         }
-        if (runtime_enabled && !camera_extrinsics_.has_value()) {
+        const bool precision_landing_enabled =
+            options.autonomy_runtime.enabled &&
+            options.autonomy_runtime.mode ==
+                AutonomyRuntimeMode::precision_landing;
+        if (precision_landing_enabled && !camera_extrinsics_.has_value()) {
             throw std::invalid_argument(
                 "autonomy runtime requires vision guidance");
         }

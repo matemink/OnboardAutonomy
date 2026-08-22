@@ -38,6 +38,13 @@ using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
 using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
 using RuntimeSnapshotSink = bootstrap::RuntimeSnapshotSink;
 
+mission::AutonomyRuntimeMode autonomy_runtime_mode(
+    const operator_interface::cli::AutonomyMode mode) {
+    return mode == operator_interface::cli::AutonomyMode::aerial_observation
+               ? mission::AutonomyRuntimeMode::aerial_observation
+               : mission::AutonomyRuntimeMode::precision_landing;
+}
+
 std::vector<std::string_view> command_line_arguments(const int argc,
     char** argv) {
     std::vector<std::string_view> arguments;
@@ -158,6 +165,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .simulated_wind = std::nullopt,
         .environment = MissionEnvironment::hardware,
         .autonomous = options.autonomy.enabled,
+        .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
     };
@@ -175,6 +183,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .simulated_wind = options.wind,
         .environment = MissionEnvironment::simulation,
         .autonomous = options.autonomy.enabled,
+        .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
     };

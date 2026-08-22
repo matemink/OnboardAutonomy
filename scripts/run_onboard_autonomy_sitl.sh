@@ -69,7 +69,9 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
     fi
 fi
 
-if [[ "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" ]]; then
+if [[ "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" == "1" ]]; then
+    arguments+=(--aerial-observation)
+elif [[ "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" ]]; then
     arguments+=(--autonomous)
 fi
 

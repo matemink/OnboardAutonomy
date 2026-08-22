@@ -11,6 +11,7 @@
 namespace {
 
 using onboard_autonomy::mission::AutonomyRuntime;
+using onboard_autonomy::mission::AutonomyRuntimeMode;
 using onboard_autonomy::mission::AutonomyRuntimePhase;
 using onboard_autonomy::mission::BodyFramePosition;
 using onboard_autonomy::mission::CompanionLinkFailsafePhase;
@@ -99,6 +100,36 @@ void runtime_waits_for_startup() {
     require(runtime.snapshot().phase ==
                 AutonomyRuntimePhase::waiting_for_startup,
         "runtime must expose startup dependency");
+}
+
+void aerial_observation_holds_after_takeoff_without_landing() {
+    AutonomyRuntime runtime{{
+        .enabled = true,
+        .mode = AutonomyRuntimeMode::aerial_observation,
+    }};
+    const auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+
+    require(runtime.snapshot().detail ==
+                "Preparing takeoff for aerial observation",
+        "observation mode must be visible before flight startup completes");
+    require(runtime.update(vehicle, startup, failsafe, start).empty(),
+        "aerial observation must hold without emitting a motion command");
+    require(runtime
+                .update(vehicle,
+                    startup,
+                    failsafe,
+                    start + std::chrono::seconds(10))
+                .empty(),
+        "missing landing vision must not trigger LAND in observation mode");
+    const auto snapshot = runtime.snapshot();
+    require(snapshot.phase == AutonomyRuntimePhase::active &&
+                snapshot.detail ==
+                    "Aerial observation active; holding after takeoff" &&
+                snapshot.land_attempt == 0,
+        "observation mode must expose a stable active hold");
 }
 
 void runtime_streams_fresh_target_and_lands() {
@@ -402,6 +433,7 @@ void restart_clears_terminal_autonomy_state() {
 
 void run_autonomy_runtime_tests() {
     runtime_waits_for_startup();
+    aerial_observation_holds_after_takeoff_without_landing();
     runtime_streams_fresh_target_and_lands();
     runtime_streams_target_at_ten_hz();
     terminal_descent_requires_stable_low_alignment();
