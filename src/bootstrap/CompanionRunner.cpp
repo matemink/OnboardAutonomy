@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <csignal>
+#include <iostream>
 #include <span>
 #include <stdexcept>
 #include <thread>
@@ -120,6 +121,9 @@ void CompanionRunner::publish_downward_camera_frame() {
 void CompanionRunner::publish_forward_camera_frame() {
     if (forward_camera_monitor_ == nullptr) {
         return;
+    }
+    if (const auto error = forward_camera_monitor_->take_latest_error()) {
+        std::cerr << "Forward camera detection disabled: " << *error << '\n';
     }
     auto processed = forward_camera_monitor_->take_latest_processed_frame();
     if (!processed.has_value()) {

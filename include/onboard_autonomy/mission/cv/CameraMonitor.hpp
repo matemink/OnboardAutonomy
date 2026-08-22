@@ -52,6 +52,7 @@ class CameraMonitor {
         mission::TimePoint now) const;
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_frame();
+    void disable_target_detection();
 
   private:
     class Impl;

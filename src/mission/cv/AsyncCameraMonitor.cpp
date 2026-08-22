@@ -1,6 +1,7 @@
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 
 #include <chrono>
+#include <exception>
 #include <mutex>
 #include <stop_token>
 #include <thread>
@@ -39,10 +40,23 @@ class AsyncCameraMonitor::Impl {
         return frame;
     }
 
+    [[nodiscard]] std::optional<std::string> take_latest_error() {
+        std::scoped_lock lock{latest_frame_mutex_};
+        auto error = std::move(latest_error_);
+        latest_error_.reset();
+        return error;
+    }
+
   private:
     void run(const std::stop_token& stop_token) {
         while (!stop_token.stop_requested()) {
-            monitor_.poll(std::chrono::steady_clock::now());
+            try {
+                monitor_.poll(std::chrono::steady_clock::now());
+            } catch (const std::exception& error) {
+                disable_failed_detector(error.what());
+            } catch (...) {
+                disable_failed_detector("unknown target detector failure");
+            }
             if (auto frame = monitor_.take_latest_processed_frame()) {
                 std::scoped_lock lock{latest_frame_mutex_};
                 latest_frame_ = std::move(frame);
@@ -52,9 +66,16 @@ class AsyncCameraMonitor::Impl {
         }
     }
 
+    void disable_failed_detector(std::string error) {
+        monitor_.disable_target_detection();
+        std::scoped_lock lock{latest_frame_mutex_};
+        latest_error_ = std::move(error);
+    }
+
     CameraMonitor monitor_;
     std::mutex latest_frame_mutex_;
     std::optional<ProcessedCameraFrame> latest_frame_;
+    std::optional<std::string> latest_error_;
     std::jthread worker_;
 };
 
@@ -67,6 +88,10 @@ AsyncCameraMonitor::~AsyncCameraMonitor() = default;
 std::optional<ProcessedCameraFrame>
 AsyncCameraMonitor::take_latest_processed_frame() {
     return impl_->take_latest_processed_frame();
+}
+
+std::optional<std::string> AsyncCameraMonitor::take_latest_error() {
+    return impl_->take_latest_error();
 }
 
 } // namespace onboard_autonomy::mission

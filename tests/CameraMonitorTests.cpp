@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -28,6 +29,7 @@ class FakeCameraSource final
     : public onboard_autonomy::mission::ports::CameraSource {
   public:
     void emit(onboard_autonomy::mission::ports::CameraFrame frame) {
+        std::scoped_lock lock{mutex_};
         latest_ = std::move(frame);
         ++status_.produced_frames;
         status_.phase =
@@ -35,6 +37,7 @@ class FakeCameraSource final
     }
 
     void reconnecting(std::string error, const std::uint64_t restart_count) {
+        std::scoped_lock lock{mutex_};
         status_.phase =
             onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting;
         status_.error = std::move(error);
@@ -43,6 +46,7 @@ class FakeCameraSource final
 
     [[nodiscard]] std::optional<onboard_autonomy::mission::ports::CameraFrame>
     take_latest_frame() override {
+        std::scoped_lock lock{mutex_};
         auto frame = std::move(latest_);
         latest_.reset();
         return frame;
@@ -51,10 +55,12 @@ class FakeCameraSource final
     [[nodiscard]]
     onboard_autonomy::mission::ports::CameraSourceStatus
     status() const override {
+        std::scoped_lock lock{mutex_};
         return status_;
     }
 
   private:
+    mutable std::mutex mutex_;
     onboard_autonomy::mission::ports::CameraSourceStatus status_{
         .description = "fake camera",
         .error = "",
@@ -89,6 +95,19 @@ class FakeTargetDetector final
 
     [[nodiscard]] std::string description() const override {
         return "fake target detector";
+    }
+};
+
+class ThrowingTargetDetector final
+    : public onboard_autonomy::mission::ports::TargetDetector {
+  public:
+    [[nodiscard]] onboard_autonomy::mission::TargetDetectionBatch detect(
+        const onboard_autonomy::mission::ports::CameraFrame&) override {
+        throw std::runtime_error("incompatible detector output");
+    }
+
+    [[nodiscard]] std::string description() const override {
+        return "throwing target detector";
     }
 };
 
@@ -269,6 +288,38 @@ void async_monitor_processes_frames_off_the_caller_thread() {
         "async camera output must be consumed only once");
 }
 
+void async_monitor_contains_detector_failures() {
+    using namespace std::chrono_literals;
+
+    FakeCameraSource source;
+    ThrowingTargetDetector detector;
+    source.emit(frame(41, std::chrono::system_clock::time_point{}, 10.0));
+    onboard_autonomy::mission::AsyncCameraMonitor monitor{source, &detector};
+
+    std::optional<std::string> error;
+    const auto error_deadline = std::chrono::steady_clock::now() + 500ms;
+    while (!error.has_value() &&
+           std::chrono::steady_clock::now() < error_deadline) {
+        error = monitor.take_latest_error();
+        std::this_thread::sleep_for(1ms);
+    }
+    require(error.has_value() && error->find("incompatible detector output") !=
+                                     std::string::npos,
+        "async camera monitor must surface detector failures");
+
+    source.emit(frame(42, std::chrono::system_clock::time_point{}, 10.0));
+    std::optional<onboard_autonomy::mission::ProcessedCameraFrame> processed;
+    const auto frame_deadline = std::chrono::steady_clock::now() + 500ms;
+    while (!processed.has_value() &&
+           std::chrono::steady_clock::now() < frame_deadline) {
+        processed = monitor.take_latest_processed_frame();
+        std::this_thread::sleep_for(1ms);
+    }
+    require(processed.has_value() && processed->frame.sequence == 42U &&
+                processed->targets.empty(),
+        "raw camera preview must continue after detector failure");
+}
+
 } // namespace
 
 void run_camera_monitor_tests() {
@@ -279,4 +330,5 @@ void run_camera_monitor_tests() {
     monitor_exposes_camera_recovery_state();
     monitor_exposes_processed_frames_without_a_preview_dependency();
     async_monitor_processes_frames_off_the_caller_thread();
+    async_monitor_contains_detector_failures();
 }

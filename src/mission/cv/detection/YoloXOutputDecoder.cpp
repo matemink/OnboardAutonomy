@@ -1,5 +1,6 @@
 #include "onboard_autonomy/mission/cv/detection/YoloXOutputDecoder.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -57,20 +58,27 @@ std::vector<GridCell> make_grid(const YoloXDecoderConfig& config) {
     return result;
 }
 
-std::pair<std::int32_t, float> best_accepted_class(
+std::pair<std::int32_t, float> highest_scoring_class(
     const std::span<const float> row,
     const YoloXDecoderConfig& config) {
     std::int32_t selected_class = -1;
     float selected_score = 0.0F;
-    for (const auto class_id : config.accepted_class_ids) {
-        const auto score =
-            row[kClassScoresOffset + static_cast<std::size_t>(class_id)];
+    for (std::size_t class_index = 0U; class_index < config.class_count;
+         ++class_index) {
+        const auto score = row[kClassScoresOffset + class_index];
         if (std::isfinite(score) && score > selected_score) {
             selected_score = score;
-            selected_class = class_id;
+            selected_class = static_cast<std::int32_t>(class_index);
         }
     }
     return {selected_class, selected_score};
+}
+
+bool accepted_class(const std::int32_t class_id,
+    const YoloXDecoderConfig& config) {
+    return std::find(config.accepted_class_ids.begin(),
+               config.accepted_class_ids.end(),
+               class_id) != config.accepted_class_ids.end();
 }
 
 } // namespace
@@ -92,10 +100,10 @@ std::vector<YoloXCandidate> decode_yolox_output(
     for (std::size_t row_index = 0U; row_index < row_count; ++row_index) {
         const auto row = output.subspan(row_index * column_count, column_count);
         const auto objectness = row[kObjectnessIndex];
-        const auto [class_id, class_score] = best_accepted_class(row, config);
+        const auto [class_id, class_score] = highest_scoring_class(row, config);
         const auto confidence = objectness * class_score;
-        if (class_id < 0 || !std::isfinite(objectness) ||
-            !std::isfinite(confidence) ||
+        if (class_id < 0 || !accepted_class(class_id, config) ||
+            !std::isfinite(objectness) || !std::isfinite(confidence) ||
             confidence < config.confidence_threshold) {
             continue;
         }

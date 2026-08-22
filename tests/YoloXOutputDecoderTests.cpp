@@ -82,9 +82,29 @@ void confidence_and_shape_are_enforced() {
     throw std::runtime_error("unexpected YOLOX tensor shape was accepted");
 }
 
+void dominant_non_aerial_class_is_rejected() {
+    constexpr std::int32_t person_class_id = 0;
+    const auto config = single_cell_config();
+    std::vector<float> output(kClassScoresOffset + config.class_count, 0.0F);
+    output[2U] = 0.0F;
+    output[3U] = 0.0F;
+    output[4U] = 1.0F;
+    output[kClassScoresOffset + static_cast<std::size_t>(person_class_id)] =
+        0.90F;
+    output[kClassScoresOffset + static_cast<std::size_t>(kKiteClassId)] = 0.80F;
+
+    require(onboard_autonomy::mission::cv::decode_yolox_output(output,
+                1U,
+                output.size(),
+                config)
+                .empty(),
+        "an ordinary object must not be relabelled as an aerial object");
+}
+
 } // namespace
 
 void run_yolox_output_decoder_tests() {
     accepted_class_is_decoded_from_raw_yolox_values();
     confidence_and_shape_are_enforced();
+    dominant_non_aerial_class_is_rejected();
 }

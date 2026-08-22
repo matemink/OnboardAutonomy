@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 
 namespace onboard_autonomy::mission {
 
@@ -20,6 +21,7 @@ class AsyncCameraMonitor {
 
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_frame();
+    [[nodiscard]] std::optional<std::string> take_latest_error();
 
   private:
     class Impl;
