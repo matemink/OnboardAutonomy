@@ -90,6 +90,7 @@ TARGET_SPAWNER = (
 TARGET_LAUNCHER = (
     PROJECT_ROOT / "StartOnboardAutonomyAerialTracking.cmd"
 )
+CAMERA_PREVIEW_PAGE = PROJECT_ROOT / "assets" / "camera-preview" / "index.html"
 
 
 class GazeboAprilTagWorldTests(unittest.TestCase):
@@ -136,6 +137,37 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
 
         self.assertEqual((width_m, height_m), (4.4, 4.4))
         self.assertAlmostEqual(width_m * 5.0 / 11.0, 2.0)
+
+    def test_forward_camera_is_visible_and_streams_independently(self) -> None:
+        model = element_tree.parse(CAMERA_MODEL).getroot()
+        sensor = model.find(
+            ".//sensor[@name='Raspberry_Pi_Camera_Module_3_Wide_Forward']"
+        )
+        self.assertIsNotNone(sensor)
+
+        parent_link = next(
+            link
+            for link in model.findall(".//model/link")
+            if sensor in list(link)
+        )
+        visual_names = {
+            visual.attrib["name"] for visual in parent_link.findall("visual")
+        }
+        sensor_pose = [float(value) for value in sensor.findtext("pose").split()]
+
+        self.assertIn(
+            "Raspberry_Pi_Camera_Module_3_Wide_Forward_body",
+            visual_names,
+        )
+        self.assertIn(
+            "Raspberry_Pi_Camera_Module_3_Wide_Forward_lens",
+            visual_names,
+        )
+        self.assertEqual(sensor_pose[3:], [0.0, 0.0, 0.0])
+        self.assertEqual(sensor.find("plugin").attrib["name"], "GstCameraPlugin")
+        self.assertEqual(sensor.findtext("plugin/udp_port"), "5602")
+        self.assertEqual(sensor.findtext("camera/image/width"), "640")
+        self.assertEqual(sensor.findtext("camera/image/height"), "480")
 
     def test_texture_preserves_the_pinned_tag_and_quiet_zone(self) -> None:
         source = cv2.imread(str(SOURCE_TAG), cv2.IMREAD_GRAYSCALE)
@@ -323,6 +355,23 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertLess(spawn_index, sitl_index)
         self.assertLess(spawn_index, preview_index)
 
+    def test_dual_camera_preview_keeps_streams_independent(self) -> None:
+        preview = CAMERA_PREVIEW_PAGE.read_text(encoding="utf-8")
+        gazebo_runner = (
+            PROJECT_ROOT / "scripts" / "run_onboard_autonomy_gazebo_vision.sh"
+        ).read_text(encoding="utf-8")
+        sitl_runner = (
+            PROJECT_ROOT / "scripts" / "run_onboard_autonomy_sitl.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('data-stream="forward"', preview)
+        self.assertIn('data-stream="downward"', preview)
+        self.assertIn("/api/frame/${stream}", preview)
+        self.assertIn("DETECTOR NOT LOADED", preview)
+        self.assertIn("Raspberry_Pi_Camera_Module_3_Wide_Forward", gazebo_runner)
+        self.assertIn("ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT", gazebo_runner)
+        self.assertIn("--forward-camera-udp-port", sitl_runner)
+
     def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
         demo_launcher = (
             PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
@@ -360,6 +409,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
                 "Pixhawk_6C",
                 "Raspberry_Pi_5",
                 "Raspberry_Pi_Camera_Module_3_Wide",
+                "Raspberry_Pi_Camera_Module_3_Wide_Forward",
             }.issubset(component_links)
         )
 

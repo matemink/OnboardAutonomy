@@ -66,6 +66,7 @@ struct OperatorInterfaceOptions {
 
 struct DiagnosticsOptions {
     std::optional<CameraPreviewOptions> camera_preview;
+    std::optional<std::uint16_t> forward_camera_udp_port;
     std::string log_file;
 };
 

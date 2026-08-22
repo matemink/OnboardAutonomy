@@ -10,6 +10,11 @@ class CompanionApplication;
 struct AppSnapshot;
 } // namespace onboard_autonomy::mission
 
+namespace onboard_autonomy::mission::ports {
+class CameraSource;
+struct CameraFrame;
+} // namespace onboard_autonomy::mission::ports
+
 namespace onboard_autonomy::diagnostics::preview {
 class CameraPreviewSink;
 }
@@ -39,6 +44,7 @@ class CompanionRunner {
   public:
     CompanionRunner(CompanionRunnerOptions options,
         mission::CompanionApplication& application,
+        mission::ports::CameraSource* forward_preview_camera,
         RuntimeCommandSource* command_source,
         std::vector<RuntimeSnapshotSink*> snapshot_sinks,
         std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks);
@@ -47,12 +53,15 @@ class CompanionRunner {
 
   private:
     void handle_runtime_commands();
-    void publish_camera_frame();
+    void publish_camera_frames();
+    void publish_downward_camera_frame();
+    void publish_forward_camera_frame();
     void publish_snapshot(const mission::AppSnapshot& snapshot) const;
     void update_terminal_state(const mission::AppSnapshot& snapshot);
 
     CompanionRunnerOptions options_;
     mission::CompanionApplication& application_;
+    mission::ports::CameraSource* forward_preview_camera_;
     RuntimeCommandSource* command_source_;
     std::vector<RuntimeSnapshotSink*> snapshot_sinks_;
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks_;
