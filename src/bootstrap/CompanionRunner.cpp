@@ -133,7 +133,7 @@ void CompanionRunner::publish_forward_camera_frame() {
         processed->frame.width,
         processed->frame.height,
         processed->frame.sequence,
-        std::chrono::steady_clock::now());
+        processed->observed_at);
     for (auto* sink : preview_sinks_) {
         if (sink != nullptr) {
             sink->publish(diagnostics::preview::CameraPreviewStream::forward,
