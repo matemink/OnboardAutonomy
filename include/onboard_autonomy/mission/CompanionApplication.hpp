@@ -16,6 +16,7 @@ struct CompanionApplicationOptions {
     FlightStartupConfig flight_startup;
     AutonomyRuntimeConfig autonomy_runtime;
     bool motion_commands_allowed{false};
+    bool aerial_tracking_allowed{false};
     ports::CameraSource* camera_source{nullptr};
     ports::TargetDetector* target_detector{nullptr};
     std::optional<mission::CameraExtrinsics> camera_extrinsics;

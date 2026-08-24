@@ -215,6 +215,20 @@ std::vector<std::uint8_t> accepted_interval_ack() {
     return serialize(message);
 }
 
+std::vector<std::uint8_t> accepted_rtl_ack() {
+    mavlink_message_t message{};
+    mavlink_msg_command_ack_pack(1,
+        MAV_COMP_ID_AUTOPILOT1,
+        &message,
+        MAV_CMD_NAV_RETURN_TO_LAUNCH,
+        MAV_RESULT_ACCEPTED,
+        100,
+        0,
+        1,
+        onboard_autonomy::hardware::mavlink::kCompanionComponentId);
+    return serialize(message);
+}
+
 void application_orchestrates_the_complete_telemetry_setup() {
     FakeTransport transport;
     onboard_autonomy::mission::CompanionApplication application{transport};
@@ -344,6 +358,7 @@ void interactive_autonomy_restart_is_guarded() {
                     .start_automatically = false,
                 },
             .motion_commands_allowed = true,
+            .aerial_tracking_allowed = true,
             .camera_source = &camera,
             .target_detector = &detector,
             .camera_extrinsics = identity_extrinsics(),
@@ -373,13 +388,16 @@ void interactive_autonomy_restart_is_guarded() {
 
     require(application.request_return_to_launch(
                 start + std::chrono::milliseconds(3)),
-        "RTL on a disarmed vehicle must cancel the active scenario");
+        "RTL must cancel an active scenario despite a stale disarmed state");
+    application.poll(start + std::chrono::milliseconds(4));
+    transport.enqueue(accepted_rtl_ack());
+    application.poll(start + std::chrono::milliseconds(5));
     require(application.request_autonomy_start(
                 AutonomyRuntimeMode::precision_landing,
-                start + std::chrono::milliseconds(4)),
-        "a cancelled disarmed run must be restartable in another mode");
+                start + std::chrono::milliseconds(6)),
+        "an acknowledged disarmed RTL must permit another mission");
 
-    snapshot = application.snapshot(start + std::chrono::milliseconds(4));
+    snapshot = application.snapshot(start + std::chrono::milliseconds(6));
     require(snapshot.flight_startup.phase ==
                     onboard_autonomy::mission::FlightStartupPhase::
                         waiting_for_vehicle &&
@@ -414,6 +432,7 @@ void operator_rtl_aborts_the_active_mission() {
                     .start_automatically = false,
                 },
             .motion_commands_allowed = true,
+            .aerial_tracking_allowed = true,
             .camera_source = &camera,
             .target_detector = &detector,
             .camera_extrinsics = identity_extrinsics(),
@@ -426,6 +445,7 @@ void operator_rtl_aborts_the_active_mission() {
     require(application.request_return_to_launch(
                 start + std::chrono::milliseconds(1)),
         "armed vehicle must accept the operator RTL request");
+    application.poll(start + std::chrono::milliseconds(2));
 
     const auto rtl = std::find_if(transport.outgoing().begin(),
         transport.outgoing().end(),
@@ -445,6 +465,44 @@ void operator_rtl_aborts_the_active_mission() {
                 AutonomyRuntimeMode::aerial_observation,
                 start + std::chrono::milliseconds(2)),
         "a new mission must not start while RTL is active");
+}
+
+void hardware_runtime_rejects_sitl_only_aerial_tracking() {
+    using onboard_autonomy::mission::AutonomyRuntimeMode;
+
+    FakeTransport transport;
+    FakeCameraSource camera;
+    FakeTargetDetector detector;
+    onboard_autonomy::mission::CompanionApplication application{transport,
+        {
+            .flight_startup =
+                {
+                    .enabled = true,
+                    .start_automatically = false,
+                    .takeoff_altitude_m = 8.0,
+                },
+            .autonomy_runtime =
+                {
+                    .enabled = true,
+                    .start_automatically = false,
+                },
+            .motion_commands_allowed = true,
+            .aerial_tracking_allowed = false,
+            .camera_source = &camera,
+            .target_detector = &detector,
+            .camera_extrinsics = identity_extrinsics(),
+            .simulated_wind = std::nullopt,
+        }};
+    const onboard_autonomy::mission::TimePoint start{};
+    transport.enqueue(autopilot_heartbeat());
+    application.poll(start);
+
+    require(!application.request_autonomy_start(
+                AutonomyRuntimeMode::aerial_observation,
+                start + std::chrono::milliseconds(1)) &&
+                application.snapshot(start).link_events.back().detail ==
+                    "ZEPHYR TRACKING IS AVAILABLE IN SITL ONLY",
+        "hardware runtime must not bypass the SITL-only aerial guard");
 }
 
 void autonomy_runtime_requires_vision_guidance() {
@@ -482,5 +540,6 @@ void run_companion_application_tests() {
     quiet_transport_does_not_stall_runtime_scheduling();
     interactive_autonomy_restart_is_guarded();
     operator_rtl_aborts_the_active_mission();
+    hardware_runtime_rejects_sitl_only_aerial_tracking();
     autonomy_runtime_requires_vision_guidance();
 }

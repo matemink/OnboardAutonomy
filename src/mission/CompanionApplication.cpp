@@ -303,6 +303,7 @@ class CompanionApplication::Impl {
         CompanionApplicationOptions options)
         : transport_(transport),
           motion_commands_allowed_(options.motion_commands_allowed),
+          aerial_tracking_allowed_(options.aerial_tracking_allowed),
           autonomy_scenario_configured_(options.flight_startup.enabled &&
                                         options.autonomy_runtime.enabled),
           simulated_wind_(options.simulated_wind),
@@ -653,6 +654,16 @@ class CompanionApplication::Impl {
             return false;
         }
 
+        if (mode == AutonomyRuntimeMode::aerial_observation &&
+            !aerial_tracking_allowed_) {
+            record_event(LinkEventDirection::outbound,
+                LinkEventStatus::failure,
+                "START",
+                "ZEPHYR TRACKING IS AVAILABLE IN SITL ONLY",
+                now);
+            return false;
+        }
+
         if (mode == AutonomyRuntimeMode::precision_landing &&
             !camera_extrinsics_.has_value()) {
             record_event(LinkEventDirection::outbound,
@@ -723,6 +734,18 @@ class CompanionApplication::Impl {
             return false;
         }
 
+        const auto startup = flight_startup_.snapshot();
+        const auto autonomy = autonomy_runtime_.snapshot();
+        const bool mission_active =
+            startup.phase != FlightStartupPhase::disabled &&
+            startup.phase != FlightStartupPhase::idle &&
+            startup.phase != FlightStartupPhase::completed &&
+            startup.phase != FlightStartupPhase::failed;
+        const bool autonomy_active =
+            autonomy.phase != AutonomyRuntimePhase::disabled &&
+            autonomy.phase != AutonomyRuntimePhase::idle &&
+            autonomy.phase != AutonomyRuntimePhase::completed &&
+            autonomy.phase != AutonomyRuntimePhase::failed;
         flight_startup_.cancel("Startup cancelled by operator");
         const auto vehicle = vehicle_state_.snapshot(now);
         if (!vehicle.connected || !vehicle.system_id.has_value()) {
@@ -736,7 +759,7 @@ class CompanionApplication::Impl {
             return false;
         }
 
-        if (!vehicle.armed) {
+        if (!vehicle.armed && !mission_active && !autonomy_active) {
             autonomy_runtime_.cancel("Mission idle; vehicle already disarmed");
             record_event(LinkEventDirection::outbound,
                 LinkEventStatus::success,
@@ -746,14 +769,13 @@ class CompanionApplication::Impl {
             return true;
         }
 
-        autonomy_runtime_.begin_return_to_launch(*vehicle.system_id);
-        const FlightActionRequest request{
-            .action = FlightAction::return_to_launch,
-            .vehicle_system_id = *vehicle.system_id,
-        };
-        send_flight_action(request, now, false);
-        return autonomy_runtime_.snapshot().phase !=
-               AutonomyRuntimePhase::failed;
+        autonomy_runtime_.begin_return_to_launch(*vehicle.system_id, now);
+        record_event(LinkEventDirection::outbound,
+            LinkEventStatus::pending,
+            "RTL",
+            "MISSION CANCELLED | RTL REQUESTED",
+            now);
+        return true;
     }
 
     AppSnapshot snapshot(const mission::TimePoint now) {
@@ -985,6 +1007,7 @@ class CompanionApplication::Impl {
 
     ports::Transport& transport_;
     bool motion_commands_allowed_{false};
+    bool aerial_tracking_allowed_{false};
     bool autonomy_scenario_configured_{false};
     std::optional<SimulatedWindProfile> simulated_wind_;
     mission::VehicleState vehicle_state_;
