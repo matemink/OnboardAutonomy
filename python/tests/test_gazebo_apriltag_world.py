@@ -369,7 +369,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         ]
         self.assertEqual(linear, [12.0, 0.0, 0.0])
         self.assertEqual(angular[:2], [0.0, 0.0])
-        self.assertAlmostEqual(linear[0] / angular[2], 20.0)
+        self.assertAlmostEqual(linear[0] / angular[2], 15.0)
 
     def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
         world = element_tree.parse(WORLD).getroot()

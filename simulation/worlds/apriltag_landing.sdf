@@ -100,7 +100,7 @@
     <include>
       <uri>model://iris_with_landing_camera</uri>
       <name>Holybro_S500</name>
-      <pose>-3 0 0.195 0 0 1.5707963267948966</pose>
+      <pose>-3 0 0.195 0 0 -1.5707963267948966</pose>
     </include>
   </world>
 </sdf>
