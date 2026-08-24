@@ -67,7 +67,7 @@ forward detection overlay is disabled. A failure of either camera stream is
 reported independently in the preview.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
-spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
+spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 15 m
 radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
 Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
 `ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
