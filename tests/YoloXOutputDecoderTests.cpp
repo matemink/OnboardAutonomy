@@ -23,12 +23,12 @@ onboard_autonomy::mission::cv::YoloXDecoderConfig single_cell_config() {
         .class_count = 80U,
         .input_size = 8U,
         .strides = {8U},
-        .accepted_class_ids = {4, 14, kKiteClassId},
+        .accepted_class_ids = {},
         .confidence_threshold = 0.20F,
     };
 }
 
-void accepted_class_is_decoded_from_raw_yolox_values() {
+void detected_class_is_decoded_from_raw_yolox_values() {
     const auto config = single_cell_config();
     std::vector<float> output(kClassScoresOffset + config.class_count, 0.0F);
     output[0U] = 0.5F;
@@ -44,7 +44,7 @@ void accepted_class_is_decoded_from_raw_yolox_values() {
             output.size(),
             config);
 
-    require(candidates.size() == 1U, "accepted aerial class must be decoded");
+    require(candidates.size() == 1U, "detected COCO class must be decoded");
     const auto& candidate = candidates.front();
     require(candidate.class_id == kKiteClassId &&
                 std::abs(candidate.confidence - 0.6F) < 0.0001F &&
@@ -82,7 +82,7 @@ void confidence_and_shape_are_enforced() {
     throw std::runtime_error("unexpected YOLOX tensor shape was accepted");
 }
 
-void dominant_non_aerial_class_is_rejected() {
+void dominant_class_is_decoded_without_a_category_filter() {
     constexpr std::int32_t person_class_id = 0;
     const auto config = single_cell_config();
     std::vector<float> output(kClassScoresOffset + config.class_count, 0.0F);
@@ -93,18 +93,38 @@ void dominant_non_aerial_class_is_rejected() {
         0.90F;
     output[kClassScoresOffset + static_cast<std::size_t>(kKiteClassId)] = 0.80F;
 
+    const auto candidates =
+        onboard_autonomy::mission::cv::decode_yolox_output(output,
+            1U,
+            output.size(),
+            config);
+    require(candidates.size() == 1U &&
+                candidates.front().class_id == person_class_id,
+        "the detector's dominant class must pass without a category filter");
+}
+
+void explicit_category_filter_remains_available() {
+    constexpr std::int32_t person_class_id = 0;
+    auto config = single_cell_config();
+    config.accepted_class_ids = {kKiteClassId};
+    std::vector<float> output(kClassScoresOffset + config.class_count, 0.0F);
+    output[4U] = 1.0F;
+    output[kClassScoresOffset + static_cast<std::size_t>(person_class_id)] =
+        0.90F;
+
     require(onboard_autonomy::mission::cv::decode_yolox_output(output,
                 1U,
                 output.size(),
                 config)
                 .empty(),
-        "an ordinary object must not be relabelled as an aerial object");
+        "an explicit category filter must still reject other classes");
 }
 
 } // namespace
 
 void run_yolox_output_decoder_tests() {
-    accepted_class_is_decoded_from_raw_yolox_values();
+    detected_class_is_decoded_from_raw_yolox_values();
     confidence_and_shape_are_enforced();
-    dominant_non_aerial_class_is_rejected();
+    dominant_class_is_decoded_without_a_category_filter();
+    explicit_category_filter_remains_available();
 }

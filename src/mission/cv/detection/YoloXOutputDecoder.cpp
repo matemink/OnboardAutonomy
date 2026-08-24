@@ -20,8 +20,7 @@ struct GridCell {
 
 void validate_config(const YoloXDecoderConfig& config) {
     if (config.class_count == 0U || config.input_size == 0U ||
-        config.strides.empty() || config.accepted_class_ids.empty() ||
-        !std::isfinite(config.confidence_threshold) ||
+        config.strides.empty() || !std::isfinite(config.confidence_threshold) ||
         config.confidence_threshold < 0.0F ||
         config.confidence_threshold > 1.0F) {
         throw std::invalid_argument("invalid YOLOX decoder configuration");
@@ -76,7 +75,8 @@ std::pair<std::int32_t, float> highest_scoring_class(
 
 bool accepted_class(const std::int32_t class_id,
     const YoloXDecoderConfig& config) {
-    return std::find(config.accepted_class_ids.begin(),
+    return config.accepted_class_ids.empty() ||
+           std::find(config.accepted_class_ids.begin(),
                config.accepted_class_ids.end(),
                class_id) != config.accepted_class_ids.end();
 }

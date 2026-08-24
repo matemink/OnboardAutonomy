@@ -104,29 +104,29 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     motion_safety_status_ = MotionSafetyStatus::no_intent;
     if (!aerial_target.has_value() ||
         aerial_target->phase == AerialTargetTrackPhase::searching) {
-        detail_ = "AIRPLANE SEARCHING | GUIDED HOLD";
+        detail_ = "TARGET SEARCHING | GUIDED HOLD";
         return {};
     }
     if (aerial_target->phase == AerialTargetTrackPhase::acquiring) {
-        detail_ = "AIRPLANE ACQUIRING " +
+        detail_ = "TARGET ACQUIRING " +
                   std::to_string(aerial_target->consecutive_observations) +
                   "/" + std::to_string(aerial_target->required_observations) +
                   " | GUIDED HOLD";
         return {};
     }
     if (!aerial_target->horizontal_error.has_value()) {
-        detail_ = "AIRPLANE LOCK INVALID | GUIDED HOLD";
+        detail_ = "TARGET LOCK INVALID | GUIDED HOLD";
         return {};
     }
 
     const auto horizontal_error = *aerial_target->horizontal_error;
     if (!std::isfinite(horizontal_error) ||
         std::abs(horizontal_error) <= config_.yaw_deadband_ratio) {
-        detail_ = "AIRPLANE LOCKED | CENTERED | GUIDED HOLD";
+        detail_ = "TARGET LOCKED | CENTERED | GUIDED HOLD";
         return {};
     }
     if (now < next_yaw_command_ || !vehicle_system_id_.has_value()) {
-        detail_ = "AIRPLANE LOCKED | YAW ALIGNING | GUIDED HOLD";
+        detail_ = "TARGET LOCKED | YAW ALIGNING | GUIDED HOLD";
         return {};
     }
 
@@ -140,7 +140,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     motion_safety_status_ = MotionSafetyStatus::allowed;
 
     std::ostringstream detail;
-    detail << "AIRPLANE LOCKED | YAW "
+    detail << "TARGET LOCKED | YAW "
            << (yaw_degrees >= 0.0 ? "RIGHT " : "LEFT ") << std::fixed
            << std::setprecision(1) << std::abs(yaw_degrees)
            << " DEG | GUIDED HOLD";

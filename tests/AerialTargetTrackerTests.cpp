@@ -46,7 +46,7 @@ TargetObservation airplane(const double center_x,
     };
 }
 
-void highest_confidence_airplane_starts_the_track() {
+void highest_confidence_detection_starts_the_track() {
     AerialTargetTracker tracker;
     const TimePoint start{};
     for (std::uint64_t sequence = 1; sequence <= 3; ++sequence) {
@@ -65,10 +65,10 @@ void highest_confidence_airplane_starts_the_track() {
     require(track.phase == AerialTargetTrackPhase::tracking,
         "three consistent frames must acquire the aerial target");
     require(track.horizontal_error.has_value() && *track.horizontal_error > 0.0,
-        "acquisition must select the most confident airplane");
+        "acquisition must select the most confident detection");
 }
 
-void airplane_can_be_acquired_anywhere_in_the_frame() {
+void detection_can_be_acquired_anywhere_in_the_frame() {
     AerialTargetTracker tracker;
     const TimePoint start{};
     for (std::uint64_t sequence = 1; sequence <= 4; ++sequence) {
@@ -82,7 +82,7 @@ void airplane_can_be_acquired_anywhere_in_the_frame() {
 
     require(tracker.snapshot(start + std::chrono::milliseconds(120)).phase ==
                 AerialTargetTrackPhase::tracking,
-        "image position must not prevent a valid airplane track");
+        "image position must not prevent a valid target track");
 }
 
 void short_detector_misses_do_not_discard_acquisition() {
@@ -115,12 +115,13 @@ void short_detector_misses_do_not_discard_acquisition() {
         "short detector misses must not reset consistent acquisition");
 }
 
-void non_airplane_classes_cannot_start_a_track() {
+void require_class_can_start_a_track(const std::int32_t class_id,
+    const std::string& class_name) {
     AerialTargetTracker tracker;
-    auto bird = airplane(320.0, 180.0, 99.0);
-    bird.id = 14;
-    bird.family = "bird";
-    const std::array observations{bird};
+    auto observation = airplane(320.0, 180.0, 99.0);
+    observation.id = class_id;
+    observation.family = class_name;
+    const std::array observations{observation};
     const TimePoint start{};
     for (std::uint64_t sequence = 1; sequence <= 4; ++sequence) {
         tracker.update(observations,
@@ -131,8 +132,13 @@ void non_airplane_classes_cannot_start_a_track() {
     }
 
     require(tracker.snapshot(start + std::chrono::milliseconds(120)).phase ==
-                AerialTargetTrackPhase::searching,
-        "bird and kite detections must remain diagnostics-only");
+                AerialTargetTrackPhase::tracking,
+        class_name + " detections must be eligible for tracking");
+}
+
+void any_forward_detector_class_can_start_a_track() {
+    require_class_can_start_a_track(14, "bird");
+    require_class_can_start_a_track(33, "kite");
 }
 
 void locked_track_uses_continuity_and_expires() {
@@ -161,7 +167,7 @@ void locked_track_uses_continuity_and_expires() {
     require(maintained.phase == AerialTargetTrackPhase::tracking &&
                 maintained.horizontal_error.has_value() &&
                 *maintained.horizontal_error < 0.0,
-        "tracking must prefer the spatially continuous airplane");
+        "tracking must prefer the spatially continuous target");
 
     const std::vector<TargetObservation> missing;
     tracker.update(missing,
@@ -180,9 +186,9 @@ void locked_track_uses_continuity_and_expires() {
 } // namespace
 
 void run_aerial_target_tracker_tests() {
-    highest_confidence_airplane_starts_the_track();
-    airplane_can_be_acquired_anywhere_in_the_frame();
+    highest_confidence_detection_starts_the_track();
+    detection_can_be_acquired_anywhere_in_the_frame();
     short_detector_misses_do_not_discard_acquisition();
-    non_airplane_classes_cannot_start_a_track();
+    any_forward_detector_class_can_start_a_track();
     locked_track_uses_continuity_and_expires();
 }
