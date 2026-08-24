@@ -164,17 +164,41 @@ std::string parameter_request_id(const std::vector<std::uint8_t>& frame) {
     return {std::begin(request.param_id), end};
 }
 
-std::vector<std::uint8_t> autopilot_heartbeat() {
+std::vector<std::uint8_t> autopilot_heartbeat(const bool armed = false) {
     mavlink_message_t message{};
     mavlink_msg_heartbeat_pack(1,
         MAV_COMP_ID_AUTOPILOT1,
         &message,
         MAV_TYPE_QUADROTOR,
         MAV_AUTOPILOT_ARDUPILOTMEGA,
-        0,
+        armed ? MAV_MODE_FLAG_SAFETY_ARMED : 0,
         0,
         MAV_STATE_STANDBY);
     return serialize(message);
+}
+
+std::optional<std::uint16_t> command_long_command(
+    const std::vector<std::uint8_t>& frame) {
+    mavlink_message_t receive_buffer{};
+    mavlink_status_t receive_status{};
+    mavlink_message_t parsed_message{};
+    mavlink_status_t parsed_status{};
+    for (const auto byte : frame) {
+        if (mavlink_frame_char_buffer(&receive_buffer,
+                &receive_status,
+                byte,
+                &parsed_message,
+                &parsed_status) != MAVLINK_FRAMING_OK) {
+            continue;
+        }
+        if (parsed_message.msgid != MAVLINK_MSG_ID_COMMAND_LONG) {
+            return std::nullopt;
+        }
+        mavlink_command_long_t command{};
+        mavlink_msg_command_long_decode(&parsed_message, &command);
+        return command.command;
+    }
+    return std::nullopt;
 }
 
 std::vector<std::uint8_t> accepted_interval_ack() {
@@ -290,11 +314,14 @@ void quiet_transport_does_not_stall_runtime_scheduling() {
 
 void interactive_autonomy_restart_is_guarded() {
     const onboard_autonomy::mission::TimePoint start{};
+    using onboard_autonomy::mission::AutonomyRuntimeMode;
 
     FakeTransport blocked_transport;
     onboard_autonomy::mission::CompanionApplication blocked_application{
         blocked_transport};
-    require(!blocked_application.request_autonomy_start(start),
+    require(!blocked_application.request_autonomy_start(
+                AutonomyRuntimeMode::precision_landing,
+                start),
         "autonomy start must be blocked without motion permission");
     require(blocked_application.snapshot(start).link_events.back().detail ==
                 "BLOCKED BY MOTION SAFETY POLICY",
@@ -308,11 +335,13 @@ void interactive_autonomy_restart_is_guarded() {
             .flight_startup =
                 {
                     .enabled = true,
+                    .start_automatically = false,
                     .takeoff_altitude_m = 8.0,
                 },
             .autonomy_runtime =
                 {
                     .enabled = true,
+                    .start_automatically = false,
                 },
             .motion_commands_allowed = true,
             .camera_source = &camera,
@@ -320,25 +349,37 @@ void interactive_autonomy_restart_is_guarded() {
             .camera_extrinsics = identity_extrinsics(),
             .simulated_wind = std::nullopt,
         }};
-    require(!application.request_autonomy_start(start),
+    auto snapshot = application.snapshot(start);
+    require(snapshot.flight_startup.phase ==
+                    onboard_autonomy::mission::FlightStartupPhase::idle &&
+                snapshot.autonomy.phase ==
+                    onboard_autonomy::mission::AutonomyRuntimePhase::idle,
+        "interactive autonomy must remain idle until the operator starts it");
+    require(!application.request_autonomy_start(
+                AutonomyRuntimeMode::precision_landing,
+                start),
         "autonomy start must be blocked before heartbeat");
 
     transport.enqueue(autopilot_heartbeat());
     application.poll(start);
-    require(!application.request_autonomy_start(
+    require(application.request_autonomy_start(
+                AutonomyRuntimeMode::aerial_observation,
                 start + std::chrono::milliseconds(1)),
+        "connected idle runtime must accept an operator-selected mission");
+    require(!application.request_autonomy_start(
+                AutonomyRuntimeMode::precision_landing,
+                start + std::chrono::milliseconds(2)),
         "an active autonomy run must not be restarted");
 
-    application.poll(start + std::chrono::seconds(91));
-    transport.enqueue(autopilot_heartbeat());
-    application.poll(start + std::chrono::seconds(92));
-    require(
-        application.request_autonomy_start(
-            start + std::chrono::seconds(92) + std::chrono::milliseconds(1)),
-        "a disarmed terminal run must be restartable");
+    require(application.request_return_to_launch(
+                start + std::chrono::milliseconds(3)),
+        "RTL on a disarmed vehicle must cancel the active scenario");
+    require(application.request_autonomy_start(
+                AutonomyRuntimeMode::precision_landing,
+                start + std::chrono::milliseconds(4)),
+        "a cancelled disarmed run must be restartable in another mode");
 
-    const auto snapshot = application.snapshot(
-        start + std::chrono::seconds(92) + std::chrono::milliseconds(1));
+    snapshot = application.snapshot(start + std::chrono::milliseconds(4));
     require(snapshot.flight_startup.phase ==
                     onboard_autonomy::mission::FlightStartupPhase::
                         waiting_for_vehicle &&
@@ -349,6 +390,61 @@ void interactive_autonomy_restart_is_guarded() {
                 snapshot.link_events.back().status ==
                     onboard_autonomy::mission::LinkEventStatus::pending,
         "restart must reset both state machines and remain observable");
+}
+
+void operator_rtl_aborts_the_active_mission() {
+    using onboard_autonomy::mission::AutonomyRuntimeMode;
+    using onboard_autonomy::mission::AutonomyRuntimePhase;
+    using onboard_autonomy::mission::FlightStartupPhase;
+
+    FakeTransport transport;
+    FakeCameraSource camera;
+    FakeTargetDetector detector;
+    onboard_autonomy::mission::CompanionApplication application{transport,
+        {
+            .flight_startup =
+                {
+                    .enabled = true,
+                    .start_automatically = false,
+                    .takeoff_altitude_m = 8.0,
+                },
+            .autonomy_runtime =
+                {
+                    .enabled = true,
+                    .start_automatically = false,
+                },
+            .motion_commands_allowed = true,
+            .camera_source = &camera,
+            .target_detector = &detector,
+            .camera_extrinsics = identity_extrinsics(),
+            .simulated_wind = std::nullopt,
+        }};
+    const onboard_autonomy::mission::TimePoint start{};
+
+    transport.enqueue(autopilot_heartbeat(true));
+    application.poll(start);
+    require(application.request_return_to_launch(
+                start + std::chrono::milliseconds(1)),
+        "armed vehicle must accept the operator RTL request");
+
+    const auto rtl = std::find_if(transport.outgoing().begin(),
+        transport.outgoing().end(),
+        [](const auto& frame) {
+            return command_long_command(frame) == MAV_CMD_NAV_RETURN_TO_LAUNCH;
+        });
+    require(rtl != transport.outgoing().end(),
+        "operator abort must transmit MAV_CMD_NAV_RETURN_TO_LAUNCH");
+    const auto snapshot =
+        application.snapshot(start + std::chrono::milliseconds(1));
+    require(snapshot.flight_startup.phase == FlightStartupPhase::idle &&
+                snapshot.autonomy.phase ==
+                    AutonomyRuntimePhase::returning_to_launch,
+        "RTL must cancel startup and remain visible as an active state");
+
+    require(!application.request_autonomy_start(
+                AutonomyRuntimeMode::aerial_observation,
+                start + std::chrono::milliseconds(2)),
+        "a new mission must not start while RTL is active");
 }
 
 void autonomy_runtime_requires_vision_guidance() {
@@ -385,5 +481,6 @@ void run_companion_application_tests() {
     application_orchestrates_the_complete_telemetry_setup();
     quiet_transport_does_not_stall_runtime_scheduling();
     interactive_autonomy_restart_is_guarded();
+    operator_rtl_aborts_the_active_mission();
     autonomy_runtime_requires_vision_guidance();
 }

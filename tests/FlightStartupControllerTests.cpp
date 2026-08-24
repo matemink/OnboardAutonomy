@@ -191,12 +191,10 @@ void startup_reports_missing_navigation_estimate() {
     vehicle.navigation_ready = false;
     vehicle.armable = false;
 
-    require(controller
-                .update(vehicle, true, accepted_failsafe(), TimePoint{})
+    require(controller.update(vehicle, true, accepted_failsafe(), TimePoint{})
                 .empty(),
         "missing navigation must block startup commands");
-    require(controller.snapshot().detail ==
-                "Waiting for a navigation estimate",
+    require(controller.snapshot().detail == "Waiting for a navigation estimate",
         "startup must describe the source-neutral navigation requirement");
 }
 
@@ -222,6 +220,26 @@ void restart_clears_terminal_startup_state() {
         "restart must reset startup state for another flight");
 }
 
+void operator_controlled_startup_stays_idle_until_restarted() {
+    FlightStartupController controller{{
+        .enabled = true,
+        .start_automatically = false,
+        .takeoff_altitude_m = 5.0,
+    }};
+
+    require(
+        controller.snapshot().phase == FlightStartupPhase::idle &&
+            controller
+                .update(ready_vehicle(), true, accepted_failsafe(), TimePoint{})
+                .empty(),
+        "operator-controlled startup must not emit commands while idle");
+
+    controller.restart();
+    require(controller.snapshot().phase ==
+                FlightStartupPhase::waiting_for_vehicle,
+        "operator mission selection must activate flight startup");
+}
+
 } // namespace
 
 void run_flight_startup_controller_tests() {
@@ -232,4 +250,5 @@ void run_flight_startup_controller_tests() {
     startup_uses_source_neutral_navigation_readiness();
     startup_reports_missing_navigation_estimate();
     restart_clears_terminal_startup_state();
+    operator_controlled_startup_stays_idle_until_restarted();
 }

@@ -18,9 +18,11 @@ namespace onboard_autonomy::mission {
 
 enum class AutonomyRuntimePhase {
     disabled,
+    idle,
     waiting_for_startup,
     active,
     landing,
+    returning_to_launch,
     completed,
     failed,
 };
@@ -44,6 +46,7 @@ struct AutonomyRuntimeConfig {
     static constexpr double kDefaultForwardCameraHorizontalFovRadians = 2.0;
 
     bool enabled{false};
+    bool start_automatically{true};
     AutonomyRuntimeMode mode{AutonomyRuntimeMode::precision_landing};
     std::chrono::milliseconds target_loss_land_after{
         kDefaultTargetLossLandAfter};
@@ -92,6 +95,9 @@ class AutonomyRuntime {
         mission::TimePoint now);
 
     void restart();
+    void restart(AutonomyRuntimeMode mode);
+    void cancel(std::string detail);
+    void begin_return_to_launch(std::uint8_t vehicle_system_id);
     [[nodiscard]] AutonomyRuntimeSnapshot snapshot() const;
 
   private:
@@ -120,6 +126,9 @@ class AutonomyRuntime {
     handle_approved_motion(const DesiredMotion& intent, mission::TimePoint now);
     [[nodiscard]] std::optional<FlightActionRequest> update_land_command(
         mission::TimePoint now);
+    [[nodiscard]] std::vector<FlightActionRequest> update_return_to_launch(
+        const mission::VehicleSnapshot& vehicle);
+    void reset_runtime_state();
     void fail(std::string detail);
 
     static constexpr auto kLandingTargetInterval =

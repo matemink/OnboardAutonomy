@@ -584,6 +584,7 @@ std::string battery_detail(const mission::VehicleSnapshot& vehicle) {
 std::string startup_phase_name(const mission::FlightStartupPhase phase) {
     switch (phase) {
     case mission::FlightStartupPhase::disabled:
+    case mission::FlightStartupPhase::idle:
         return "IDLE";
     case mission::FlightStartupPhase::waiting_for_vehicle:
     case mission::FlightStartupPhase::waiting_for_readiness:
@@ -605,6 +606,7 @@ std::string startup_phase_name(const mission::FlightStartupPhase phase) {
 std::string autonomy_phase_name(const mission::AutonomyRuntimePhase phase) {
     switch (phase) {
     case mission::AutonomyRuntimePhase::disabled:
+    case mission::AutonomyRuntimePhase::idle:
         return "IDLE";
     case mission::AutonomyRuntimePhase::waiting_for_startup:
         return "WAITING";
@@ -612,6 +614,8 @@ std::string autonomy_phase_name(const mission::AutonomyRuntimePhase phase) {
         return "ACTIVE";
     case mission::AutonomyRuntimePhase::landing:
         return "LANDING";
+    case mission::AutonomyRuntimePhase::returning_to_launch:
+        return "RTL";
     case mission::AutonomyRuntimePhase::completed:
         return "COMPLETE";
     case mission::AutonomyRuntimePhase::failed:
@@ -628,8 +632,10 @@ Tone autonomy_tone(const mission::AutonomyRuntimePhase phase) {
         return Tone::bad;
     case mission::AutonomyRuntimePhase::active:
     case mission::AutonomyRuntimePhase::landing:
+    case mission::AutonomyRuntimePhase::returning_to_launch:
         return Tone::accent;
     case mission::AutonomyRuntimePhase::disabled:
+    case mission::AutonomyRuntimePhase::idle:
         return Tone::dim;
     case mission::AutonomyRuntimePhase::waiting_for_startup:
         return Tone::waiting;
@@ -706,7 +712,11 @@ std::string overall_status(const mission::AppSnapshot& snapshot) {
         snapshot.flight_startup.phase == mission::FlightStartupPhase::failed) {
         return "FLIGHT FAILED";
     }
-    if (phase != mission::AutonomyRuntimePhase::disabled) {
+    if (phase == mission::AutonomyRuntimePhase::returning_to_launch) {
+        return "RETURNING TO LAUNCH";
+    }
+    if (phase != mission::AutonomyRuntimePhase::disabled &&
+        phase != mission::AutonomyRuntimePhase::idle) {
         return "AUTONOMY RUNNING";
     }
     if (!vehicle.connected) {
@@ -726,7 +736,7 @@ Tone overall_tone(const mission::AppSnapshot& snapshot) {
     if (status == "NOT READY" || status == "FLIGHT FAILED") {
         return Tone::bad;
     }
-    if (status == "AUTONOMY RUNNING") {
+    if (status == "AUTONOMY RUNNING" || status == "RETURNING TO LAUNCH") {
         return Tone::accent;
     }
     return Tone::waiting;
@@ -875,6 +885,7 @@ void write_runtime_footer(std::ostringstream& output,
     const auto& autonomy = snapshot.autonomy;
     const bool startup_finished =
         startup.phase == mission::FlightStartupPhase::completed ||
+        startup.phase == mission::FlightStartupPhase::idle ||
         startup.phase == mission::FlightStartupPhase::disabled;
 
     write_border(output, '-', use_color);
@@ -889,10 +900,16 @@ void write_runtime_footer(std::ostringstream& output,
         use_color);
     write_centered_line(output,
         snapshot.motion_commands_allowed
-            ? "[S] START AGAIN     [Q] QUIT"
+            ? "[1] LAND ON APRILTAG     [2] TRACK ZEPHYR (HOLD + YAW)"
             : "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT",
         snapshot.motion_commands_allowed ? Tone::normal : Tone::dim,
         use_color);
+    if (snapshot.motion_commands_allowed) {
+        write_centered_line(output,
+            "[R] ABORT MISSION + RTL     [Q] QUIT",
+            Tone::normal,
+            use_color);
+    }
     write_border(output, '=', use_color);
 }
 

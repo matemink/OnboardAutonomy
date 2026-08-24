@@ -38,7 +38,9 @@ class CompanionApplication {
     // deterministic.
     void poll();
     void poll(mission::TimePoint now);
-    [[nodiscard]] bool request_autonomy_start(mission::TimePoint now);
+    [[nodiscard]] bool request_autonomy_start(AutonomyRuntimeMode mode,
+        mission::TimePoint now);
+    [[nodiscard]] bool request_return_to_launch(mission::TimePoint now);
     [[nodiscard]] AppSnapshot snapshot(mission::TimePoint now);
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_camera_frame();

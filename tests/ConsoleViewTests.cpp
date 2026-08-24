@@ -149,7 +149,10 @@ void command_bus_shows_both_directions() {
     require(output.find("SET_MODE") != std::string::npos &&
                 output.find("ACCEPTED") != std::string::npos,
         "command and acknowledgement labels must be visible");
-    require(output.find("[S] START AGAIN") != std::string::npos &&
+    require(output.find("[1] LAND ON APRILTAG") != std::string::npos &&
+                output.find("[2] TRACK ZEPHYR (HOLD + YAW)") !=
+                    std::string::npos &&
+                output.find("[R] ABORT MISSION + RTL") != std::string::npos &&
                 output.find("[Q] QUIT") != std::string::npos,
         "interactive command hints must be visible");
     require(output.find("AUTONOMY: ACTIVE") != std::string::npos &&

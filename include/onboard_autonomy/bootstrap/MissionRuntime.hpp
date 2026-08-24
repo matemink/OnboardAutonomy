@@ -67,6 +67,7 @@ struct MissionRuntimeConfig {
     std::optional<mission::SimulatedWindProfile> simulated_wind;
     MissionEnvironment environment{MissionEnvironment::hardware};
     bool autonomous{};
+    bool start_automatically{true};
     mission::AutonomyRuntimeMode autonomy_mode{
         mission::AutonomyRuntimeMode::precision_landing};
     bool motion_commands_requested{};

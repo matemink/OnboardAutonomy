@@ -514,6 +514,51 @@ void restart_clears_terminal_autonomy_state() {
         "restart must reset autonomy state for another flight");
 }
 
+void operator_controls_runtime_mode_and_rtl_lifecycle() {
+    AutonomyRuntime runtime{{
+        .enabled = true,
+        .start_automatically = false,
+    }};
+    const TimePoint start{};
+
+    require(runtime.snapshot().phase == AutonomyRuntimePhase::idle &&
+                runtime
+                    .update(flying_vehicle(),
+                        completed_startup(),
+                        accepted_failsafe(),
+                        start)
+                    .empty(),
+        "operator-controlled autonomy must stay idle without a mission");
+
+    runtime.restart(AutonomyRuntimeMode::aerial_observation);
+    require(runtime.snapshot().phase ==
+                    AutonomyRuntimePhase::waiting_for_startup &&
+                runtime.snapshot().detail.find("aerial observation") !=
+                    std::string::npos,
+        "operator must be able to select the aerial tracking mode");
+
+    runtime.begin_return_to_launch(1);
+    runtime.on_command_ack(FlightAction::return_to_launch,
+        FlightCommandAckOutcome::accepted,
+        0,
+        1,
+        start);
+    require(runtime.snapshot().phase ==
+                    AutonomyRuntimePhase::returning_to_launch &&
+                runtime.snapshot().detail.find("accepted") != std::string::npos,
+        "accepted RTL must remain active while the vehicle is armed");
+
+    auto disarmed = flying_vehicle();
+    disarmed.armed = false;
+    require(runtime.update(disarmed,
+                       completed_startup(),
+                       accepted_failsafe(),
+                       start + std::chrono::seconds(1))
+                    .empty() &&
+                runtime.snapshot().phase == AutonomyRuntimePhase::completed,
+        "RTL must complete after the flight controller reports disarm");
+}
+
 } // namespace
 
 void run_autonomy_runtime_tests() {
@@ -528,4 +573,5 @@ void run_autonomy_runtime_tests() {
     link_loss_stops_runtime_output();
     rejected_link_failsafe_stops_runtime_output();
     restart_clears_terminal_autonomy_state();
+    operator_controls_runtime_mode_and_rtl_lifecycle();
 }

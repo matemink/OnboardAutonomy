@@ -133,12 +133,14 @@ class MissionRuntime::Impl {
                     .flight_startup =
                         {
                             .enabled = config.autonomous,
+                            .start_automatically = config.start_automatically,
                             .takeoff_altitude_m = mission::FlightStartupConfig::
                                 kDefaultTakeoffAltitudeM,
                         },
                     .autonomy_runtime =
                         {
                             .enabled = config.autonomous,
+                            .start_automatically = config.start_automatically,
                             .mode = config.autonomy_mode,
                         },
                     .motion_commands_allowed = safety_.motion_commands_allowed,

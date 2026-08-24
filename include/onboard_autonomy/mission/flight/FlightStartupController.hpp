@@ -13,6 +13,7 @@ namespace onboard_autonomy::mission {
 
 enum class FlightStartupPhase {
     disabled,
+    idle,
     waiting_for_vehicle,
     waiting_for_readiness,
     setting_guided,
@@ -26,6 +27,7 @@ struct FlightStartupConfig {
     static constexpr double kDefaultTakeoffAltitudeM = 8.0;
 
     bool enabled{false};
+    bool start_automatically{true};
     double takeoff_altitude_m{kDefaultTakeoffAltitudeM};
 };
 
@@ -58,6 +60,7 @@ class FlightStartupController {
         mission::TimePoint now);
 
     void restart();
+    void cancel(std::string detail);
     [[nodiscard]] FlightStartupSnapshot snapshot() const;
 
   private:

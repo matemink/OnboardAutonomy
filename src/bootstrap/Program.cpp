@@ -165,6 +165,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .simulated_wind = std::nullopt,
         .environment = MissionEnvironment::hardware,
         .autonomous = options.autonomy.enabled,
+        .start_automatically = !options.operator_interface.interactive,
         .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
@@ -183,6 +184,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .simulated_wind = options.wind,
         .environment = MissionEnvironment::simulation,
         .autonomous = options.autonomy.enabled,
+        .start_automatically = !options.operator_interface.interactive,
         .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
@@ -360,8 +362,14 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
 
     [[nodiscard]] std::optional<RuntimeCommand> poll() override {
         while (const auto key = input_.poll()) {
-            if (*key == 's' || *key == 'S') {
-                return RuntimeCommand::start_autonomy;
+            if (*key == '1') {
+                return RuntimeCommand::start_precision_landing;
+            }
+            if (*key == '2') {
+                return RuntimeCommand::start_aerial_tracking;
+            }
+            if (*key == 'r' || *key == 'R') {
+                return RuntimeCommand::return_to_launch;
             }
             if (*key == 'q' || *key == 'Q') {
                 return RuntimeCommand::shutdown;
