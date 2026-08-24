@@ -145,7 +145,8 @@ class MissionRuntime::Impl {
                         },
                     .motion_commands_allowed = safety_.motion_commands_allowed,
                     .aerial_tracking_allowed =
-                        config.environment == MissionEnvironment::simulation,
+                        config.environment == MissionEnvironment::simulation &&
+                        config.aerial_tracking_allowed,
                     .camera_source = camera_source_.get(),
                     .target_detector = target_detector_.get(),
                     .camera_extrinsics = camera_extrinsics_,

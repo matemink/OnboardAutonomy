@@ -166,6 +166,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .environment = MissionEnvironment::hardware,
         .autonomous = options.autonomy.enabled,
         .start_automatically = !options.operator_interface.interactive,
+        .aerial_tracking_allowed = false,
         .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
@@ -185,6 +186,8 @@ MissionRuntimeConfig make_mission_runtime_config(
         .environment = MissionEnvironment::simulation,
         .autonomous = options.autonomy.enabled,
         .start_automatically = !options.operator_interface.interactive,
+        .aerial_tracking_allowed =
+            options.diagnostics.forward_camera.has_value(),
         .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,

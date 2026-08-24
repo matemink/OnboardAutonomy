@@ -538,12 +538,17 @@ void operator_controls_runtime_mode_and_rtl_lifecycle() {
         "operator must be able to select the aerial tracking mode");
 
     runtime.begin_return_to_launch(1, start);
+    runtime.on_command_ack(FlightAction::return_to_launch,
+        FlightCommandAckOutcome::accepted,
+        0,
+        1,
+        start);
     const auto rtl = only_action(runtime.update(flying_vehicle(),
                                      completed_startup(),
                                      accepted_failsafe(),
                                      start),
         FlightAction::return_to_launch,
-        "RTL must be emitted after operator cancellation");
+        "a stale ACK must not suppress the new operator RTL command");
     runtime.on_action_sent(rtl, true, start);
     runtime.on_command_ack(FlightAction::return_to_launch,
         FlightCommandAckOutcome::accepted,

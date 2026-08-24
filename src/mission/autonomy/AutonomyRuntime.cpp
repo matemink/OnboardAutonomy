@@ -386,7 +386,7 @@ void AutonomyRuntime::on_command_ack(const FlightAction action,
     const mission::TimePoint now) {
     if (action == FlightAction::return_to_launch &&
         phase_ == AutonomyRuntimePhase::returning_to_launch &&
-        vehicle_system_id_.has_value() &&
+        awaiting_rtl_ack_ && vehicle_system_id_.has_value() &&
         source_system == *vehicle_system_id_) {
         if (outcome == FlightCommandAckOutcome::rejected) {
             awaiting_rtl_ack_ = false;
