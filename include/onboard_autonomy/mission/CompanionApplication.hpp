@@ -5,8 +5,10 @@
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/mission/cv/extrinsics/TargetTransform.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 
 namespace onboard_autonomy::mission {
 
@@ -40,6 +42,12 @@ class CompanionApplication {
     [[nodiscard]] AppSnapshot snapshot(mission::TimePoint now);
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_camera_frame();
+    void update_forward_target_observations(
+        std::span<const mission::TargetObservation> observations,
+        std::uint32_t frame_width,
+        std::uint32_t frame_height,
+        std::uint64_t frame_sequence,
+        mission::TimePoint now);
 
   private:
     class Impl;

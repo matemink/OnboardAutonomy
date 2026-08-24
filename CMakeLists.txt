@@ -282,6 +282,7 @@ add_library(
     src/mission/flight/FlightStartupController.cpp
     src/mission/safety/MotionSafetyPolicy.cpp
     src/mission/safety/SafetySupervisor.cpp
+    src/mission/cv/tracking/AerialTargetTracker.cpp
     src/mission/cv/tracking/TargetTracker.cpp
     src/mission/cv/VisionMonitor.cpp
     src/mission/autonomy/WorldState.cpp
@@ -436,6 +437,7 @@ if(BUILD_TESTING)
         tests/JsonDiagnosticSinkTests.cpp
         tests/AutonomyCoreTests.cpp
         tests/AutonomyRuntimeTests.cpp
+        tests/AerialTargetTrackerTests.cpp
         tests/FlightStartupControllerTests.cpp
         tests/BoardTypeCatalogTests.cpp
         tests/CameraMonitorTests.cpp

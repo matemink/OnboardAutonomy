@@ -12,6 +12,7 @@ enum class FlightAction {
     return_to_launch,
     land,
     landing_target,
+    condition_yaw,
 };
 
 enum class FlightCommandAckOutcome {
@@ -28,6 +29,8 @@ struct FlightActionRequest {
     double x_m{0.0};
     double y_m{0.0};
     double z_m{0.0};
+    double yaw_degrees{0.0};
+    double yaw_speed_degrees_per_second{0.0};
     std::uint64_t time_usec{0};
 };
 

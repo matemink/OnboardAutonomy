@@ -7,6 +7,7 @@ void run_mavlink_decoder_tests();
 void run_mavlink_encoder_tests();
 void run_telemetry_stream_configurator_tests();
 void run_target_tracker_tests();
+void run_aerial_target_tracker_tests();
 void run_target_transform_tests();
 void run_console_view_tests();
 void run_board_type_catalog_tests();

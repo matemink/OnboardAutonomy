@@ -82,36 +82,15 @@
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
-      <diffuse>0.9 0.9 0.9 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
+      <diffuse>0.45 0.45 0.45 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
-    <model name="ground">
-      <static>true</static>
-      <link name="ground_link">
-        <collision name="ground_collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>200 200</size>
-            </plane>
-          </geometry>
-        </collision>
-        <visual name="ground_visual">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>200 200</size>
-            </plane>
-          </geometry>
-          <material>
-            <ambient>0.22 0.30 0.22 1</ambient>
-            <diffuse>0.30 0.40 0.30 1</diffuse>
-          </material>
-        </visual>
-      </link>
-    </model>
+    <include>
+      <uri>model://lightweight_grass_ground</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
 
     <include>
       <uri>model://apriltag_landing_pad</uri>

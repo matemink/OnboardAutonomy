@@ -22,6 +22,13 @@ PAD_MODEL = (
     / "apriltag_landing_pad"
     / "model.sdf"
 )
+GROUND_MODEL_DIR = (
+    PROJECT_ROOT
+    / "simulation"
+    / "models"
+    / "lightweight_grass_ground"
+)
+GROUND_MODEL = GROUND_MODEL_DIR / "model.sdf"
 WORLD = (
     PROJECT_ROOT
     / "simulation"
@@ -198,6 +205,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertEqual(
             set(includes),
             {
+                "model://lightweight_grass_ground",
                 "model://apriltag_landing_pad",
                 "model://iris_with_landing_camera",
             },
@@ -227,6 +235,43 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             ].findtext("name"),
             "Holybro_S500",
         )
+
+    def test_ground_uses_one_lightweight_textured_plane(self) -> None:
+        world = element_tree.parse(WORLD).getroot().find("world")
+        self.assertIsNotNone(world)
+        sun = world.find("light[@name='sun']")
+        self.assertIsNotNone(sun)
+        self.assertEqual(sun.findtext("cast_shadows"), "true")
+        self.assertEqual(sun.findtext("diffuse"), "0.45 0.45 0.45 1")
+
+        model = element_tree.parse(GROUND_MODEL).getroot().find("model")
+        self.assertIsNotNone(model)
+
+        collisions = model.findall("link/collision")
+        visuals = model.findall("link/visual")
+        self.assertEqual(len(collisions), 1)
+        self.assertEqual(len(visuals), 1)
+        self.assertEqual(
+            collisions[0].findtext("geometry/plane/size"),
+            "200 200",
+        )
+        self.assertEqual(
+            visuals[0].findtext("geometry/mesh/uri"),
+            "meshes/ground.obj",
+        )
+
+        mesh = GROUND_MODEL_DIR / "meshes" / "ground.obj"
+        mesh_lines = mesh.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(sum(line.startswith("v ") for line in mesh_lines), 4)
+        self.assertEqual(sum(line.startswith("f ") for line in mesh_lines), 2)
+
+        texture_uri = visuals[0].findtext(
+            "material/pbr/metal/albedo_map"
+        )
+        texture = GROUND_MODEL_DIR / texture_uri
+        self.assertTrue(texture.is_file())
+        self.assertLess(texture.stat().st_size, 3_000_000)
+        self.assertTrue((GROUND_MODEL_DIR / "NOTICE.md").is_file())
 
     def test_showcase_world_is_opt_in_and_starts_clean(self) -> None:
         deterministic = element_tree.parse(WORLD).getroot().find("world")

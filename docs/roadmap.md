@@ -254,7 +254,7 @@ weighted campaigns should run 80-90% of missions in that profile.
 - [ ] Report bounding box, bearing, confidence, capture time, and track ID;
   keep range unavailable until a calibrated relative-position estimator can
   provide it with explicit uncertainty.
-- [ ] Add temporal tracking, target-loss detection, and bounded reacquisition.
+- [x] Add temporal tracking, target-loss detection, and bounded reacquisition.
 - [ ] Compare detections with evaluator-only ground truth for precision,
   recall, bearing error, continuity, and processing latency.
 
