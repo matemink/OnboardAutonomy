@@ -88,9 +88,19 @@ void CompanionRunner::handle_runtime_commands() {
     }
     while (const auto command = command_source_->poll()) {
         const auto command_time = std::chrono::steady_clock::now();
-        if (*command == RuntimeCommand::start_autonomy) {
+        if (*command == RuntimeCommand::start_precision_landing) {
+            static_cast<void>(application_.request_autonomy_start(
+                mission::AutonomyRuntimeMode::precision_landing,
+                command_time));
+            next_snapshot_ = command_time;
+        } else if (*command == RuntimeCommand::start_aerial_tracking) {
+            static_cast<void>(application_.request_autonomy_start(
+                mission::AutonomyRuntimeMode::aerial_observation,
+                command_time));
+            next_snapshot_ = command_time;
+        } else if (*command == RuntimeCommand::return_to_launch) {
             static_cast<void>(
-                application_.request_autonomy_start(command_time));
+                application_.request_return_to_launch(command_time));
             next_snapshot_ = command_time;
         } else if (*command == RuntimeCommand::shutdown) {
             keep_running = 0;

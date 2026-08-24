@@ -85,6 +85,8 @@ std::string_view startup_phase_name(const mission::FlightStartupPhase phase) {
     switch (phase) {
     case FlightStartupPhase::disabled:
         return "disabled";
+    case FlightStartupPhase::idle:
+        return "idle";
     case FlightStartupPhase::waiting_for_vehicle:
         return "waiting_for_vehicle";
     case FlightStartupPhase::waiting_for_readiness:
@@ -109,12 +111,16 @@ std::string_view autonomy_phase_name(
     switch (phase) {
     case AutonomyRuntimePhase::disabled:
         return "disabled";
+    case AutonomyRuntimePhase::idle:
+        return "idle";
     case AutonomyRuntimePhase::waiting_for_startup:
         return "waiting_for_startup";
     case AutonomyRuntimePhase::active:
         return "active";
     case AutonomyRuntimePhase::landing:
         return "landing";
+    case AutonomyRuntimePhase::returning_to_launch:
+        return "returning_to_launch";
     case AutonomyRuntimePhase::completed:
         return "completed";
     case AutonomyRuntimePhase::failed:

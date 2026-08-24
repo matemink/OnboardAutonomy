@@ -46,8 +46,10 @@ AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
         config_.forward_camera_horizontal_fov_radians <= 0.0) {
         throw std::invalid_argument("invalid aerial yaw guidance thresholds");
     }
-    if (config_.enabled) {
+    if (config_.enabled && config_.start_automatically) {
         restart();
+    } else if (config_.enabled) {
+        cancel("Waiting for operator mission selection");
     }
 }
 
@@ -59,9 +61,13 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     std::optional<mission::BodyFramePosition> landing_target,
     std::optional<AerialTargetTrackSnapshot> aerial_target) {
     if (phase_ == AutonomyRuntimePhase::disabled ||
+        phase_ == AutonomyRuntimePhase::idle ||
         phase_ == AutonomyRuntimePhase::completed ||
         phase_ == AutonomyRuntimePhase::failed) {
         return {};
+    }
+    if (phase_ == AutonomyRuntimePhase::returning_to_launch) {
+        return update_return_to_launch(vehicle, now);
     }
     if (!prepare_active_runtime(startup, companion_link_failsafe, now) ||
         !validate_runtime_context(vehicle, companion_link_failsafe)) {
@@ -345,6 +351,17 @@ std::vector<FlightActionRequest> AutonomyRuntime::handle_approved_motion(
 void AutonomyRuntime::on_action_sent(const FlightActionRequest& request,
     const bool sent,
     const mission::TimePoint) {
+    if (request.action == FlightAction::return_to_launch) {
+        if (!sent && phase_ == AutonomyRuntimePhase::returning_to_launch) {
+            awaiting_rtl_ack_ = false;
+            if (rtl_attempt_ >= kMaximumRtlAttempts) {
+                fail("Failed to send RTL after 3 attempts");
+            } else {
+                detail_ = "Failed to send RTL; retrying";
+            }
+        }
+        return;
+    }
     if (request.action == FlightAction::landing_target) {
         vision_landing_target_active_ = sent;
         if (!sent) {
@@ -367,6 +384,28 @@ void AutonomyRuntime::on_command_ack(const FlightAction action,
     const std::uint8_t raw_result,
     const std::uint8_t source_system,
     const mission::TimePoint now) {
+    if (action == FlightAction::return_to_launch &&
+        phase_ == AutonomyRuntimePhase::returning_to_launch &&
+        awaiting_rtl_ack_ && vehicle_system_id_.has_value() &&
+        source_system == *vehicle_system_id_) {
+        if (outcome == FlightCommandAckOutcome::rejected) {
+            awaiting_rtl_ack_ = false;
+            if (rtl_attempt_ >= kMaximumRtlAttempts) {
+                failure_result_ = raw_result;
+                fail("RTL was rejected with MAV_RESULT " +
+                     std::to_string(raw_result));
+            } else {
+                detail_ = "RTL rejected; retrying";
+            }
+        } else {
+            awaiting_rtl_ack_ = false;
+            rtl_acknowledged_ = true;
+            detail_ = outcome == FlightCommandAckOutcome::accepted
+                          ? "RTL accepted; monitoring return"
+                          : "RTL is in progress";
+        }
+        return;
+    }
     if (action != FlightAction::land || !awaiting_land_ack_ ||
         !vehicle_system_id_.has_value() ||
         source_system != *vehicle_system_id_) {
@@ -401,6 +440,33 @@ void AutonomyRuntime::restart() {
                       ? "Preparing takeoff for aerial observation"
                       : "Waiting for verified flight startup";
     }
+    reset_runtime_state();
+}
+
+void AutonomyRuntime::restart(const AutonomyRuntimeMode mode) {
+    config_.mode = mode;
+    restart();
+}
+
+void AutonomyRuntime::cancel(std::string detail) {
+    restart();
+    if (config_.enabled) {
+        phase_ = AutonomyRuntimePhase::idle;
+        detail_ = std::move(detail);
+    }
+}
+
+void AutonomyRuntime::begin_return_to_launch(
+    const std::uint8_t vehicle_system_id,
+    const mission::TimePoint now) {
+    reset_runtime_state();
+    phase_ = AutonomyRuntimePhase::returning_to_launch;
+    detail_ = "RTL requested; waiting for ArduPilot";
+    vehicle_system_id_ = vehicle_system_id;
+    acknowledgement_deadline_ = now;
+}
+
+void AutonomyRuntime::reset_runtime_state() {
     motion_safety_status_ = MotionSafetyStatus::no_intent;
     vehicle_system_id_.reset();
     land_command_after_.reset();
@@ -411,11 +477,52 @@ void AutonomyRuntime::restart() {
     acknowledgement_deadline_ = {};
     landing_deadline_ = {};
     land_attempt_ = 0;
+    rtl_attempt_ = 0;
     awaiting_land_ack_ = false;
+    awaiting_rtl_ack_ = false;
+    rtl_acknowledged_ = false;
     vision_landing_target_active_ = false;
     terminal_alignment_confirmed_ = false;
     terminal_descent_active_ = false;
     failure_result_.reset();
+}
+
+std::vector<FlightActionRequest> AutonomyRuntime::update_return_to_launch(
+    const mission::VehicleSnapshot& vehicle,
+    const mission::TimePoint now) {
+    if (!vehicle.connected) {
+        fail("Flight-controller heartbeat was lost during RTL");
+        return {};
+    }
+    if (!vehicle_system_id_.has_value()) {
+        fail("Cannot send RTL without a vehicle system ID");
+        return {};
+    }
+    if (rtl_acknowledged_ && !vehicle.armed) {
+        phase_ = AutonomyRuntimePhase::completed;
+        detail_ = "RTL complete; vehicle disarmed";
+        return {};
+    }
+    if (rtl_acknowledged_ ||
+        (awaiting_rtl_ack_ && now < acknowledgement_deadline_)) {
+        return {};
+    }
+    awaiting_rtl_ack_ = false;
+    if (rtl_attempt_ >= kMaximumRtlAttempts) {
+        fail("No COMMAND_ACK for RTL after 3 attempts");
+        return {};
+    }
+
+    const auto confirmation = static_cast<std::uint8_t>(rtl_attempt_);
+    ++rtl_attempt_;
+    awaiting_rtl_ack_ = true;
+    acknowledgement_deadline_ = now + kRtlAcknowledgementTimeout;
+    detail_ = "RTL attempt " + std::to_string(rtl_attempt_) + "/3";
+    return {{
+        .action = FlightAction::return_to_launch,
+        .vehicle_system_id = *vehicle_system_id_,
+        .confirmation = confirmation,
+    }};
 }
 
 AutonomyRuntimeSnapshot AutonomyRuntime::snapshot() const {

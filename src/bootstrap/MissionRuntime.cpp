@@ -133,15 +133,20 @@ class MissionRuntime::Impl {
                     .flight_startup =
                         {
                             .enabled = config.autonomous,
+                            .start_automatically = config.start_automatically,
                             .takeoff_altitude_m = mission::FlightStartupConfig::
                                 kDefaultTakeoffAltitudeM,
                         },
                     .autonomy_runtime =
                         {
                             .enabled = config.autonomous,
+                            .start_automatically = config.start_automatically,
                             .mode = config.autonomy_mode,
                         },
                     .motion_commands_allowed = safety_.motion_commands_allowed,
+                    .aerial_tracking_allowed =
+                        config.environment == MissionEnvironment::simulation &&
+                        config.aerial_tracking_allowed,
                     .camera_source = camera_source_.get(),
                     .target_detector = target_detector_.get(),
                     .camera_extrinsics = camera_extrinsics_,

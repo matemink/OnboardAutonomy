@@ -89,8 +89,10 @@ FlightStartupController::FlightStartupController(FlightStartupConfig config)
         throw std::invalid_argument(
             "takeoff altitude must be finite and positive");
     }
-    if (config_.enabled) {
+    if (config_.enabled && config_.start_automatically) {
         restart();
+    } else if (config_.enabled) {
+        cancel("Waiting for operator mission selection");
     }
 }
 
@@ -101,6 +103,7 @@ std::vector<FlightActionRequest> FlightStartupController::update(
     const mission::TimePoint now) {
     std::vector<FlightActionRequest> actions;
     if (phase_ == FlightStartupPhase::disabled ||
+        phase_ == FlightStartupPhase::idle ||
         phase_ == FlightStartupPhase::completed ||
         phase_ == FlightStartupPhase::failed) {
         return actions;
@@ -164,6 +167,7 @@ FlightStartupController::update_current_phase(
     case FlightStartupPhase::taking_off:
         return update_taking_off(vehicle, now, actions);
     case FlightStartupPhase::disabled:
+    case FlightStartupPhase::idle:
     case FlightStartupPhase::completed:
     case FlightStartupPhase::failed:
         return PhaseUpdate::stop;
@@ -339,6 +343,14 @@ void FlightStartupController::restart() {
     failure_result_.reset();
 }
 
+void FlightStartupController::cancel(std::string detail) {
+    restart();
+    if (config_.enabled) {
+        phase_ = FlightStartupPhase::idle;
+        detail_ = std::move(detail);
+    }
+}
+
 FlightStartupSnapshot FlightStartupController::snapshot() const {
     return {
         .phase = phase_,
@@ -374,6 +386,7 @@ void FlightStartupController::enter_phase(const FlightStartupPhase phase,
         detail_ = "Preparing takeoff";
         break;
     case FlightStartupPhase::disabled:
+    case FlightStartupPhase::idle:
     case FlightStartupPhase::waiting_for_vehicle:
     case FlightStartupPhase::completed:
     case FlightStartupPhase::failed:
@@ -452,6 +465,7 @@ std::optional<FlightAction> FlightStartupController::expected_action() const {
     case FlightStartupPhase::taking_off:
         return FlightAction::takeoff;
     case FlightStartupPhase::disabled:
+    case FlightStartupPhase::idle:
     case FlightStartupPhase::waiting_for_vehicle:
     case FlightStartupPhase::waiting_for_readiness:
     case FlightStartupPhase::completed:

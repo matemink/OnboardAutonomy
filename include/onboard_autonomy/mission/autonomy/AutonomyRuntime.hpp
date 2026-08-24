@@ -18,9 +18,11 @@ namespace onboard_autonomy::mission {
 
 enum class AutonomyRuntimePhase {
     disabled,
+    idle,
     waiting_for_startup,
     active,
     landing,
+    returning_to_launch,
     completed,
     failed,
 };
@@ -44,6 +46,7 @@ struct AutonomyRuntimeConfig {
     static constexpr double kDefaultForwardCameraHorizontalFovRadians = 2.0;
 
     bool enabled{false};
+    bool start_automatically{true};
     AutonomyRuntimeMode mode{AutonomyRuntimeMode::precision_landing};
     std::chrono::milliseconds target_loss_land_after{
         kDefaultTargetLossLandAfter};
@@ -92,6 +95,10 @@ class AutonomyRuntime {
         mission::TimePoint now);
 
     void restart();
+    void restart(AutonomyRuntimeMode mode);
+    void cancel(std::string detail);
+    void begin_return_to_launch(std::uint8_t vehicle_system_id,
+        mission::TimePoint now);
     [[nodiscard]] AutonomyRuntimeSnapshot snapshot() const;
 
   private:
@@ -120,14 +127,20 @@ class AutonomyRuntime {
     handle_approved_motion(const DesiredMotion& intent, mission::TimePoint now);
     [[nodiscard]] std::optional<FlightActionRequest> update_land_command(
         mission::TimePoint now);
+    [[nodiscard]] std::vector<FlightActionRequest> update_return_to_launch(
+        const mission::VehicleSnapshot& vehicle,
+        mission::TimePoint now);
+    void reset_runtime_state();
     void fail(std::string detail);
 
     static constexpr auto kLandingTargetInterval =
         std::chrono::milliseconds(100);
     static constexpr auto kLandingTargetWarmup = std::chrono::seconds(1);
     static constexpr auto kAcknowledgementTimeout = std::chrono::seconds(2);
+    static constexpr auto kRtlAcknowledgementTimeout = std::chrono::seconds(2);
     static constexpr auto kLandingTimeout = std::chrono::seconds(90);
     static constexpr std::size_t kMaximumLandAttempts = 3;
+    static constexpr std::size_t kMaximumRtlAttempts = 3;
     static constexpr double kTargetStopAltitudeM = 0.20;
 
     AutonomyRuntimeConfig config_;
@@ -145,7 +158,10 @@ class AutonomyRuntime {
     mission::TimePoint acknowledgement_deadline_{};
     mission::TimePoint landing_deadline_{};
     std::size_t land_attempt_{0};
+    std::size_t rtl_attempt_{0};
     bool awaiting_land_ack_{false};
+    bool awaiting_rtl_ack_{false};
+    bool rtl_acknowledged_{false};
     bool vision_landing_target_active_{false};
     bool terminal_alignment_confirmed_{false};
     bool terminal_descent_active_{false};

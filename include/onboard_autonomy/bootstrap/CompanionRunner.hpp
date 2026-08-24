@@ -25,7 +25,9 @@ namespace onboard_autonomy::bootstrap {
 class RuntimeSnapshotSink;
 
 enum class RuntimeCommand {
-    start_autonomy,
+    start_precision_landing,
+    start_aerial_tracking,
+    return_to_launch,
     shutdown,
 };
 

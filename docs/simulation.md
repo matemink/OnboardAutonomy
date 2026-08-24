@@ -71,10 +71,9 @@ spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 20 m
 radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
 Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
 `ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
-to the model. This launcher selects the SITL-only aerial-observation mission:
-the S500 performs the guarded GUIDED/ARM/TAKEOFF sequence and then holds while
-the forward detector remains active. It does not enter the AprilTag precision
-landing runtime.
+to the model. The interactive runtime starts idle: the S500 remains disarmed on
+the ground until the operator selects a mission. Both the AprilTag landing and
+the SITL-only aerial-observation paths are available from the same console.
 
 The Zephyr is still a visual stimulus, not a second ArduPlane SITL instance.
 YOLOX may report generic COCO labels for both the aircraft and visually similar
@@ -174,10 +173,15 @@ scripted demonstration routes:
    complete the terminal descent without reacting to partial reacquisition.
 7. Finish only when ArduPilot reports the vehicle disarmed.
 
-After a completed or failed run, interactive mode lets `S` start the same
-guarded autonomy sequence again without restarting the simulator. The
-request is blocked while the vehicle is armed or a run is already active.
-`Q` exits the runtime. It does not select an alternate flight plan.
+Interactive mode never starts flight automatically. Press `1` to run the
+guarded takeoff and AprilTag precision-landing mission, or `2` to take off and
+track the Zephyr with bounded yaw while remaining in GUIDED hold. Press `R` to
+cancel either mission and request ArduPilot RTL; if the vehicle is already
+disarmed, it simply returns the runtime to idle. Press `Q` to exit. A mission
+request is blocked while another mission or RTL is active.
+
+Non-interactive acceptance runs retain automatic startup so CI and repeatable
+flight evidence do not require keyboard input.
 
 Run the non-interactive acceptance flight with compact JSON telemetry and
 exit automatically after completion or failure:
