@@ -19,8 +19,8 @@ AerialTargetTracker::make_candidate(
     const mission::TargetObservation& observation,
     const std::uint32_t frame_width,
     const std::uint32_t frame_height) const {
-    if (observation.id != config_.target_class_id || frame_width == 0U ||
-        frame_height == 0U || !std::isfinite(observation.decision_margin) ||
+    if (frame_width == 0U || frame_height == 0U ||
+        !std::isfinite(observation.decision_margin) ||
         observation.decision_margin < config_.minimum_confidence_percent) {
         return std::nullopt;
     }

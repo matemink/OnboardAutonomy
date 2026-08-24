@@ -129,7 +129,7 @@ void aerial_observation_holds_after_takeoff_without_landing() {
         "missing landing vision must not trigger LAND in observation mode");
     const auto snapshot = runtime.snapshot();
     require(snapshot.phase == AutonomyRuntimePhase::active &&
-                snapshot.detail == "AIRPLANE SEARCHING | GUIDED HOLD" &&
+                snapshot.detail == "TARGET SEARCHING | GUIDED HOLD" &&
                 snapshot.land_attempt == 0,
         "observation mode must expose a stable active hold");
 }
@@ -160,7 +160,7 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
         runtime
             .update(vehicle, startup, failsafe, start, std::nullopt, acquiring)
             .empty(),
-        "an unconfirmed airplane must not produce a yaw command");
+        "an unconfirmed target must not produce a yaw command");
 
     const AerialTargetTrackSnapshot locked_right{
         .phase = AerialTargetTrackPhase::tracking,
@@ -213,7 +213,7 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                        std::nullopt,
                        lost)
                     .empty() &&
-                runtime.snapshot().detail == "AIRPLANE SEARCHING | GUIDED HOLD",
+                runtime.snapshot().detail == "TARGET SEARCHING | GUIDED HOLD",
         "target loss must stop yaw guidance and preserve hold");
 }
 

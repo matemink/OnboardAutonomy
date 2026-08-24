@@ -17,13 +17,11 @@ enum class AerialTargetTrackPhase {
 };
 
 struct AerialTargetTrackerConfig {
-    static constexpr std::int32_t kDefaultTargetClassId = 4;
     static constexpr std::uint32_t kDefaultRequiredObservations = 3;
     static constexpr auto kDefaultLossTimeout = std::chrono::milliseconds{500};
     static constexpr double kDefaultMinimumConfidencePercent = 35.0;
     static constexpr double kDefaultMaximumCenterJumpRatio = 0.18;
 
-    std::int32_t target_class_id{kDefaultTargetClassId};
     std::uint32_t required_consecutive_observations{
         kDefaultRequiredObservations};
     std::chrono::milliseconds loss_timeout{kDefaultLossTimeout};

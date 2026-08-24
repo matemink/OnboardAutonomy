@@ -79,8 +79,8 @@ The Zephyr is still a visual stimulus, not a second ArduPlane SITL instance.
 YOLOX may report generic COCO labels for both the aircraft and visually similar
 objects. The lightweight grass texture and lower-contrast directional light
 reduce the unrealistically sharp silhouette that the old flat ground produced.
-Guidance still accepts only `airplane`, requires three spatially continuous
-observations, and expires a
+Guidance accepts any class emitted by the configured forward detector, requires
+three spatially continuous observations, and expires a
 stale lock after 500 ms. A confirmed off-centre target produces a bounded
 relative yaw correction; an ambiguous or lost target produces no command and
 keeps the S500 in GUIDED hold.

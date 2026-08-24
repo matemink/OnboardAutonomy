@@ -55,7 +55,7 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
   fallbacks.
 - Dual-camera YUV420/OpenCV processing for AprilTag landing and forward ONNX
   aerial-object detection.
-- SITL-only airplane target lock confirms spatial and temporal continuity,
+- SITL-only forward-object lock confirms spatial and temporal continuity,
   then applies bounded yaw centering while the vehicle remains in GUIDED hold.
 - Automatic serial and camera recovery after disconnects or process stalls.
 - Motion is SITL-gated; physical endpoints remain observation-only. CI covers

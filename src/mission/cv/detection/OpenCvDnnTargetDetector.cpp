@@ -165,11 +165,24 @@ mission::TargetObservation make_observation(const ::cv::Rect& box,
     };
 }
 
+std::vector<std::int32_t> detected_class_ids(
+    const std::span<const YoloXCandidate> candidates) {
+    std::vector<std::int32_t> result;
+    result.reserve(candidates.size());
+    for (const auto& candidate : candidates) {
+        result.push_back(candidate.class_id);
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
+
 class OpenCvDnnTargetDetector final : public mission::ports::TargetDetector {
   public:
     explicit OpenCvDnnTargetDetector(const OpenCvDnnDetectorConfig& config)
         : config_(config),
           decoder_config_{
+              .accepted_class_ids = {},
               .confidence_threshold = config.confidence_threshold,
           } {
         validate_config(config_);
@@ -220,7 +233,7 @@ class OpenCvDnnTargetDetector final : public mission::ports::TargetDetector {
             decoder_config_);
 
         std::vector<mission::TargetObservation> observations;
-        for (const auto class_id : decoder_config_.accepted_class_ids) {
+        for (const auto class_id : detected_class_ids(candidates)) {
             std::vector<::cv::Rect> boxes;
             std::vector<float> scores;
             std::vector<const YoloXCandidate*> selected_candidates;

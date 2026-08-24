@@ -25,11 +25,6 @@ struct YoloXDecoderConfig {
         16U,
         32U,
     };
-    static constexpr std::array<std::int32_t, 3> kAerialClassIds{
-        4,
-        14,
-        33,
-    };
     static constexpr float kDefaultConfidenceThreshold = 0.20F;
 
     std::size_t class_count{kCocoClassCount};
@@ -38,10 +33,8 @@ struct YoloXDecoderConfig {
         kDefaultStrides.begin(),
         kDefaultStrides.end(),
     };
-    std::vector<std::int32_t> accepted_class_ids{
-        kAerialClassIds.begin(),
-        kAerialClassIds.end(),
-    };
+    // An empty list accepts the detector's highest-confidence COCO class.
+    std::vector<std::int32_t> accepted_class_ids;
     float confidence_threshold{kDefaultConfidenceThreshold};
 };
 
