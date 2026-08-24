@@ -2,6 +2,7 @@
 
 #include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
 #include "onboard_autonomy/mission/autonomy/DecisionEngine.hpp"
+#include "onboard_autonomy/mission/cv/tracking/AerialTargetTracker.hpp"
 #include "onboard_autonomy/mission/flight/FlightCommand.hpp"
 #include "onboard_autonomy/mission/flight/FlightStartupController.hpp"
 #include "onboard_autonomy/mission/safety/SafetySupervisor.hpp"
@@ -35,6 +36,12 @@ struct AutonomyRuntimeConfig {
     static constexpr double kDefaultTerminalAlignmentRadiusM = 0.25;
     static constexpr auto kDefaultTerminalAlignmentDuration =
         std::chrono::milliseconds{500};
+    static constexpr auto kDefaultYawCommandInterval =
+        std::chrono::milliseconds{500};
+    static constexpr double kDefaultYawDeadbandRatio = 0.08;
+    static constexpr double kDefaultMaximumYawStepDegrees = 10.0;
+    static constexpr double kDefaultYawSpeedDegreesPerSecond = 15.0;
+    static constexpr double kDefaultForwardCameraHorizontalFovRadians = 2.0;
 
     bool enabled{false};
     AutonomyRuntimeMode mode{AutonomyRuntimeMode::precision_landing};
@@ -44,6 +51,12 @@ struct AutonomyRuntimeConfig {
     double terminal_alignment_radius_m{kDefaultTerminalAlignmentRadiusM};
     std::chrono::milliseconds terminal_alignment_duration{
         kDefaultTerminalAlignmentDuration};
+    std::chrono::milliseconds yaw_command_interval{kDefaultYawCommandInterval};
+    double yaw_deadband_ratio{kDefaultYawDeadbandRatio};
+    double maximum_yaw_step_degrees{kDefaultMaximumYawStepDegrees};
+    double yaw_speed_degrees_per_second{kDefaultYawSpeedDegreesPerSecond};
+    double forward_camera_horizontal_fov_radians{
+        kDefaultForwardCameraHorizontalFovRadians};
 };
 
 struct AutonomyRuntimeSnapshot {
@@ -65,8 +78,8 @@ class AutonomyRuntime {
         const FlightStartupSnapshot& startup,
         const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
         mission::TimePoint now,
-        std::optional<mission::BodyFramePosition> landing_target =
-            std::nullopt);
+        std::optional<mission::BodyFramePosition> landing_target = std::nullopt,
+        std::optional<AerialTargetTrackSnapshot> aerial_target = std::nullopt);
 
     void on_action_sent(const FlightActionRequest& request,
         bool sent,
@@ -93,6 +106,10 @@ class AutonomyRuntime {
         const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<mission::BodyFramePosition>& landing_target);
+    [[nodiscard]] std::vector<FlightActionRequest> update_aerial_observation(
+        const mission::VehicleSnapshot& vehicle,
+        mission::TimePoint now,
+        const std::optional<AerialTargetTrackSnapshot>& aerial_target);
     void update_terminal_alignment(const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<mission::BodyFramePosition>& landing_target);
@@ -124,6 +141,7 @@ class AutonomyRuntime {
     std::optional<mission::TimePoint> target_missing_since_;
     std::optional<mission::TimePoint> terminal_alignment_since_;
     mission::TimePoint next_landing_target_{};
+    mission::TimePoint next_yaw_command_{};
     mission::TimePoint acknowledgement_deadline_{};
     mission::TimePoint landing_deadline_{};
     std::size_t land_attempt_{0};

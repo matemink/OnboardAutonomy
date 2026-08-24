@@ -4,12 +4,15 @@
 
 #include <algorithm>
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
 
+using onboard_autonomy::mission::AerialTargetTrackPhase;
+using onboard_autonomy::mission::AerialTargetTrackSnapshot;
 using onboard_autonomy::mission::AutonomyRuntime;
 using onboard_autonomy::mission::AutonomyRuntimeMode;
 using onboard_autonomy::mission::AutonomyRuntimePhase;
@@ -126,10 +129,92 @@ void aerial_observation_holds_after_takeoff_without_landing() {
         "missing landing vision must not trigger LAND in observation mode");
     const auto snapshot = runtime.snapshot();
     require(snapshot.phase == AutonomyRuntimePhase::active &&
-                snapshot.detail ==
-                    "Aerial observation active; holding after takeoff" &&
+                snapshot.detail == "AIRPLANE SEARCHING | GUIDED HOLD" &&
                 snapshot.land_attempt == 0,
         "observation mode must expose a stable active hold");
+}
+
+void aerial_observation_yaws_only_for_a_stable_target_lock() {
+    AutonomyRuntime runtime{{
+        .enabled = true,
+        .mode = AutonomyRuntimeMode::aerial_observation,
+    }};
+    const auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+    const AerialTargetTrackSnapshot acquiring{
+        .phase = AerialTargetTrackPhase::acquiring,
+        .consecutive_observations = 2,
+        .required_observations = 3,
+        .accepted_observations = 2,
+        .observation_age_ms = 0.0,
+        .confidence_percent = 70.0,
+        .horizontal_error = std::nullopt,
+        .center_y_ratio = 0.4,
+        .width_ratio = 0.1,
+        .height_ratio = 0.1,
+    };
+
+    require(
+        runtime
+            .update(vehicle, startup, failsafe, start, std::nullopt, acquiring)
+            .empty(),
+        "an unconfirmed airplane must not produce a yaw command");
+
+    const AerialTargetTrackSnapshot locked_right{
+        .phase = AerialTargetTrackPhase::tracking,
+        .consecutive_observations = 3,
+        .required_observations = 3,
+        .accepted_observations = 3,
+        .observation_age_ms = 0.0,
+        .confidence_percent = 80.0,
+        .horizontal_error = 0.6,
+        .center_y_ratio = 0.4,
+        .width_ratio = 0.1,
+        .height_ratio = 0.1,
+    };
+    const auto yaw = only_action(runtime.update(vehicle,
+                                     startup,
+                                     failsafe,
+                                     start + std::chrono::milliseconds(10),
+                                     std::nullopt,
+                                     locked_right),
+        FlightAction::condition_yaw,
+        "stable target lock");
+    require(yaw.yaw_degrees == 10.0 && yaw.yaw_speed_degrees_per_second == 15.0,
+        "yaw guidance must clamp the relative correction and speed");
+    require(runtime
+                .update(vehicle,
+                    startup,
+                    failsafe,
+                    start + std::chrono::milliseconds(100),
+                    std::nullopt,
+                    locked_right)
+                .empty(),
+        "yaw commands must be rate limited");
+
+    const AerialTargetTrackSnapshot lost{
+        .phase = AerialTargetTrackPhase::searching,
+        .consecutive_observations = 0,
+        .required_observations = 3,
+        .accepted_observations = 0,
+        .observation_age_ms = std::nullopt,
+        .confidence_percent = std::nullopt,
+        .horizontal_error = std::nullopt,
+        .center_y_ratio = std::nullopt,
+        .width_ratio = std::nullopt,
+        .height_ratio = std::nullopt,
+    };
+    require(runtime.update(vehicle,
+                       startup,
+                       failsafe,
+                       start + std::chrono::milliseconds(600),
+                       std::nullopt,
+                       lost)
+                    .empty() &&
+                runtime.snapshot().detail == "AIRPLANE SEARCHING | GUIDED HOLD",
+        "target loss must stop yaw guidance and preserve hold");
 }
 
 void runtime_streams_fresh_target_and_lands() {
@@ -434,6 +519,7 @@ void restart_clears_terminal_autonomy_state() {
 void run_autonomy_runtime_tests() {
     runtime_waits_for_startup();
     aerial_observation_holds_after_takeoff_without_landing();
+    aerial_observation_yaws_only_for_a_stable_target_lock();
     runtime_streams_fresh_target_and_lands();
     runtime_streams_target_at_ten_hz();
     terminal_descent_requires_stable_low_alignment();

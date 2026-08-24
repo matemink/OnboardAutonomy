@@ -3,9 +3,11 @@
 #include "onboard_autonomy/hardware/mavlink/MavlinkDecoder.hpp"
 #include "onboard_autonomy/hardware/mavlink/MavlinkEncoder.hpp"
 #include "onboard_autonomy/hardware/mavlink/TelemetryStreamConfigurator.hpp"
+#include "onboard_autonomy/mission/cv/tracking/AerialTargetTracker.hpp"
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -57,6 +59,8 @@ std::optional<FlightAction> map_flight_action(const std::uint16_t command) {
         return FlightAction::land;
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
         return FlightAction::return_to_launch;
+    case MAV_CMD_CONDITION_YAW:
+        return FlightAction::condition_yaw;
     default:
         return std::nullopt;
     }
@@ -122,6 +126,8 @@ std::string mav_command_name(const std::uint16_t command) {
         return "ACK LAND";
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
         return "ACK RTL";
+    case MAV_CMD_CONDITION_YAW:
+        return "ACK YAW";
     default:
         return "ACK COMMAND " + std::to_string(command);
     }
@@ -152,6 +158,8 @@ std::string flight_action_name(const FlightAction action) {
         return "LAND";
     case FlightAction::landing_target:
         return "LANDING_TARGET";
+    case FlightAction::condition_yaw:
+        return "YAW";
     }
     return "ACTION";
 }
@@ -167,6 +175,7 @@ std::string flight_action_message_name(const FlightAction action) {
     case FlightAction::takeoff:
     case FlightAction::return_to_launch:
     case FlightAction::land:
+    case FlightAction::condition_yaw:
         return "COMMAND_LONG";
     }
     return "MAVLINK";
@@ -206,6 +215,14 @@ std::string flight_action_detail(const FlightActionRequest& request) {
         target << std::fixed << std::setprecision(1) << "F/R/D " << request.x_m
                << "/" << request.y_m << "/" << request.z_m << " M";
         return target.str();
+    }
+    case FlightAction::condition_yaw: {
+        std::ostringstream yaw;
+        yaw << std::fixed << std::setprecision(1)
+            << (request.yaw_degrees >= 0.0 ? "RIGHT " : "LEFT ")
+            << std::abs(request.yaw_degrees) << " DEG";
+        detail = yaw.str();
+        break;
     }
     }
 
@@ -268,6 +285,12 @@ std::vector<std::uint8_t> encode_flight_action(
             request.x_m,
             request.y_m,
             request.z_m);
+    case FlightAction::condition_yaw:
+        return hardware::mavlink::encode_condition_yaw(
+            request.vehicle_system_id,
+            request.yaw_degrees,
+            request.yaw_speed_degrees_per_second,
+            request.confirmation);
     }
     return {};
 }
@@ -591,7 +614,8 @@ class CompanionApplication::Impl {
             flight_startup_.snapshot(),
             companion_link_failsafe_.snapshot(),
             now,
-            current_landing_target(now));
+            current_landing_target(now),
+            aerial_target_tracker_.snapshot(now));
         for (const auto& action : autonomy_actions) {
             send_flight_action(action, now, false);
         }
@@ -716,6 +740,19 @@ class CompanionApplication::Impl {
             return std::nullopt;
         }
         return camera_monitor_->take_latest_processed_frame();
+    }
+
+    void update_forward_target_observations(
+        const std::span<const mission::TargetObservation> observations,
+        const std::uint32_t frame_width,
+        const std::uint32_t frame_height,
+        const std::uint64_t frame_sequence,
+        const mission::TimePoint now) {
+        aerial_target_tracker_.update(observations,
+            frame_width,
+            frame_height,
+            frame_sequence,
+            now);
     }
 
   private:
@@ -897,6 +934,7 @@ class CompanionApplication::Impl {
     hardware::mavlink::TelemetryStreamConfigurator telemetry_configurator_;
     FlightStartupController flight_startup_;
     AutonomyRuntime autonomy_runtime_;
+    AerialTargetTracker aerial_target_tracker_;
     std::optional<CameraMonitor> camera_monitor_;
     std::optional<mission::CameraExtrinsics> camera_extrinsics_;
     hardware::mavlink::MavlinkDecoder decoder_;
@@ -943,6 +981,19 @@ AppSnapshot CompanionApplication::snapshot(const mission::TimePoint now) {
 std::optional<ProcessedCameraFrame>
 CompanionApplication::take_latest_processed_camera_frame() {
     return impl_->take_latest_processed_camera_frame();
+}
+
+void CompanionApplication::update_forward_target_observations(
+    const std::span<const mission::TargetObservation> observations,
+    const std::uint32_t frame_width,
+    const std::uint32_t frame_height,
+    const std::uint64_t frame_sequence,
+    const mission::TimePoint now) {
+    impl_->update_forward_target_observations(observations,
+        frame_width,
+        frame_height,
+        frame_sequence,
+        now);
 }
 
 } // namespace onboard_autonomy::mission

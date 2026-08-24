@@ -59,6 +59,7 @@ class CameraMonitor::Impl {
 
         latest_processed_frame_ = ProcessedCameraFrame{
             .frame = std::move(*frame),
+            .observed_at = now,
             .targets = {targets.begin(), targets.end()},
             .target_track = target_track,
         };

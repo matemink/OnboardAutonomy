@@ -76,11 +76,19 @@ the S500 performs the guarded GUIDED/ARM/TAKEOFF sequence and then holds while
 the forward detector remains active. It does not enter the AprilTag precision
 landing runtime.
 
-The Zephyr is still a visual Phase 1 stimulus, not a second ArduPlane SITL
-instance. OnboardAutonomy detects the small rendered object with generic COCO
-labels such as `kite`, `bird`, or `airplane`; it does not receive the scripted
-model pose, infer 3D range, or turn detections into flight commands. Target
-bearing and standoff guidance remain separate later increments.
+The Zephyr is still a visual stimulus, not a second ArduPlane SITL instance.
+YOLOX may report generic COCO labels for both the aircraft and visually similar
+objects. The lightweight grass texture and lower-contrast directional light
+reduce the unrealistically sharp silhouette that the old flat ground produced.
+Guidance still accepts only `airplane`, requires three spatially continuous
+observations, and expires a
+stale lock after 500 ms. A confirmed off-centre target produces a bounded
+relative yaw correction; an ambiguous or lost target produces no command and
+keeps the S500 in GUIDED hold.
+
+OnboardAutonomy does not receive the scripted model pose or infer 3D range.
+Forward pursuit and standoff guidance remain separate later increments and
+cannot run until a range estimate with explicit uncertainty exists.
 
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to

@@ -236,6 +236,15 @@ void flight_commands_use_documented_arducopter_parameters() {
             system_id));
     require(rtl.command == MAV_CMD_NAV_RETURN_TO_LAUNCH,
         "RTL must use MAV_CMD_NAV_RETURN_TO_LAUNCH");
+
+    const auto yaw = decode_command_long(
+        onboard_autonomy::hardware::mavlink::encode_condition_yaw(system_id,
+            -8.0,
+            15.0));
+    require(yaw.command == MAV_CMD_CONDITION_YAW && yaw.param1 == 8.0F &&
+                yaw.param2 == 15.0F && yaw.param3 == -1.0F &&
+                yaw.param4 == 1.0F,
+        "yaw guidance must encode a bounded relative counter-clockwise turn");
 }
 
 void movement_and_precision_messages_use_documented_frames() {

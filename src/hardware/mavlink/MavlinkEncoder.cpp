@@ -244,6 +244,38 @@ std::vector<std::uint8_t> encode_return_to_launch(
         });
 }
 
+std::vector<std::uint8_t> encode_condition_yaw(
+    const std::uint8_t vehicle_system_id,
+    const double relative_yaw_degrees,
+    const double yaw_speed_degrees_per_second,
+    const std::uint8_t confirmation,
+    const std::uint8_t component_id) {
+    constexpr double kMaximumRelativeYawDegrees = 180.0;
+    if (!std::isfinite(relative_yaw_degrees) ||
+        std::abs(relative_yaw_degrees) > kMaximumRelativeYawDegrees ||
+        !std::isfinite(yaw_speed_degrees_per_second) ||
+        yaw_speed_degrees_per_second <= 0.0) {
+        throw std::invalid_argument("invalid condition-yaw command");
+    }
+
+    constexpr float kClockwise = 1.0F;
+    constexpr float kCounterClockwise = -1.0F;
+    constexpr float kRelativeAngle = 1.0F;
+    return encode_command_long(vehicle_system_id,
+        component_id,
+        MAV_CMD_CONDITION_YAW,
+        confirmation,
+        {
+            static_cast<float>(std::abs(relative_yaw_degrees)),
+            static_cast<float>(yaw_speed_degrees_per_second),
+            relative_yaw_degrees >= 0.0 ? kClockwise : kCounterClockwise,
+            kRelativeAngle,
+            0.0F,
+            0.0F,
+            0.0F,
+        });
+}
+
 std::vector<std::uint8_t> encode_local_position_target(
     const std::uint8_t vehicle_system_id,
     const double north_m,

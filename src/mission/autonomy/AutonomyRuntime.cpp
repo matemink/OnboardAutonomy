@@ -2,15 +2,22 @@
 
 #include "onboard_autonomy/mission/autonomy/WorldState.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <numbers>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 namespace onboard_autonomy::mission {
+namespace {
+
+constexpr double kMaximumRelativeYawDegrees = 180.0;
+
+} // namespace
 
 AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
     : config_(config) {
@@ -27,6 +34,18 @@ AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
         throw std::invalid_argument(
             "terminal-descent thresholds must be positive");
     }
+    if (config_.yaw_command_interval <= std::chrono::milliseconds::zero() ||
+        !std::isfinite(config_.yaw_deadband_ratio) ||
+        config_.yaw_deadband_ratio < 0.0 || config_.yaw_deadband_ratio >= 1.0 ||
+        !std::isfinite(config_.maximum_yaw_step_degrees) ||
+        config_.maximum_yaw_step_degrees <= 0.0 ||
+        config_.maximum_yaw_step_degrees > kMaximumRelativeYawDegrees ||
+        !std::isfinite(config_.yaw_speed_degrees_per_second) ||
+        config_.yaw_speed_degrees_per_second <= 0.0 ||
+        !std::isfinite(config_.forward_camera_horizontal_fov_radians) ||
+        config_.forward_camera_horizontal_fov_radians <= 0.0) {
+        throw std::invalid_argument("invalid aerial yaw guidance thresholds");
+    }
     if (config_.enabled) {
         restart();
     }
@@ -37,7 +56,8 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     const FlightStartupSnapshot& startup,
     const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
     const mission::TimePoint now,
-    std::optional<mission::BodyFramePosition> landing_target) {
+    std::optional<mission::BodyFramePosition> landing_target,
+    std::optional<AerialTargetTrackSnapshot> aerial_target) {
     if (phase_ == AutonomyRuntimePhase::disabled ||
         phase_ == AutonomyRuntimePhase::completed ||
         phase_ == AutonomyRuntimePhase::failed) {
@@ -49,13 +69,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     }
 
     if (config_.mode == AutonomyRuntimeMode::aerial_observation) {
-        if (!vehicle.armed) {
-            fail("Vehicle disarmed during aerial observation");
-            return {};
-        }
-        motion_safety_status_ = MotionSafetyStatus::no_intent;
-        detail_ = "Aerial observation active; holding after takeoff";
-        return {};
+        return update_aerial_observation(vehicle, now, aerial_target);
     }
 
     if (!continue_landing_update(vehicle, now, landing_target)) {
@@ -71,6 +85,72 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
         return handle_missing_target(vehicle, now);
     }
     return handle_approved_motion(*supervised.approved, now);
+}
+
+std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
+    const mission::VehicleSnapshot& vehicle,
+    const mission::TimePoint now,
+    const std::optional<AerialTargetTrackSnapshot>& aerial_target) {
+    if (!vehicle.armed) {
+        fail("Vehicle disarmed during aerial observation");
+        return {};
+    }
+    motion_safety_status_ = MotionSafetyStatus::no_intent;
+    if (!aerial_target.has_value() ||
+        aerial_target->phase == AerialTargetTrackPhase::searching) {
+        detail_ = "AIRPLANE SEARCHING | GUIDED HOLD";
+        return {};
+    }
+    if (aerial_target->phase == AerialTargetTrackPhase::acquiring) {
+        detail_ = "AIRPLANE ACQUIRING " +
+                  std::to_string(aerial_target->consecutive_observations) +
+                  "/" + std::to_string(aerial_target->required_observations) +
+                  " | GUIDED HOLD";
+        return {};
+    }
+    if (!aerial_target->horizontal_error.has_value()) {
+        detail_ = "AIRPLANE LOCK INVALID | GUIDED HOLD";
+        return {};
+    }
+
+    const auto horizontal_error = *aerial_target->horizontal_error;
+    if (!std::isfinite(horizontal_error) ||
+        std::abs(horizontal_error) <= config_.yaw_deadband_ratio) {
+        detail_ = "AIRPLANE LOCKED | CENTERED | GUIDED HOLD";
+        return {};
+    }
+    if (now < next_yaw_command_ || !vehicle_system_id_.has_value()) {
+        detail_ = "AIRPLANE LOCKED | YAW ALIGNING | GUIDED HOLD";
+        return {};
+    }
+
+    constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
+    const auto half_fov_degrees =
+        config_.forward_camera_horizontal_fov_radians * kRadiansToDegrees / 2.0;
+    const auto yaw_degrees = std::clamp(horizontal_error * half_fov_degrees,
+        -config_.maximum_yaw_step_degrees,
+        config_.maximum_yaw_step_degrees);
+    next_yaw_command_ = now + config_.yaw_command_interval;
+    motion_safety_status_ = MotionSafetyStatus::allowed;
+
+    std::ostringstream detail;
+    detail << "AIRPLANE LOCKED | YAW "
+           << (yaw_degrees >= 0.0 ? "RIGHT " : "LEFT ") << std::fixed
+           << std::setprecision(1) << std::abs(yaw_degrees)
+           << " DEG | GUIDED HOLD";
+    detail_ = detail.str();
+    return {{
+        .action = FlightAction::condition_yaw,
+        .vehicle_system_id = *vehicle_system_id_,
+        .confirmation = 0,
+        .altitude_m = 0.0,
+        .x_m = 0.0,
+        .y_m = 0.0,
+        .z_m = 0.0,
+        .yaw_degrees = yaw_degrees,
+        .yaw_speed_degrees_per_second = config_.yaw_speed_degrees_per_second,
+        .time_usec = 0,
+    }};
 }
 
 bool AutonomyRuntime::prepare_active_runtime(
@@ -327,6 +407,7 @@ void AutonomyRuntime::restart() {
     target_missing_since_.reset();
     terminal_alignment_since_.reset();
     next_landing_target_ = {};
+    next_yaw_command_ = {};
     acknowledgement_deadline_ = {};
     landing_deadline_ = {};
     land_attempt_ = 0;

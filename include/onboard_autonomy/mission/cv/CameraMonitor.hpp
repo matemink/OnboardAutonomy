@@ -31,6 +31,7 @@ struct CameraSnapshot {
 
 struct ProcessedCameraFrame {
     ports::CameraFrame frame;
+    mission::TimePoint observed_at;
     std::vector<mission::TargetObservation> targets;
     TargetTrackSnapshot target_track;
 };

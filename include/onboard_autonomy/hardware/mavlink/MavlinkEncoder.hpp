@@ -53,6 +53,12 @@ std::vector<std::uint8_t> encode_return_to_launch(
     std::uint8_t confirmation = 0,
     std::uint8_t component_id = kCompanionComponentId);
 
+std::vector<std::uint8_t> encode_condition_yaw(std::uint8_t vehicle_system_id,
+    double relative_yaw_degrees,
+    double yaw_speed_degrees_per_second,
+    std::uint8_t confirmation = 0,
+    std::uint8_t component_id = kCompanionComponentId);
+
 std::vector<std::uint8_t> encode_local_position_target(
     std::uint8_t vehicle_system_id,
     double north_m,

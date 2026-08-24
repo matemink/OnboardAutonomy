@@ -250,10 +250,13 @@ void monitor_exposes_processed_frames_without_a_preview_dependency() {
     };
 
     source.emit(frame(21, std::chrono::system_clock::time_point{}, 10.0));
-    monitor.poll(onboard_autonomy::mission::TimePoint{});
+    const auto observed_at =
+        onboard_autonomy::mission::TimePoint{} + std::chrono::seconds{2};
+    monitor.poll(observed_at);
     const auto processed = monitor.take_latest_processed_frame();
 
     require(processed.has_value() && processed->frame.sequence == 21U &&
+                processed->observed_at == observed_at &&
                 processed->frame.yuv420.size() == 640U * 480U * 3U / 2U &&
                 processed->targets.size() == 1U &&
                 processed->targets.front().id == 12 &&
