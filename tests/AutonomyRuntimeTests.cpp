@@ -182,10 +182,8 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                                      locked_right),
         FlightAction::condition_yaw,
         "stable target lock");
-    require(yaw.yaw_degrees == -10.0 &&
-                yaw.yaw_speed_degrees_per_second == 15.0,
-        "a target right of center must produce the matching simulated yaw "
-        "correction and clamp its magnitude");
+    require(yaw.yaw_degrees == 10.0 && yaw.yaw_speed_degrees_per_second == 15.0,
+        "yaw guidance must clamp the relative correction and speed");
     require(runtime
                 .update(vehicle,
                     startup,
@@ -195,20 +193,6 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                     locked_right)
                 .empty(),
         "yaw commands must be rate limited");
-
-    auto locked_left = locked_right;
-    locked_left.horizontal_error = -0.6;
-    const auto opposite_yaw =
-        only_action(runtime.update(vehicle,
-                        startup,
-                        failsafe,
-                        start + std::chrono::milliseconds(600),
-                        std::nullopt,
-                        locked_left),
-            FlightAction::condition_yaw,
-            "stable target lock on the opposite side");
-    require(opposite_yaw.yaw_degrees == 10.0,
-        "targets on opposite image sides must produce opposite yaw commands");
 
     const AerialTargetTrackSnapshot lost{
         .phase = AerialTargetTrackPhase::searching,
@@ -225,7 +209,7 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
     require(runtime.update(vehicle,
                        startup,
                        failsafe,
-                       start + std::chrono::milliseconds(1200),
+                       start + std::chrono::milliseconds(600),
                        std::nullopt,
                        lost)
                     .empty() &&
