@@ -501,7 +501,7 @@ void hardware_runtime_rejects_sitl_only_aerial_tracking() {
                 AutonomyRuntimeMode::aerial_observation,
                 start + std::chrono::milliseconds(1)) &&
                 application.snapshot(start).link_events.back().detail ==
-                    "ZEPHYR TRACKING IS AVAILABLE IN SITL ONLY",
+                    "SHAHED-136 TRACKING IS AVAILABLE IN SITL ONLY",
         "hardware runtime must not bypass the SITL-only aerial guard");
 }
 

@@ -150,7 +150,7 @@ void command_bus_shows_both_directions() {
                 output.find("ACCEPTED") != std::string::npos,
         "command and acknowledgement labels must be visible");
     require(output.find("[1] LAND ON APRILTAG") != std::string::npos &&
-                output.find("[2] TRACK ZEPHYR (HOLD + YAW)") !=
+                output.find("[2] TRACK SHAHED-136 (HOLD + YAW)") !=
                     std::string::npos &&
                 output.find("[R] ABORT MISSION + RTL") != std::string::npos &&
                 output.find("[Q] QUIT") != std::string::npos,

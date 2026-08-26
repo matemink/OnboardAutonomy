@@ -659,7 +659,7 @@ class CompanionApplication::Impl {
             record_event(LinkEventDirection::outbound,
                 LinkEventStatus::failure,
                 "START",
-                "ZEPHYR TRACKING IS AVAILABLE IN SITL ONLY",
+                "SHAHED-136 TRACKING IS AVAILABLE IN SITL ONLY",
                 now);
             return false;
         }
@@ -718,7 +718,7 @@ class CompanionApplication::Impl {
             LinkEventStatus::pending,
             "START",
             mode == AutonomyRuntimeMode::aerial_observation
-                ? "ZEPHYR VISUAL TRACKING REQUESTED"
+                ? "SHAHED-136 VISUAL TRACKING REQUESTED"
                 : "APRILTAG LANDING REQUESTED",
             now);
         return true;

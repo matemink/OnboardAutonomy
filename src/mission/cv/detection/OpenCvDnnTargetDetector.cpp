@@ -182,7 +182,7 @@ class OpenCvDnnTargetDetector final : public mission::ports::TargetDetector {
     explicit OpenCvDnnTargetDetector(const OpenCvDnnDetectorConfig& config)
         : config_(config),
           decoder_config_{
-              .accepted_class_ids = {},
+              .accepted_class_ids = config.accepted_class_ids,
               .confidence_threshold = config.confidence_threshold,
           } {
         validate_config(config_);

@@ -83,6 +83,8 @@ FPS_INDICATOR_QML = (
     PROJECT_ROOT / "simulation" / "gui" / "FpsIndicator.qml"
 )
 GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
+GAZEBO_SERVER_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_iris.sh"
+GAZEBO_GPU_GUARD = PROJECT_ROOT / "scripts" / "require_gazebo_gpu.sh"
 TARGET_MODEL = (
     PROJECT_ROOT
     / "simulation"
@@ -338,21 +340,21 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertEqual(model.findtext("link/gravity"), "false")
 
         mesh_uri = model.findtext("link/visual/geometry/mesh/uri")
-        self.assertEqual(mesh_uri, "meshes/wing.dae")
+        self.assertEqual(mesh_uri, "meshes/shahed_136/scene.gltf")
         self.assertTrue((TARGET_MODEL_DIR / mesh_uri).is_file())
+        self.assertTrue(
+            (TARGET_MODEL_DIR / "meshes" / "shahed_136" / "scene.bin").is_file()
+        )
 
         visual_pose = [
             float(value) for value in model.findtext("link/visual/pose").split()
         ]
-        self.assertEqual(visual_pose[:5], [0.0, 0.0, 0.0, 0.0, 0.0])
+        self.assertEqual(visual_pose[3:5], [0.0, 0.0])
         self.assertAlmostEqual(visual_pose[5], math.pi / 2.0)
 
-        self.assertTrue(
-            (TARGET_MODEL_DIR / "materials" / "textures" / "wing.png").is_file()
-        )
         self.assertTrue((TARGET_MODEL_DIR / "NOTICE.md").is_file())
         self.assertTrue(
-            (TARGET_MODEL_DIR / "LICENSE.ardupilot-gazebo.md").is_file()
+            (TARGET_MODEL_DIR / "LICENSE.shahed-136.txt").is_file()
         )
 
         plugin = model.find("plugin")
@@ -371,6 +373,19 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertEqual(angular[:2], [0.0, 0.0])
         self.assertAlmostEqual(linear[0] / angular[2], 15.0)
 
+    def test_gazebo_launchers_reject_software_rendering(self) -> None:
+        guard = GAZEBO_GPU_GUARD.read_text(encoding="utf-8")
+        gui_launcher = GAZEBO_GUI_LAUNCHER.read_text(encoding="utf-8")
+        server_launcher = GAZEBO_SERVER_LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("GALLIUM_DRIVER=d3d12", guard)
+        self.assertIn("MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA", guard)
+        self.assertIn("llvmpipe|softpipe|swrast", guard)
+        self.assertIn("Accelerated: yes", guard)
+        self.assertIn("D3D12 (NVIDIA", guard)
+        self.assertIn('source "${script_dir}/require_gazebo_gpu.sh"', gui_launcher)
+        self.assertIn('source "${script_dir}/require_gazebo_gpu.sh"', server_launcher)
+
     def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
         world = element_tree.parse(WORLD).getroot()
         base_uris = {
@@ -386,7 +401,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("/world/${world_name}/create", spawner)
         self.assertIn("gz.msgs.EntityFactory", spawner)
-        self.assertIn('readonly target_name="Zephyr_Fixed_Wing_Target"', spawner)
+        self.assertIn('readonly target_name="Shahed_136_Visual_Target"', spawner)
         self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
         self.assertIn("ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET=1", launcher)
         self.assertIn("ONBOARD_AUTONOMY_AERIAL_OBSERVATION=1", launcher)

@@ -30,10 +30,7 @@ export GZ_SIM_SYSTEM_PLUGIN_PATH="${gazebo_build_dir}:${GZ_SIM_SYSTEM_PLUGIN_PAT
 export GZ_SIM_RESOURCE_PATH="${project_dir}/simulation/models:${project_dir}/simulation/worlds:${gazebo_source_dir}/models:${gazebo_source_dir}/worlds:${GZ_SIM_RESOURCE_PATH:-}"
 export GZ_GUI_PLUGIN_PATH="${gui_plugin_build_dir}:${GZ_GUI_PLUGIN_PATH:-}"
 
-if [[ -e /dev/dxg ]]; then
-    export GALLIUM_DRIVER="${GALLIUM_DRIVER:-d3d12}"
-    export MESA_D3D12_DEFAULT_ADAPTER_NAME="${MESA_D3D12_DEFAULT_ADAPTER_NAME:-NVIDIA}"
-fi
+source "${script_dir}/require_gazebo_gpu.sh"
 
 printf 'Connecting Gazebo GUI to the running simulation server\n'
 exec gz sim -g -v4 --gui-config "${gui_config}"

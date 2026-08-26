@@ -39,10 +39,10 @@ struct AutonomyRuntimeConfig {
     static constexpr auto kDefaultTerminalAlignmentDuration =
         std::chrono::milliseconds{500};
     static constexpr auto kDefaultYawCommandInterval =
-        std::chrono::milliseconds{500};
+        std::chrono::milliseconds{100};
     static constexpr double kDefaultYawDeadbandRatio = 0.08;
     static constexpr double kDefaultMaximumYawStepDegrees = 10.0;
-    static constexpr double kDefaultYawSpeedDegreesPerSecond = 15.0;
+    static constexpr double kDefaultYawSpeedDegreesPerSecond = 90.0;
     static constexpr double kDefaultForwardCameraHorizontalFovRadians = 2.0;
 
     bool enabled{false};
@@ -117,6 +117,7 @@ class AutonomyRuntime {
         const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<AerialTargetTrackSnapshot>& aerial_target);
+    [[nodiscard]] std::vector<FlightActionRequest> stop_aerial_yaw();
     void update_terminal_alignment(const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<mission::BodyFramePosition>& landing_target);
@@ -163,6 +164,7 @@ class AutonomyRuntime {
     bool awaiting_rtl_ack_{false};
     bool rtl_acknowledged_{false};
     bool vision_landing_target_active_{false};
+    bool aerial_yaw_active_{false};
     bool terminal_alignment_confirmed_{false};
     bool terminal_descent_active_{false};
     std::optional<std::uint8_t> failure_result_;

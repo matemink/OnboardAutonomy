@@ -105,25 +105,25 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     if (!aerial_target.has_value() ||
         aerial_target->phase == AerialTargetTrackPhase::searching) {
         detail_ = "TARGET SEARCHING | GUIDED HOLD";
-        return {};
+        return stop_aerial_yaw();
     }
     if (aerial_target->phase == AerialTargetTrackPhase::acquiring) {
         detail_ = "TARGET ACQUIRING " +
                   std::to_string(aerial_target->consecutive_observations) +
                   "/" + std::to_string(aerial_target->required_observations) +
                   " | GUIDED HOLD";
-        return {};
+        return stop_aerial_yaw();
     }
     if (!aerial_target->horizontal_error.has_value()) {
         detail_ = "TARGET LOCK INVALID | GUIDED HOLD";
-        return {};
+        return stop_aerial_yaw();
     }
 
     const auto horizontal_error = *aerial_target->horizontal_error;
     if (!std::isfinite(horizontal_error) ||
         std::abs(horizontal_error) <= config_.yaw_deadband_ratio) {
         detail_ = "TARGET LOCKED | CENTERED | GUIDED HOLD";
-        return {};
+        return stop_aerial_yaw();
     }
     if (now < next_yaw_command_ || !vehicle_system_id_.has_value()) {
         detail_ = "TARGET LOCKED | YAW ALIGNING | GUIDED HOLD";
@@ -133,11 +133,12 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
     const auto half_fov_degrees =
         config_.forward_camera_horizontal_fov_radians * kRadiansToDegrees / 2.0;
-    const auto yaw_degrees = std::clamp(horizontal_error * half_fov_degrees,
+    const auto yaw_degrees = std::clamp(-horizontal_error * half_fov_degrees,
         -config_.maximum_yaw_step_degrees,
         config_.maximum_yaw_step_degrees);
     next_yaw_command_ = now + config_.yaw_command_interval;
     motion_safety_status_ = MotionSafetyStatus::allowed;
+    aerial_yaw_active_ = true;
 
     std::ostringstream detail;
     detail << "TARGET LOCKED | YAW "
@@ -156,6 +157,21 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
         .yaw_degrees = yaw_degrees,
         .yaw_speed_degrees_per_second = config_.yaw_speed_degrees_per_second,
         .time_usec = 0,
+    }};
+}
+
+std::vector<FlightActionRequest> AutonomyRuntime::stop_aerial_yaw() {
+    if (!aerial_yaw_active_ || !vehicle_system_id_.has_value()) {
+        return {};
+    }
+    aerial_yaw_active_ = false;
+    return {{
+        .action = FlightAction::condition_yaw,
+        .vehicle_system_id = *vehicle_system_id_,
+        .confirmation = 0,
+        .yaw_degrees = 0.0,
+        .yaw_speed_degrees_per_second =
+            config_.yaw_speed_degrees_per_second,
     }};
 }
 
@@ -275,6 +291,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::handle_missing_target(
     const mission::VehicleSnapshot& vehicle,
     const mission::TimePoint now) {
     vision_landing_target_active_ = false;
+    aerial_yaw_active_ = false;
     land_command_after_.reset();
     next_landing_target_ = now;
     if (!target_missing_since_.has_value()) {

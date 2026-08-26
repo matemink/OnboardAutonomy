@@ -419,8 +419,11 @@
             response.headers.get("X-OnboardAutonomy-Target-Track") ||
               JSON.stringify(defaultTrack)
           );
-          const luma = new Uint8Array(await response.arrayBuffer());
-          if (luma.length !== width * height) {
+          const yuv420 = new Uint8Array(await response.arrayBuffer());
+          const lumaSize = width * height;
+          const chromaWidth = width / 2;
+          const chromaSize = chromaWidth * (height / 2);
+          if (yuv420.length !== lumaSize + chromaSize * 2) {
             throw new Error("Incomplete camera frame");
           }
 
@@ -434,16 +437,35 @@
           }
 
           const rgba = imageData.data;
-          for (
-            let source = 0, destination = 0;
-            source < luma.length;
-            source += 1, destination += 4
-          ) {
-            const value = luma[source];
-            rgba[destination] = value;
-            rgba[destination + 1] = value;
-            rgba[destination + 2] = value;
-            rgba[destination + 3] = 255;
+          const uOffset = lumaSize;
+          const vOffset = lumaSize + chromaSize;
+          for (let y = 0; y < height; y += 1) {
+            const rowOffset = y * width;
+            const chromaRowOffset = Math.floor(y / 2) * chromaWidth;
+            for (let x = 0; x < width; x += 1) {
+              const source = rowOffset + x;
+              const chroma = chromaRowOffset + Math.floor(x / 2);
+              const luminance = Math.max(0, yuv420[source] - 16);
+              const u = yuv420[uOffset + chroma] - 128;
+              const v = yuv420[vOffset + chroma] - 128;
+              const destination = source * 4;
+              rgba[destination] = Math.max(
+                0,
+                Math.min(255, (298 * luminance + 409 * v + 128) >> 8)
+              );
+              rgba[destination + 1] = Math.max(
+                0,
+                Math.min(
+                  255,
+                  (298 * luminance - 100 * u - 208 * v + 128) >> 8
+                )
+              );
+              rgba[destination + 2] = Math.max(
+                0,
+                Math.min(255, (298 * luminance + 516 * u + 128) >> 8)
+              );
+              rgba[destination + 3] = 255;
+            }
           }
           context.putImageData(imageData, 0, 0);
           if (stream === "downward") {
@@ -472,7 +494,7 @@
           statusText.textContent = "LIVE";
           waiting.classList.add("hidden");
           frameText.textContent =
-            `${width}x${height} Y PLANE / FRAME ${sequence}`;
+            `${width}x${height} I420 COLOR / FRAME ${sequence}`;
           nextPollDelay = 100;
         } catch (error) {
           setOffline("OFFLINE");
