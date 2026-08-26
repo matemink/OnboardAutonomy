@@ -133,6 +133,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
     const auto half_fov_degrees =
         config_.forward_camera_horizontal_fov_radians * kRadiansToDegrees / 2.0;
+    // The tested forward-camera image X polarity is opposite relative MAVLink yaw.
     const auto yaw_degrees = std::clamp(-horizontal_error * half_fov_degrees,
         -config_.maximum_yaw_step_degrees,
         config_.maximum_yaw_step_degrees);

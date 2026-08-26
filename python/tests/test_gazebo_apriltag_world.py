@@ -85,6 +85,7 @@ FPS_INDICATOR_QML = (
 GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
 GAZEBO_SERVER_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_iris.sh"
 GAZEBO_GPU_GUARD = PROJECT_ROOT / "scripts" / "require_gazebo_gpu.sh"
+GAZEBO_INSTALLER = PROJECT_ROOT / "scripts" / "install_gazebo_harmonic.sh"
 TARGET_MODEL = (
     PROJECT_ROOT
     / "simulation"
@@ -377,6 +378,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         guard = GAZEBO_GPU_GUARD.read_text(encoding="utf-8")
         gui_launcher = GAZEBO_GUI_LAUNCHER.read_text(encoding="utf-8")
         server_launcher = GAZEBO_SERVER_LAUNCHER.read_text(encoding="utf-8")
+        installer = GAZEBO_INSTALLER.read_text(encoding="utf-8")
 
         self.assertIn("GALLIUM_DRIVER=d3d12", guard)
         self.assertIn("MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA", guard)
@@ -385,6 +387,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn("D3D12 (NVIDIA", guard)
         self.assertIn('source "${script_dir}/require_gazebo_gpu.sh"', gui_launcher)
         self.assertIn('source "${script_dir}/require_gazebo_gpu.sh"', server_launcher)
+        self.assertIn("mesa-utils", installer)
 
     def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
         world = element_tree.parse(WORLD).getroot()
