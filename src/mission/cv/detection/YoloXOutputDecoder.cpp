@@ -57,6 +57,14 @@ std::vector<GridCell> make_grid(const YoloXDecoderConfig& config) {
     return result;
 }
 
+bool accepted_class(const std::int32_t class_id,
+    const YoloXDecoderConfig& config) {
+    return config.accepted_class_ids.empty() ||
+           std::find(config.accepted_class_ids.begin(),
+               config.accepted_class_ids.end(),
+               class_id) != config.accepted_class_ids.end();
+}
+
 std::pair<std::int32_t, float> highest_scoring_class(
     const std::span<const float> row,
     const YoloXDecoderConfig& config) {
@@ -64,21 +72,17 @@ std::pair<std::int32_t, float> highest_scoring_class(
     float selected_score = 0.0F;
     for (std::size_t class_index = 0U; class_index < config.class_count;
          ++class_index) {
+        const auto class_id = static_cast<std::int32_t>(class_index);
+        if (!accepted_class(class_id, config)) {
+            continue;
+        }
         const auto score = row[kClassScoresOffset + class_index];
         if (std::isfinite(score) && score > selected_score) {
             selected_score = score;
-            selected_class = static_cast<std::int32_t>(class_index);
+            selected_class = class_id;
         }
     }
     return {selected_class, selected_score};
-}
-
-bool accepted_class(const std::int32_t class_id,
-    const YoloXDecoderConfig& config) {
-    return config.accepted_class_ids.empty() ||
-           std::find(config.accepted_class_ids.begin(),
-               config.accepted_class_ids.end(),
-               class_id) != config.accepted_class_ids.end();
 }
 
 } // namespace
@@ -104,7 +108,7 @@ std::vector<YoloXCandidate> decode_yolox_output(
         const auto confidence = objectness * class_score;
         if (class_id < 0 || !accepted_class(class_id, config) ||
             !std::isfinite(objectness) || !std::isfinite(confidence) ||
-            confidence < config.confidence_threshold) {
+            confidence <= config.confidence_threshold) {
             continue;
         }
 

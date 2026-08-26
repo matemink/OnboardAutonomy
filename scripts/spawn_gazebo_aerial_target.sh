@@ -7,7 +7,7 @@ readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
 readonly model_file="${project_dir}/simulation/models/scripted_fixed_wing_target/model.sdf"
 readonly world_name="${ONBOARD_AUTONOMY_GAZEBO_WORLD_NAME:-apriltag_landing}"
 readonly create_service="/world/${world_name}/create"
-readonly target_name="Zephyr_Fixed_Wing_Target"
+readonly target_name="Shahed_136_Visual_Target"
 
 if [[ ! -f "${model_file}" ]]; then
     printf 'Aerial target model is missing: %s\n' "${model_file}" >&2

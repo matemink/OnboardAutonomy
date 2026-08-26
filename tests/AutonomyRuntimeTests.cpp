@@ -182,7 +182,8 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                                      locked_right),
         FlightAction::condition_yaw,
         "stable target lock");
-    require(yaw.yaw_degrees == 10.0 && yaw.yaw_speed_degrees_per_second == 15.0,
+    require(yaw.yaw_degrees == -10.0 &&
+                yaw.yaw_speed_degrees_per_second == 90.0,
         "yaw guidance must clamp the relative correction and speed");
     require(runtime
                 .update(vehicle,
@@ -206,15 +207,17 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
         .width_ratio = std::nullopt,
         .height_ratio = std::nullopt,
     };
-    require(runtime.update(vehicle,
-                       startup,
-                       failsafe,
-                       start + std::chrono::milliseconds(600),
-                       std::nullopt,
-                       lost)
-                    .empty() &&
+    const auto hold = only_action(runtime.update(vehicle,
+                                      startup,
+                                      failsafe,
+                                      start + std::chrono::milliseconds(600),
+                                      std::nullopt,
+                                      lost),
+        FlightAction::condition_yaw,
+        "target loss yaw hold");
+    require(hold.yaw_degrees == 0.0 &&
                 runtime.snapshot().detail == "TARGET SEARCHING | GUIDED HOLD",
-        "target loss must stop yaw guidance and preserve hold");
+        "target loss must cancel the pending turn and preserve heading");
 }
 
 void runtime_streams_fresh_target_and_lands() {

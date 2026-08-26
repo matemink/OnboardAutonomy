@@ -242,14 +242,15 @@ Expected behavior:
   `30.013 FPS` with zero processing drops and approximately `10 ms`
 sensor-to-application latency.
 
-It also enables a 10 FPS grayscale diagnostic preview:
+It also enables a 10 FPS color diagnostic preview:
 
 ```text
 http://companionpi.local:8080/
 ```
 
-The page shows the exact Y plane consumed by the AprilTag detector and
-overlays only confirmed targets. It is unauthenticated HTTP intended for
+The page reconstructs RGB from the exact I420 frame received by the runtime
+and overlays only confirmed targets. The AprilTag detector intentionally uses
+the same frame's Y plane. It is unauthenticated HTTP intended for
 the local trusted bench network. Disable it with:
 
 ```bash

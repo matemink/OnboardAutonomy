@@ -38,7 +38,7 @@ struct PreviewFrame {
     std::uint32_t width{0};
     std::uint32_t height{0};
     std::chrono::steady_clock::time_point published_at{};
-    std::vector<std::uint8_t> luma;
+    std::vector<std::uint8_t> yuv420;
     std::vector<mission::TargetObservation> targets;
     mission::TargetTrackSnapshot target_track;
 };
@@ -225,24 +225,26 @@ class HttpCameraPreviewServer final
             return;
         }
 
-        const std::uint64_t luma_size =
+        const std::uint64_t pixel_count =
             static_cast<std::uint64_t>(frame.width) *
             static_cast<std::uint64_t>(frame.height);
+        const std::uint64_t yuv420_size = pixel_count + pixel_count / 2U;
         if (frame.width == 0U || frame.height == 0U ||
-            luma_size > frame.yuv420.size() ||
-            luma_size > static_cast<std::uint64_t>(
-                            std::numeric_limits<std::size_t>::max())) {
+            frame.width % 2U != 0U || frame.height % 2U != 0U ||
+            yuv420_size > frame.yuv420.size() ||
+            yuv420_size > static_cast<std::uint64_t>(
+                              std::numeric_limits<std::size_t>::max())) {
             return;
         }
 
         const auto end =
-            frame.yuv420.begin() + static_cast<std::ptrdiff_t>(luma_size);
+            frame.yuv420.begin() + static_cast<std::ptrdiff_t>(yuv420_size);
         latest_frames_[index] = PreviewFrame{
             .sequence = frame.sequence,
             .width = frame.width,
             .height = frame.height,
             .published_at = now,
-            .luma = {frame.yuv420.begin(), end},
+            .yuv420 = {frame.yuv420.begin(), end},
             .targets = {targets.begin(), targets.end()},
             .target_track = target_track,
         };
@@ -291,14 +293,15 @@ class HttpCameraPreviewServer final
         response.set_header("X-Frame-Sequence", std::to_string(frame.sequence));
         response.set_header("X-OnboardAutonomy-Camera",
             std::string(stream_name(stream)));
+        response.set_header("X-OnboardAutonomy-Pixel-Format", "I420");
         response.set_header("X-OnboardAutonomy-Targets",
             targets_json(frame.targets));
         response.set_header("X-OnboardAutonomy-Target-Track",
             target_track_json(frame.target_track));
         response.set_content(
             std::string{
-                reinterpret_cast<const char*>(frame.luma.data()),
-                frame.luma.size(),
+                reinterpret_cast<const char*>(frame.yuv420.data()),
+                frame.yuv420.size(),
             },
             "application/octet-stream");
     }

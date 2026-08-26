@@ -29,6 +29,7 @@ install_gazebo_packages() {
         git \
         gnupg \
         lsb-release \
+        mesa-utils \
         ninja-build \
         pkg-config
 

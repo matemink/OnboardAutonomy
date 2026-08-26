@@ -28,11 +28,7 @@ export GZ_VERSION=harmonic
 export GZ_SIM_SYSTEM_PLUGIN_PATH="${gazebo_build_dir}:${GZ_SIM_SYSTEM_PLUGIN_PATH:-}"
 export GZ_SIM_RESOURCE_PATH="${project_dir}/simulation/models:${project_dir}/simulation/worlds:${gazebo_source_dir}/models:${gazebo_source_dir}/worlds:${GZ_SIM_RESOURCE_PATH:-}"
 
-# WSLg may fall back to CPU rendering even when /dev/dxg is available.
-if [[ -e /dev/dxg ]]; then
-    export GALLIUM_DRIVER="${GALLIUM_DRIVER:-d3d12}"
-    export MESA_D3D12_DEFAULT_ADAPTER_NAME="${MESA_D3D12_DEFAULT_ADAPTER_NAME:-NVIDIA}"
-fi
+source "${script_dir}/require_gazebo_gpu.sh"
 
 printf 'OnboardAutonomy Gazebo world: %s\n' "${world_file}"
 

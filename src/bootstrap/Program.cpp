@@ -33,6 +33,8 @@ namespace onboard_autonomy::bootstrap {
 namespace {
 
 constexpr std::uint32_t kMaximumConsoleRefreshIntervalMs = 100;
+constexpr std::int32_t kCocoAirplaneClassId = 4;
+constexpr float kMinimumAirplaneConfidence = 0.51F;
 
 using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
 using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
@@ -293,6 +295,8 @@ std::unique_ptr<mission::ports::TargetDetector> make_forward_target_detector(
     }
     return mission::cv::make_opencv_dnn_target_detector({
         .model_file = forward_camera->detector_model_file,
+        .accepted_class_ids = {kCocoAirplaneClassId},
+        .confidence_threshold = kMinimumAirplaneConfidence,
     });
 }
 

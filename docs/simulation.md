@@ -67,15 +67,22 @@ forward detection overlay is disabled. A failure of either camera stream is
 reported independently in the preview.
 
 `StartOnboardAutonomyAerialTracking.cmd` starts the same proven demo and then
-spawns `Zephyr_Fixed_Wing_Target` at 12 m. It follows a deterministic 15 m
+spawns the scripted Shahed-136 visual target at 12 m. It follows a deterministic 15 m
 radius loop at the ArduPlane default cruise speed of 12 m/s through Gazebo
-Harmonic's `VelocityControl`. The textured Zephyr mesh comes from the official
-`ardupilot_gazebo` project; its attribution and LGPL-3.0 license are stored next
-to the model. The interactive runtime starts idle: the S500 remains disarmed on
-the ground until the operator selects a mission. Both the AprilTag landing and
-the SITL-only aerial-observation paths are available from the same console.
+Harmonic's `VelocityControl`. The CC BY 4.0 Shahed-136 glTF visual and its
+attribution are stored next to the model. The interactive runtime starts idle:
+the S500 remains disarmed on the ground until the operator selects a mission.
+Both the AprilTag landing and the SITL-only aerial-observation paths are
+available from the same console.
 
-The Zephyr is still a visual stimulus, not a second ArduPlane SITL instance.
+Both Gazebo server and GUI launchers run `scripts/require_gazebo_gpu.sh` before
+startup. On WSL the guard forces NVIDIA D3D12 and rejects `llvmpipe`, `softpipe`,
+`swrast`, `Accelerated: no`, or any non-NVIDIA D3D12 renderer. This prevents a
+silent CPU-rendering fallback from producing misleading simulation timing.
+
+The Shahed-136 remains a visual stimulus, not a second ArduPlane SITL instance.
+Its visual is scaled to a 3.5 x 2.5 x 0.5 m reference envelope, while the
+scripted route is not a flight-dynamics model of another aircraft.
 YOLOX may report generic COCO labels for both the aircraft and visually similar
 objects. The lightweight grass texture and lower-contrast directional light
 reduce the unrealistically sharp silhouette that the old flat ground produced.
@@ -175,7 +182,7 @@ scripted demonstration routes:
 
 Interactive mode never starts flight automatically. Press `1` to run the
 guarded takeoff and AprilTag precision-landing mission, or `2` to take off and
-track the Zephyr with bounded yaw while remaining in GUIDED hold. Press `R` to
+track the scripted Shahed-136 visual with bounded yaw while remaining in GUIDED hold. Press `R` to
 cancel either mission and request ArduPilot RTL; if the vehicle is already
 disarmed, it simply returns the runtime to idle. Press `Q` to exit. A mission
 request is blocked while another mission or RTL is active.

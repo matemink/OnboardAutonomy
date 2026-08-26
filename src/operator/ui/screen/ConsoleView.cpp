@@ -900,7 +900,7 @@ void write_runtime_footer(std::ostringstream& output,
         use_color);
     write_centered_line(output,
         snapshot.motion_commands_allowed
-            ? "[1] LAND ON APRILTAG     [2] TRACK ZEPHYR (HOLD + YAW)"
+            ? "[1] LAND ON APRILTAG     [2] TRACK SHAHED-136 (HOLD + YAW)"
             : "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT",
         snapshot.motion_commands_allowed ? Tone::normal : Tone::dim,
         use_color);
