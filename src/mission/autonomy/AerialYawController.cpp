@@ -51,13 +51,13 @@ AerialYawControl AerialYawController::update(const double horizontal_error,
             : config_.proportional_gain_per_second * angle_error_degrees;
     const auto feed_forward_rate =
         config_.feed_forward_gain * smoothed_target_rate_degrees_per_second_;
-    const bool target_is_approaching_center =
+    const auto combined_yaw_rate = proportional_rate + feed_forward_rate;
+    const bool target_motion_would_reverse_correction =
         std::abs(feed_forward_rate) >=
             kMinimumTargetMotionRateDegreesPerSecond &&
-        proportional_rate * feed_forward_rate < 0.0;
-    const auto requested_yaw_rate = target_is_approaching_center
-                                        ? 0.0
-                                        : proportional_rate + feed_forward_rate;
+        proportional_rate * combined_yaw_rate < 0.0;
+    const auto requested_yaw_rate =
+        target_motion_would_reverse_correction ? 0.0 : combined_yaw_rate;
     const auto yaw_rate = std::clamp(requested_yaw_rate,
         -config_.maximum_yaw_rate_degrees_per_second,
         config_.maximum_yaw_rate_degrees_per_second);

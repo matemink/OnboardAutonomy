@@ -155,6 +155,23 @@ void approaching_target_does_not_trigger_opposite_yaw() {
         "yaw must follow target motion after it crosses image centre");
 }
 
+void slow_inward_motion_preserves_proportional_correction() {
+    AerialYawController controller{deterministic_config()};
+    const TimePoint start{};
+    controller.observe_while_holding(0.6, start);
+
+    const auto control =
+        controller.update(0.59, 0.0, start + std::chrono::milliseconds(100));
+
+    require(control.feed_forward_rate_degrees_per_second < 0.0,
+        "inward target motion must oppose the proportional correction");
+    require(control.yaw_rate_degrees_per_second > 0.0,
+        "slow inward motion must not discard proportional centering");
+    require(control.yaw_rate_degrees_per_second <
+                control.proportional_rate_degrees_per_second,
+        "inward feed-forward must reduce the proportional correction");
+}
+
 } // namespace
 
 void run_aerial_yaw_controller_tests() {
@@ -165,4 +182,5 @@ void run_aerial_yaw_controller_tests() {
     stale_observation_discards_velocity_history();
     reset_discards_lost_target_motion();
     approaching_target_does_not_trigger_opposite_yaw();
+    slow_inward_motion_preserves_proportional_correction();
 }
