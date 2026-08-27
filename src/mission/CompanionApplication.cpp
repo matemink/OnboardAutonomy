@@ -13,6 +13,7 @@
 #include <deque>
 #include <iomanip>
 #include <optional>
+#include <numbers>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -31,6 +32,7 @@ constexpr std::uint32_t kReturnToLaunchMode = 6;
 constexpr std::uint32_t kLandMode = 9;
 constexpr std::uint32_t kPositionHoldMode = 16;
 constexpr std::size_t kTransportReceiveBufferSize = 4096;
+constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 
 TelemetrySetupState map_telemetry_state(
     const hardware::mavlink::TelemetrySetupPhase phase) {
@@ -160,6 +162,10 @@ std::string flight_action_name(const FlightAction action) {
         return "LANDING_TARGET";
     case FlightAction::condition_yaw:
         return "YAW";
+    case FlightAction::yaw_rate:
+        return "YAW_RATE";
+    case FlightAction::yaw_target:
+        return "YAW_TARGET";
     }
     return "ACTION";
 }
@@ -170,6 +176,9 @@ std::string flight_action_message_name(const FlightAction action) {
         return "INVALID";
     case FlightAction::landing_target:
         return "LANDING_TARGET";
+    case FlightAction::yaw_rate:
+    case FlightAction::yaw_target:
+        return "SET_POSITION_TARGET_LOCAL_NED";
     case FlightAction::set_guided_mode:
     case FlightAction::arm:
     case FlightAction::takeoff:
@@ -183,7 +192,9 @@ std::string flight_action_message_name(const FlightAction action) {
 
 bool action_expects_ack(const FlightAction action) {
     return action != FlightAction::invalid &&
-           action != FlightAction::landing_target;
+           action != FlightAction::landing_target &&
+           action != FlightAction::yaw_rate &&
+           action != FlightAction::yaw_target;
 }
 
 std::string flight_action_detail(const FlightActionRequest& request) {
@@ -223,6 +234,19 @@ std::string flight_action_detail(const FlightActionRequest& request) {
             << std::abs(request.yaw_degrees) << " DEG";
         detail = yaw.str();
         break;
+    }
+    case FlightAction::yaw_rate: {
+        std::ostringstream yaw;
+        yaw << std::fixed << std::setprecision(1)
+            << (request.yaw_rate_degrees_per_second >= 0.0 ? "RIGHT " : "LEFT ")
+            << std::abs(request.yaw_rate_degrees_per_second) << " DEG/S";
+        return yaw.str();
+    }
+    case FlightAction::yaw_target: {
+        std::ostringstream yaw;
+        yaw << std::fixed << std::setprecision(1)
+            << request.yaw_target_radians * kRadiansToDegrees << " DEG ABS";
+        return yaw.str();
     }
     }
 
@@ -291,6 +315,13 @@ std::vector<std::uint8_t> encode_flight_action(
             request.yaw_degrees,
             request.yaw_speed_degrees_per_second,
             request.confirmation);
+    case FlightAction::yaw_rate:
+        return hardware::mavlink::encode_yaw_rate_target(
+            request.vehicle_system_id,
+            request.yaw_rate_degrees_per_second);
+    case FlightAction::yaw_target:
+        return hardware::mavlink::encode_yaw_target(request.vehicle_system_id,
+            request.yaw_target_radians);
     }
     return {};
 }

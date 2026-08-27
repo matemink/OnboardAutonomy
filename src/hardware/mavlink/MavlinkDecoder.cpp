@@ -202,7 +202,11 @@ void MavlinkDecoder::handle_attitude(const mavlink_message_t& message,
     const mission::TimePoint now) {
     mavlink_attitude_t attitude{};
     mavlink_msg_attitude_decode(&message, &attitude);
-    state_.on_attitude(attitude.roll, attitude.pitch, attitude.yaw, now);
+    state_.on_attitude(attitude.roll,
+        attitude.pitch,
+        attitude.yaw,
+        attitude.yawspeed,
+        now);
 }
 
 void MavlinkDecoder::handle_battery(const mavlink_message_t& message,

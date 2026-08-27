@@ -177,6 +177,8 @@ Json vehicle_json(const mission::VehicleSnapshot& vehicle) {
         {"roll_rad", optional_number(vehicle.roll_rad)},
         {"pitch_rad", optional_number(vehicle.pitch_rad)},
         {"yaw_rad", optional_number(vehicle.yaw_rad)},
+        {"yaw_rate_rad_per_second",
+            optional_number(vehicle.yaw_rate_rad_per_second)},
         {"battery_voltage_v", optional_number(vehicle.battery_voltage_v)},
         {"battery_current_a", optional_number(vehicle.battery_current_a)},
         {"battery_remaining_pct",
@@ -388,6 +390,21 @@ Json snapshot_json(const mission::AppSnapshot& snapshot,
             snapshot.autonomy.vision_landing_target_active},
         {"terminal_descent_active", snapshot.autonomy.terminal_descent_active},
         {"land_attempt", snapshot.autonomy.land_attempt},
+        {"aerial_yaw",
+            {{"horizontal_error",
+                 optional_number(snapshot.autonomy.aerial_horizontal_error)},
+                {"proportional_rate_degrees_per_second",
+                    optional_number(
+                        snapshot.autonomy
+                            .aerial_proportional_rate_degrees_per_second)},
+                {"feed_forward_rate_degrees_per_second",
+                    optional_number(
+                        snapshot.autonomy
+                            .aerial_feed_forward_rate_degrees_per_second)},
+                {"commanded_rate_degrees_per_second",
+                    optional_number(
+                        snapshot.autonomy
+                            .aerial_commanded_yaw_rate_degrees_per_second)}}},
     };
     result["motion_commands_allowed"] = snapshot.motion_commands_allowed;
     result["link_events"] = Json::array();

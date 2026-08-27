@@ -47,6 +47,7 @@ struct VehicleSnapshot {
     std::optional<double> roll_rad;
     std::optional<double> pitch_rad;
     std::optional<double> yaw_rad;
+    std::optional<double> yaw_rate_rad_per_second;
     std::optional<double> battery_voltage_v;
     std::optional<double> battery_current_a;
     std::optional<std::int8_t> battery_remaining_pct;
@@ -75,8 +76,11 @@ class VehicleState {
     void
     on_local_position(float north_m, float east_m, float down_m, TimePoint now);
 
-    void
-    on_attitude(float roll_rad, float pitch_rad, float yaw_rad, TimePoint now);
+    void on_attitude(float roll_rad,
+        float pitch_rad,
+        float yaw_rad,
+        float yaw_rate_rad_per_second,
+        TimePoint now);
 
     void on_battery(std::optional<double> voltage_v,
         std::optional<double> current_a,
@@ -132,6 +136,7 @@ class VehicleState {
     std::optional<double> roll_rad_;
     std::optional<double> pitch_rad_;
     std::optional<double> yaw_rad_;
+    std::optional<double> yaw_rate_rad_per_second_;
     std::optional<double> battery_voltage_v_;
     std::optional<double> battery_current_a_;
     std::optional<std::int8_t> battery_remaining_pct_;

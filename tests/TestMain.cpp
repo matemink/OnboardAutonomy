@@ -13,6 +13,7 @@ int main() {
         run_telemetry_stream_configurator_tests();
         run_target_tracker_tests();
         run_aerial_target_tracker_tests();
+        run_aerial_yaw_controller_tests();
         run_target_transform_tests();
         run_console_view_tests();
         run_board_type_catalog_tests();

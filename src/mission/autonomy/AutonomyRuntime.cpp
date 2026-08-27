@@ -16,11 +16,19 @@ namespace onboard_autonomy::mission {
 namespace {
 
 constexpr double kMaximumRelativeYawDegrees = 180.0;
+constexpr double kNormalizedHorizontalErrorToPercent = 50.0;
 
 } // namespace
 
 AutonomyRuntime::AutonomyRuntime(const AutonomyRuntimeConfig& config)
-    : config_(config) {
+    : config_(config),
+      aerial_yaw_controller_({
+          .maximum_yaw_rate_degrees_per_second =
+              config.yaw_speed_degrees_per_second,
+          .horizontal_deadband_ratio = config.yaw_deadband_ratio,
+          .horizontal_fov_radians =
+              config.forward_camera_horizontal_fov_radians,
+      }) {
     if (config_.target_loss_land_after <= std::chrono::milliseconds::zero()) {
         throw std::invalid_argument(
             "target-loss LAND timeout must be positive");
@@ -104,15 +112,42 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     motion_safety_status_ = MotionSafetyStatus::no_intent;
     if (!aerial_target.has_value() ||
         aerial_target->phase == AerialTargetTrackPhase::searching) {
+        aerial_horizontal_error_.reset();
         detail_ = "TARGET SEARCHING | GUIDED HOLD";
         return stop_aerial_yaw();
     }
+    aerial_horizontal_error_ = aerial_target->horizontal_error;
     if (aerial_target->phase == AerialTargetTrackPhase::acquiring) {
+        std::vector<FlightActionRequest> actions;
+        if (aerial_yaw_active_) {
+            actions = stop_aerial_yaw();
+        }
+        const bool has_new_observation =
+            aerial_target->horizontal_error.has_value() &&
+            std::isfinite(*aerial_target->horizontal_error) &&
+            (!last_aerial_observation_count_.has_value() ||
+                *last_aerial_observation_count_ !=
+                    aerial_target->accepted_observations);
+        if (has_new_observation) {
+            auto observed_at = now;
+            if (aerial_target->observation_age_ms.has_value() &&
+                std::isfinite(*aerial_target->observation_age_ms) &&
+                *aerial_target->observation_age_ms >= 0.0) {
+                observed_at -= std::chrono::duration_cast<Clock::duration>(
+                    std::chrono::duration<double, std::milli>{
+                        *aerial_target->observation_age_ms});
+            }
+            aerial_yaw_controller_.observe_while_holding(
+                *aerial_target->horizontal_error,
+                observed_at);
+            last_aerial_observation_count_ =
+                aerial_target->accepted_observations;
+        }
         detail_ = "TARGET ACQUIRING " +
                   std::to_string(aerial_target->consecutive_observations) +
                   "/" + std::to_string(aerial_target->required_observations) +
                   " | GUIDED HOLD";
-        return stop_aerial_yaw();
+        return actions;
     }
     if (!aerial_target->horizontal_error.has_value()) {
         detail_ = "TARGET LOCK INVALID | GUIDED HOLD";
@@ -120,59 +155,85 @@ std::vector<FlightActionRequest> AutonomyRuntime::update_aerial_observation(
     }
 
     const auto horizontal_error = *aerial_target->horizontal_error;
-    if (!std::isfinite(horizontal_error) ||
-        std::abs(horizontal_error) <= config_.yaw_deadband_ratio) {
-        detail_ = "TARGET LOCKED | CENTERED | GUIDED HOLD";
+    if (!std::isfinite(horizontal_error)) {
+        detail_ = "TARGET LOCK INVALID | GUIDED HOLD";
         return stop_aerial_yaw();
     }
-    if (now < next_yaw_command_ || !vehicle_system_id_.has_value()) {
+    const bool has_new_observation =
+        !last_aerial_observation_count_.has_value() ||
+        *last_aerial_observation_count_ != aerial_target->accepted_observations;
+    if (has_new_observation) {
+        auto observed_at = now;
+        if (aerial_target->observation_age_ms.has_value() &&
+            std::isfinite(*aerial_target->observation_age_ms) &&
+            *aerial_target->observation_age_ms >= 0.0) {
+            observed_at -= std::chrono::duration_cast<Clock::duration>(
+                std::chrono::duration<double, std::milli>{
+                    *aerial_target->observation_age_ms});
+        }
+        constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
+        const auto actual_yaw_rate_degrees_per_second =
+            vehicle.yaw_rate_rad_per_second.value_or(0.0) * kRadiansToDegrees;
+        const auto control = aerial_yaw_controller_.update(horizontal_error,
+            actual_yaw_rate_degrees_per_second,
+            observed_at);
+        aerial_proportional_rate_degrees_per_second_ =
+            control.proportional_rate_degrees_per_second;
+        aerial_feed_forward_rate_degrees_per_second_ =
+            control.feed_forward_rate_degrees_per_second;
+        current_aerial_yaw_rate_degrees_per_second_ =
+            control.yaw_rate_degrees_per_second;
+        last_aerial_observation_count_ = aerial_target->accepted_observations;
+    }
+    if (now < next_yaw_command_ || !vehicle_system_id_.has_value() ||
+        !current_aerial_yaw_rate_degrees_per_second_.has_value()) {
         detail_ = "TARGET LOCKED | YAW ALIGNING | GUIDED HOLD";
         return {};
     }
 
-    constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
-    const auto half_fov_degrees =
-        config_.forward_camera_horizontal_fov_radians * kRadiansToDegrees / 2.0;
-    // The tested forward-camera image X polarity is opposite relative MAVLink yaw.
-    const auto yaw_degrees = std::clamp(-horizontal_error * half_fov_degrees,
-        -config_.maximum_yaw_step_degrees,
-        config_.maximum_yaw_step_degrees);
     next_yaw_command_ = now + config_.yaw_command_interval;
     motion_safety_status_ = MotionSafetyStatus::allowed;
     aerial_yaw_active_ = true;
 
     std::ostringstream detail;
-    detail << "TARGET LOCKED | YAW "
-           << (yaw_degrees >= 0.0 ? "RIGHT " : "LEFT ") << std::fixed
-           << std::setprecision(1) << std::abs(yaw_degrees)
-           << " DEG | GUIDED HOLD";
+    detail << "TARGET LOCKED | CENTER ERROR " << std::fixed
+           << std::setprecision(1)
+           << horizontal_error * kNormalizedHorizontalErrorToPercent
+           << "% | YAW "
+           << (*current_aerial_yaw_rate_degrees_per_second_ < 0.0 ? "LEFT "
+                                                                  : "RIGHT ")
+           << std::abs(*current_aerial_yaw_rate_degrees_per_second_)
+           << " DEG/S";
     detail_ = detail.str();
     return {{
-        .action = FlightAction::condition_yaw,
+        .action = FlightAction::yaw_rate,
         .vehicle_system_id = *vehicle_system_id_,
         .confirmation = 0,
         .altitude_m = 0.0,
         .x_m = 0.0,
         .y_m = 0.0,
         .z_m = 0.0,
-        .yaw_degrees = yaw_degrees,
-        .yaw_speed_degrees_per_second = config_.yaw_speed_degrees_per_second,
+        .yaw_rate_degrees_per_second =
+            *current_aerial_yaw_rate_degrees_per_second_,
         .time_usec = 0,
     }};
 }
 
 std::vector<FlightActionRequest> AutonomyRuntime::stop_aerial_yaw() {
+    aerial_yaw_controller_.reset();
+    last_aerial_observation_count_.reset();
+    current_aerial_yaw_rate_degrees_per_second_.reset();
+    aerial_proportional_rate_degrees_per_second_.reset();
+    aerial_feed_forward_rate_degrees_per_second_.reset();
     if (!aerial_yaw_active_ || !vehicle_system_id_.has_value()) {
         return {};
     }
     aerial_yaw_active_ = false;
     return {{
-        .action = FlightAction::condition_yaw,
+        .action = FlightAction::yaw_rate,
         .vehicle_system_id = *vehicle_system_id_,
         .confirmation = 0,
-        .yaw_degrees = 0.0,
-        .yaw_speed_degrees_per_second =
-            config_.yaw_speed_degrees_per_second,
+        .yaw_rate_degrees_per_second = 0.0,
     }};
 }
 
@@ -485,6 +546,9 @@ void AutonomyRuntime::begin_return_to_launch(
 }
 
 void AutonomyRuntime::reset_runtime_state() {
+    aerial_yaw_controller_.reset();
+    last_aerial_observation_count_.reset();
+    current_aerial_yaw_rate_degrees_per_second_.reset();
     motion_safety_status_ = MotionSafetyStatus::no_intent;
     vehicle_system_id_.reset();
     land_command_after_.reset();
@@ -552,6 +616,13 @@ AutonomyRuntimeSnapshot AutonomyRuntime::snapshot() const {
         .terminal_descent_active = terminal_descent_active_,
         .land_attempt = land_attempt_,
         .failure_result = failure_result_,
+        .aerial_horizontal_error = aerial_horizontal_error_,
+        .aerial_proportional_rate_degrees_per_second =
+            aerial_proportional_rate_degrees_per_second_,
+        .aerial_feed_forward_rate_degrees_per_second =
+            aerial_feed_forward_rate_degrees_per_second_,
+        .aerial_commanded_yaw_rate_degrees_per_second =
+            current_aerial_yaw_rate_degrees_per_second_,
     };
 }
 
