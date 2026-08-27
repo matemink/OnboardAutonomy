@@ -17,8 +17,14 @@ arguments=(
     --sitl
     --udp-bind 127.0.0.1
     --udp-port 14550
-    --snapshot-ms 1000
+    --snapshot-ms "${ONBOARD_AUTONOMY_SNAPSHOT_MS:-1000}"
 )
+
+if [[ -n "${ONBOARD_AUTONOMY_DIAGNOSTIC_LOG:-}" ]]; then
+    mkdir -p "$(dirname -- "${ONBOARD_AUTONOMY_DIAGNOSTIC_LOG}")"
+    : > "${ONBOARD_AUTONOMY_DIAGNOSTIC_LOG}"
+    arguments+=(--diagnostic-log "${ONBOARD_AUTONOMY_DIAGNOSTIC_LOG}")
+fi
 
 if [[ -n "${ONBOARD_AUTONOMY_SIM_WIND_PROFILE:-}" ]]; then
     read -r wind_speed wind_direction wind_turbulence extra <<< \

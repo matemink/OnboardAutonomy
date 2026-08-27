@@ -59,6 +59,14 @@ std::vector<std::uint8_t> encode_condition_yaw(std::uint8_t vehicle_system_id,
     std::uint8_t confirmation = 0,
     std::uint8_t component_id = kCompanionComponentId);
 
+std::vector<std::uint8_t> encode_yaw_rate_target(std::uint8_t vehicle_system_id,
+    double yaw_rate_degrees_per_second,
+    std::uint8_t component_id = kCompanionComponentId);
+
+std::vector<std::uint8_t> encode_yaw_target(std::uint8_t vehicle_system_id,
+    double yaw_target_radians,
+    std::uint8_t component_id = kCompanionComponentId);
+
 std::vector<std::uint8_t> encode_local_position_target(
     std::uint8_t vehicle_system_id,
     double north_m,

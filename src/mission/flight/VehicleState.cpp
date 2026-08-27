@@ -112,12 +112,14 @@ void VehicleState::on_local_position(const float north_m,
 void VehicleState::on_attitude(const float roll_rad,
     const float pitch_rad,
     const float yaw_rad,
+    const float yaw_rate_rad_per_second,
     const TimePoint now) {
     std::scoped_lock lock(mutex_);
     last_attitude_ = now;
     roll_rad_ = static_cast<double>(roll_rad);
     pitch_rad_ = static_cast<double>(pitch_rad);
     yaw_rad_ = static_cast<double>(yaw_rad);
+    yaw_rate_rad_per_second_ = static_cast<double>(yaw_rate_rad_per_second);
 }
 
 void VehicleState::update_battery_locked(const std::optional<double> voltage_v,
@@ -247,6 +249,7 @@ VehicleSnapshot VehicleState::snapshot(const TimePoint now) {
         result.roll_rad = roll_rad_;
         result.pitch_rad = pitch_rad_;
         result.yaw_rad = yaw_rad_;
+        result.yaw_rate_rad_per_second = yaw_rate_rad_per_second_;
     }
 
     const bool system_status_fresh =

@@ -274,6 +274,7 @@ onboard_autonomy_enable_warnings(onboard_autonomy_operator_screen)
 
 add_library(
     onboard_autonomy_mission
+    src/mission/autonomy/AerialYawController.cpp
     src/mission/autonomy/AutonomyRuntime.cpp
     src/mission/cv/AsyncCameraMonitor.cpp
     src/mission/cv/CameraMonitor.cpp
@@ -438,6 +439,7 @@ if(BUILD_TESTING)
         tests/AutonomyCoreTests.cpp
         tests/AutonomyRuntimeTests.cpp
         tests/AerialTargetTrackerTests.cpp
+        tests/AerialYawControllerTests.cpp
         tests/FlightStartupControllerTests.cpp
         tests/BoardTypeCatalogTests.cpp
         tests/CameraMonitorTests.cpp

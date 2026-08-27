@@ -5,6 +5,7 @@
 #include <ardupilotmega/mavlink.h>
 
 #include <cstdint>
+#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -263,6 +264,21 @@ void movement_and_precision_messages_use_documented_frames() {
                 move.type_mask == 3576 && move.x == 10.0F && move.y == -4.0F &&
                 move.z == 0.0F,
         "route target must be a documented local NED position offset");
+
+    const auto yaw_rate_message = decode_message(
+        onboard_autonomy::hardware::mavlink::encode_yaw_rate_target(system_id,
+            -45.0));
+    require(yaw_rate_message.msgid ==
+                MAVLINK_MSG_ID_SET_POSITION_TARGET_LOCAL_NED,
+        "yaw rate must use SET_POSITION_TARGET_LOCAL_NED");
+    mavlink_set_position_target_local_ned_t yaw_rate{};
+    mavlink_msg_set_position_target_local_ned_decode(&yaw_rate_message,
+        &yaw_rate);
+    require(yaw_rate.coordinate_frame == MAV_FRAME_LOCAL_NED &&
+                yaw_rate.type_mask == 1479 && yaw_rate.vx == 0.0F &&
+                yaw_rate.vy == 0.0F && yaw_rate.vz == 0.0F &&
+                std::abs(yaw_rate.yaw_rate + 0.7853982F) < 0.0001F,
+        "yaw rate must hold position and preserve its signed angular velocity");
 
     const auto target_message = decode_message(
         onboard_autonomy::hardware::mavlink::encode_landing_target(system_id,

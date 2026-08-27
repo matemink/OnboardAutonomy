@@ -1,6 +1,7 @@
 #pragma once
 
 #include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
+#include "onboard_autonomy/mission/autonomy/AerialYawController.hpp"
 #include "onboard_autonomy/mission/autonomy/DecisionEngine.hpp"
 #include "onboard_autonomy/mission/cv/tracking/AerialTargetTracker.hpp"
 #include "onboard_autonomy/mission/flight/FlightCommand.hpp"
@@ -70,6 +71,10 @@ struct AutonomyRuntimeSnapshot {
     bool terminal_descent_active{false};
     std::size_t land_attempt{0};
     std::optional<std::uint8_t> failure_result;
+    std::optional<double> aerial_horizontal_error;
+    std::optional<double> aerial_proportional_rate_degrees_per_second;
+    std::optional<double> aerial_feed_forward_rate_degrees_per_second;
+    std::optional<double> aerial_commanded_yaw_rate_degrees_per_second;
 };
 
 class AutonomyRuntime {
@@ -145,6 +150,7 @@ class AutonomyRuntime {
     static constexpr double kTargetStopAltitudeM = 0.20;
 
     AutonomyRuntimeConfig config_;
+    AerialYawController aerial_yaw_controller_;
     AutonomyRuntimePhase phase_{AutonomyRuntimePhase::disabled};
     std::string detail_{"Autonomy runtime disabled"};
     DecisionEngine decision_engine_;
@@ -165,6 +171,11 @@ class AutonomyRuntime {
     bool rtl_acknowledged_{false};
     bool vision_landing_target_active_{false};
     bool aerial_yaw_active_{false};
+    std::optional<std::uint64_t> last_aerial_observation_count_;
+    std::optional<double> current_aerial_yaw_rate_degrees_per_second_;
+    std::optional<double> aerial_horizontal_error_;
+    std::optional<double> aerial_proportional_rate_degrees_per_second_;
+    std::optional<double> aerial_feed_forward_rate_degrees_per_second_;
     bool terminal_alignment_confirmed_{false};
     bool terminal_descent_active_{false};
     std::optional<std::uint8_t> failure_result_;

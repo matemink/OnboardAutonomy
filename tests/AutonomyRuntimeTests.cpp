@@ -37,6 +37,8 @@ VehicleSnapshot flying_vehicle() {
     VehicleSnapshot vehicle;
     vehicle.connected = true;
     vehicle.armed = true;
+    vehicle.yaw_rad = 0.0;
+    vehicle.yaw_rate_rad_per_second = 0.0;
     vehicle.system_id = 1;
     vehicle.relative_altitude_m = 8.0;
     return vehicle;
@@ -180,11 +182,11 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                                      start + std::chrono::milliseconds(10),
                                      std::nullopt,
                                      locked_right),
-        FlightAction::condition_yaw,
+        FlightAction::yaw_rate,
         "stable target lock");
-    require(yaw.yaw_degrees == -10.0 &&
-                yaw.yaw_speed_degrees_per_second == 90.0,
-        "yaw guidance must clamp the relative correction and speed");
+    require(yaw.yaw_rate_degrees_per_second > 68.0 &&
+                yaw.yaw_rate_degrees_per_second < 69.0,
+        "yaw guidance must derive a signed rate from target error");
     require(runtime
                 .update(vehicle,
                     startup,
@@ -213,9 +215,9 @@ void aerial_observation_yaws_only_for_a_stable_target_lock() {
                                       start + std::chrono::milliseconds(600),
                                       std::nullopt,
                                       lost),
-        FlightAction::condition_yaw,
+        FlightAction::yaw_rate,
         "target loss yaw hold");
-    require(hold.yaw_degrees == 0.0 &&
+    require(hold.yaw_rate_degrees_per_second == 0.0 &&
                 runtime.snapshot().detail == "TARGET SEARCHING | GUIDED HOLD",
         "target loss must cancel the pending turn and preserve heading");
 }

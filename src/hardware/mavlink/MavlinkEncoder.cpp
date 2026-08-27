@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,9 @@ constexpr std::size_t kCommandParam7Index = 6;
 constexpr std::size_t kMaximumParameterIdLength = 16;
 constexpr float kCopterGuidedMode = 4.0F;
 constexpr std::uint16_t kPositionOnlyTypeMask = 3576;
+constexpr std::uint16_t kVelocityAndYawRateTypeMask = 1479;
+constexpr std::uint16_t kVelocityAndYawTypeMask = 2503;
+constexpr double kMaximumYawRateDegreesPerSecond = 360.0;
 
 using CommandParameters = std::array<float, kCommandParameterCount>;
 
@@ -301,6 +305,79 @@ std::vector<std::uint8_t> encode_local_position_target(
         0.0F,
         0.0F,
         0.0F,
+        0.0F);
+
+    std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> buffer{};
+    const auto length = mavlink_msg_to_send_buffer(buffer.data(), &message);
+    return {buffer.begin(), buffer.begin() + length};
+}
+
+std::vector<std::uint8_t> encode_yaw_rate_target(
+    const std::uint8_t vehicle_system_id,
+    const double yaw_rate_degrees_per_second,
+    const std::uint8_t component_id) {
+    if (!std::isfinite(yaw_rate_degrees_per_second) ||
+        std::abs(yaw_rate_degrees_per_second) >
+            kMaximumYawRateDegreesPerSecond) {
+        throw std::invalid_argument("invalid yaw-rate target");
+    }
+
+    const auto yaw_rate_radians_per_second =
+        yaw_rate_degrees_per_second * std::numbers::pi / 180.0;
+    mavlink_message_t message{};
+    mavlink_msg_set_position_target_local_ned_pack(vehicle_system_id,
+        component_id,
+        &message,
+        0,
+        vehicle_system_id,
+        0,
+        MAV_FRAME_LOCAL_NED,
+        kVelocityAndYawRateTypeMask,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        static_cast<float>(yaw_rate_radians_per_second));
+
+    std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> buffer{};
+    const auto length = mavlink_msg_to_send_buffer(buffer.data(), &message);
+    return {buffer.begin(), buffer.begin() + length};
+}
+
+std::vector<std::uint8_t> encode_yaw_target(
+    const std::uint8_t vehicle_system_id,
+    const double yaw_target_radians,
+    const std::uint8_t component_id) {
+    if (!std::isfinite(yaw_target_radians) ||
+        std::abs(yaw_target_radians) > std::numbers::pi) {
+        throw std::invalid_argument("invalid yaw target");
+    }
+
+    mavlink_message_t message{};
+    mavlink_msg_set_position_target_local_ned_pack(vehicle_system_id,
+        component_id,
+        &message,
+        0,
+        vehicle_system_id,
+        0,
+        MAV_FRAME_LOCAL_NED,
+        kVelocityAndYawTypeMask,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        static_cast<float>(yaw_target_radians),
         0.0F);
 
     std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> buffer{};
