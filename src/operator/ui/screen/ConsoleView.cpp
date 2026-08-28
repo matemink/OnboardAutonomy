@@ -612,6 +612,8 @@ std::string autonomy_phase_name(const mission::AutonomyRuntimePhase phase) {
         return "WAITING";
     case mission::AutonomyRuntimePhase::active:
         return "ACTIVE";
+    case mission::AutonomyRuntimePhase::suspended:
+        return "SUSPENDED";
     case mission::AutonomyRuntimePhase::landing:
         return "LANDING";
     case mission::AutonomyRuntimePhase::returning_to_launch:
@@ -638,6 +640,7 @@ Tone autonomy_tone(const mission::AutonomyRuntimePhase phase) {
     case mission::AutonomyRuntimePhase::idle:
         return Tone::dim;
     case mission::AutonomyRuntimePhase::waiting_for_startup:
+    case mission::AutonomyRuntimePhase::suspended:
         return Tone::waiting;
     }
     return Tone::normal;

@@ -22,6 +22,7 @@ enum class AutonomyRuntimePhase {
     idle,
     waiting_for_startup,
     active,
+    suspended,
     landing,
     returning_to_launch,
     completed,
@@ -45,6 +46,9 @@ struct AutonomyRuntimeConfig {
     static constexpr double kDefaultMaximumYawStepDegrees = 10.0;
     static constexpr double kDefaultYawSpeedDegreesPerSecond = 90.0;
     static constexpr double kDefaultForwardCameraHorizontalFovRadians = 2.0;
+    static constexpr auto kDefaultAerialLinkLossGrace = std::chrono::seconds{1};
+    static constexpr auto kDefaultAerialLinkRecoveryHold =
+        std::chrono::milliseconds{500};
 
     bool enabled{false};
     bool start_automatically{true};
@@ -61,6 +65,10 @@ struct AutonomyRuntimeConfig {
     double yaw_speed_degrees_per_second{kDefaultYawSpeedDegreesPerSecond};
     double forward_camera_horizontal_fov_radians{
         kDefaultForwardCameraHorizontalFovRadians};
+    std::chrono::milliseconds aerial_link_loss_grace{
+        kDefaultAerialLinkLossGrace};
+    std::chrono::milliseconds aerial_link_recovery_hold{
+        kDefaultAerialLinkRecoveryHold};
 };
 
 struct AutonomyRuntimeSnapshot {
@@ -113,7 +121,13 @@ class AutonomyRuntime {
         mission::TimePoint now);
     [[nodiscard]] bool validate_runtime_context(
         const mission::VehicleSnapshot& vehicle,
-        const CompanionLinkFailsafeSnapshot& companion_link_failsafe);
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+        mission::TimePoint now);
+    [[nodiscard]] bool suspend_aerial_tracking_for_link_loss(
+        mission::TimePoint now);
+    [[nodiscard]] bool recover_suspended_aerial_tracking(
+        const CompanionLinkFailsafeSnapshot& companion_link_failsafe,
+        mission::TimePoint now);
     [[nodiscard]] bool continue_landing_update(
         const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
@@ -123,6 +137,7 @@ class AutonomyRuntime {
         mission::TimePoint now,
         const std::optional<AerialTargetTrackSnapshot>& aerial_target);
     [[nodiscard]] std::vector<FlightActionRequest> stop_aerial_yaw();
+    void clear_aerial_yaw_guidance();
     void update_terminal_alignment(const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<mission::BodyFramePosition>& landing_target);
@@ -176,6 +191,8 @@ class AutonomyRuntime {
     std::optional<double> aerial_horizontal_error_;
     std::optional<double> aerial_proportional_rate_degrees_per_second_;
     std::optional<double> aerial_feed_forward_rate_degrees_per_second_;
+    std::optional<mission::TimePoint> aerial_link_loss_since_;
+    std::optional<mission::TimePoint> aerial_link_recovered_since_;
     bool terminal_alignment_confirmed_{false};
     bool terminal_descent_active_{false};
     std::optional<std::uint8_t> failure_result_;
