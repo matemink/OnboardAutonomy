@@ -74,3 +74,4 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
 - [Architecture](docs/architecture.md)
 - [Run the Gazebo demo](docs/simulation.md)
 - [Hardware bench and evidence](docs/raspberry-pi-5-bench.md)
+- [Release status and verified scope](docs/release-status.md)
