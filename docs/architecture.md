@@ -265,9 +265,8 @@ enter GUIDED, arm, take off, and confirm each transition from both
 deadlines. The controller does not own landing guidance.
 
 `VehicleSnapshot` reports GPS health independently from `navigation_ready`.
-GPS currently supplies that navigation estimate, while the source-neutral
-contract allows a later ExternalNav adapter to satisfy startup without making
-the startup state machine depend on a specific position source.
+The startup state machine consumes the source-neutral readiness flag rather
+than GPS fields directly; the current runtime derives that flag from GPS.
 
 After startup, `WorldState` is the immutable input for one decision cycle.
 `DecisionEngine` may create a short-lived `DesiredMotion`, but it never sends

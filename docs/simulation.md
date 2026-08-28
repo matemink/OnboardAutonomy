@@ -93,8 +93,8 @@ relative yaw correction; an ambiguous or lost target produces no command and
 keeps the S500 in GUIDED hold.
 
 OnboardAutonomy does not receive the scripted model pose or infer 3D range.
-Forward pursuit and standoff guidance remain separate later increments and
-cannot run until a range estimate with explicit uncertainty exists.
+The demo therefore performs only camera-based lock and bounded yaw centering;
+it does not pursue, approach, or command a standoff distance.
 
 The interactive profile uses a 3 m/s west wind. Gazebo varies its magnitude
 and direction, adds vertical turbulence, and applies the resulting force to
