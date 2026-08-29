@@ -10,10 +10,10 @@ observation-only until a legal and safe flight test is possible.
 - C++20 runtime with MAVLink UDP, USB, and TELEM2 UART transports.
 - Readiness-gated startup, command acknowledgement, safety supervision, and
   companion-link failsafe validation.
-- Gazebo camera streaming through GStreamer, AprilTag pose estimation, and
-  vision-guided precision landing.
-- Forward-camera ONNX detection, temporal target locking, and adaptive yaw-rate
-  centering while the vehicle remains in GUIDED hold.
+- Gazebo forward-camera streaming, ONNX object detection, temporal target
+  locking, and adaptive yaw-rate centering through GStreamer and OpenCV.
+- Optional AprilTag pose estimation and vision-guided precision landing as a
+  deterministic validation scenario.
 - Raspberry Pi 5 deployment with Camera Module 3 Wide, `systemd`, bounded JSONL
   logging, recovery after camera or serial loss, and runtime profiling.
 - Linux tests, Python integration and fault-injection tests, C++ static
@@ -39,9 +39,9 @@ observation-only until a legal and safe flight test is possible.
   distance.
 - GPS supplies the current navigation estimate. Camera-based target tracking
   does not replace vehicle localization.
-- AprilTag precision landing and forward-object yaw tracking are verified in
-  simulation; the physical bench verifies the compute, camera, flight
-  controller, and transport paths without propellers.
+- Forward-object yaw tracking and the optional fiducial landing scenario are
+  verified in simulation; the physical bench verifies the compute, camera,
+  flight controller, and transport paths without propellers.
 
 There is no committed future-feature backlog. New work should start from a
 measured limitation and a dedicated GitHub issue with explicit acceptance

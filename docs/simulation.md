@@ -180,12 +180,13 @@ scripted demonstration routes:
    complete the terminal descent without reacting to partial reacquisition.
 7. Finish only when ArduPilot reports the vehicle disarmed.
 
-Interactive mode never starts flight automatically. Press `1` to run the
-guarded takeoff and AprilTag precision-landing mission, or `2` to take off and
-track the scripted Shahed-136 visual with bounded yaw while remaining in GUIDED hold. Press `R` to
-cancel either mission and request ArduPilot RTL; if the vehicle is already
-disarmed, it simply returns the runtime to idle. Press `Q` to exit. A mission
-request is blocked while another mission or RTL is active.
+Interactive mode never starts flight automatically and advertises only the
+missions configured by the selected launcher. The aerial-tracking launcher
+exposes `2` for guarded takeoff and forward-camera target tracking. The
+fiducial validation launcher exposes `1` for AprilTag precision landing. Press
+`R` to cancel either mission and request ArduPilot RTL; if the vehicle is
+already disarmed, it simply returns the runtime to idle. Press `Q` to exit. A
+mission request is blocked while another mission or RTL is active.
 
 Non-interactive acceptance runs retain automatic startup so CI and repeatable
 flight evidence do not require keyboard input.

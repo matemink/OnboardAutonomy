@@ -834,6 +834,8 @@ class CompanionApplication::Impl {
             .flight_startup = flight_startup_.snapshot(),
             .autonomy = autonomy_runtime_.snapshot(),
             .motion_commands_allowed = motion_commands_allowed_,
+            .precision_landing_available = camera_extrinsics_.has_value(),
+            .aerial_tracking_available = aerial_tracking_allowed_,
             .link_events =
                 {
                     link_events_.begin(),

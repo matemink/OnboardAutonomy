@@ -51,16 +51,22 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
         --camera-udp-port "${ONBOARD_AUTONOMY_CAMERA_UDP_PORT:-5601}"
         --camera-width 640
         --camera-height 480
-        --apriltag
-        --camera-calibration
-        "${project_dir}/config/gazebo-landing-camera-640x480.json"
-        --camera-extrinsics
-        "${project_dir}/config/gazebo-landing-camera-extrinsics.json"
-        --apriltag-size-mm 2000
         --camera-preview
         --camera-preview-port
         "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
     )
+    if [[ "${ONBOARD_AUTONOMY_FIDUCIAL_LANDING:-0}" == "1" ||
+          ( "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" &&
+            "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" != "1" ) ]]; then
+        arguments+=(
+            --apriltag
+            --camera-calibration
+            "${project_dir}/config/gazebo-landing-camera-640x480.json"
+            --camera-extrinsics
+            "${project_dir}/config/gazebo-landing-camera-extrinsics.json"
+            --apriltag-size-mm 2000
+        )
+    fi
     if [[ -n "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-}" ]]; then
         arguments+=(
             --forward-camera-udp-port

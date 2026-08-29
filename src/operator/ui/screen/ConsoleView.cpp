@@ -901,10 +901,23 @@ void write_runtime_footer(std::ostringstream& output,
         " " + (startup_finished ? autonomy.detail : startup.detail),
         autonomy_tone(autonomy.phase),
         use_color);
+    std::string mission_commands;
+    if (snapshot.precision_landing_available) {
+        mission_commands = "[1] FIDUCIAL LANDING (VALIDATION)";
+    }
+    if (snapshot.aerial_tracking_available) {
+        if (!mission_commands.empty()) {
+            mission_commands += "     ";
+        }
+        mission_commands += "[2] TRACK AIRBORNE TARGET (HOLD + YAW)";
+    }
+    if (!snapshot.motion_commands_allowed) {
+        mission_commands = "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT";
+    } else if (mission_commands.empty()) {
+        mission_commands = "NO AUTONOMY MISSION CONFIGURED";
+    }
     write_centered_line(output,
-        snapshot.motion_commands_allowed
-            ? "[1] LAND ON APRILTAG     [2] TRACK SHAHED-136 (HOLD + YAW)"
-            : "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT",
+        mission_commands,
         snapshot.motion_commands_allowed ? Tone::normal : Tone::dim,
         use_color);
     if (snapshot.motion_commands_allowed) {

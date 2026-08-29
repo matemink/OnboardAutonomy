@@ -4,17 +4,19 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg)](https://isocpp.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20ARM64-FCC624.svg)](https://www.raspberrypi.com/)
 
-OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs. It
-combines MAVLink, onboard vision, safety supervision, and precision landing.
-The same application runs in Gazebo or on a Raspberry Pi 5 with a Pixhawk 6C.
+OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs. Its
+primary simulation scenario detects an airborne object with a forward camera,
+maintains a stable visual lock, and sends supervised yaw guidance over MAVLink.
+The same runtime also runs observation-only on a Raspberry Pi 5 with a Pixhawk
+6C.
 
 ## Demo
 
-- **Vision-guided autonomous landing** (`39 s`) - takeoff, target tracking,
-  guidance, and precision landing.
+- **Fiducial landing validation** (`39 s`) - a deterministic end-to-end test of
+  takeoff, visual guidance, and landing.
   [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=rsuRYYDfZZI)
-- **Hurricane-force wind stress test** (`36 s`) - the same autonomy flow under
-  severe simulated gusts.
+- **Wind-disturbance validation** (`36 s`) - the fiducial scenario under severe
+  simulated gusts.
   [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=eqdRw3oofTI)
 
 ## System overview
@@ -51,12 +53,13 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
 
 - MAVLink 2 telemetry and acknowledged commands over SITL UDP or Linux
   USB/UART serial transport.
-- Readiness-gated takeoff and AprilTag landing with target-loss and link-loss
-  fallbacks.
-- Dual-camera YUV420/OpenCV processing for AprilTag landing and forward ONNX
-  aerial-object detection.
 - SITL-only forward-object lock confirms spatial and temporal continuity,
   then applies bounded yaw centering while the vehicle remains in GUIDED hold.
+- Transient controller-link recovery pauses stale yaw guidance, revalidates the
+  failsafe, and resumes tracking without restarting the mission.
+- Dual-camera YUV420/OpenCV processing with forward ONNX object detection.
+- Optional AprilTag-based precision landing remains as a deterministic
+  validation scenario with target-loss and link-loss fallbacks.
 - Automatic serial and camera recovery after disconnects or process stalls.
 - Motion is SITL-gated; physical endpoints remain observation-only. CI covers
   C++ tests, Python integration and fault injection, plus a native ARM64 build.

@@ -72,6 +72,8 @@ struct AppSnapshot {
     FlightStartupSnapshot flight_startup;
     AutonomyRuntimeSnapshot autonomy;
     bool motion_commands_allowed{false};
+    bool precision_landing_available{false};
+    bool aerial_tracking_available{false};
     std::vector<LinkEvent> link_events;
     std::chrono::milliseconds elapsed{};
     std::optional<LinkActivity> tx_activity;

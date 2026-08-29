@@ -54,6 +54,8 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     snapshot.autonomy.vision_landing_target_active = true;
     snapshot.autonomy.terminal_descent_active = true;
     snapshot.motion_commands_allowed = true;
+    snapshot.precision_landing_available = true;
+    snapshot.aerial_tracking_available = true;
     snapshot.vehicle.gps_ready = false;
     snapshot.vehicle.navigation_ready = true;
     snapshot.simulated_wind = onboard_autonomy::mission::SimulatedWindProfile{
@@ -86,6 +88,8 @@ void snapshot_keeps_runtime_state_without_camera_data() {
                 json.at("autonomy").at("terminal_descent_active"),
         "snapshot diagnostics must preserve mission runtime state");
     require(json.at("motion_commands_allowed") == true &&
+                json.at("precision_landing_available") == true &&
+                json.at("aerial_tracking_available") == true &&
                 json.at("navigation_ready") == true &&
                 json.at("gps_ready") == false &&
                 json.at("simulated_wind").at("speed_m_s") == 3.0 &&
