@@ -480,6 +480,123 @@ void link_loss_stops_runtime_output() {
         "link loss must fail the companion runtime");
 }
 
+void aerial_tracking_recovers_after_a_transient_link_loss() {
+    AutonomyRuntime runtime{{
+        .enabled = true,
+        .mode = AutonomyRuntimeMode::aerial_observation,
+        .aerial_link_loss_grace = std::chrono::seconds(1),
+        .aerial_link_recovery_hold = std::chrono::milliseconds(200),
+    }};
+    auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+
+    static_cast<void>(runtime.update(vehicle, startup, failsafe, start));
+    const AerialTargetTrackSnapshot initial_target{
+        .phase = AerialTargetTrackPhase::tracking,
+        .consecutive_observations = 3,
+        .required_observations = 3,
+        .accepted_observations = 9,
+        .observation_age_ms = 0.0,
+        .confidence_percent = 80.0,
+        .horizontal_error = 0.4,
+        .center_y_ratio = 0.4,
+        .width_ratio = 0.1,
+        .height_ratio = 0.1,
+    };
+    static_cast<void>(runtime.update(vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(10),
+        std::nullopt,
+        initial_target));
+    vehicle.connected = false;
+    const auto disconnected_stop =
+        only_action(runtime.update(vehicle,
+                        startup,
+                        failsafe,
+                        start + std::chrono::milliseconds(100)),
+            FlightAction::yaw_rate,
+            "transient link loss");
+    require(disconnected_stop.yaw_rate_degrees_per_second == 0.0,
+        "transient link loss must attempt to stop active yaw");
+    require(runtime.snapshot().phase == AutonomyRuntimePhase::suspended,
+        "transient link loss must suspend aerial tracking");
+
+    vehicle.connected = true;
+    CompanionLinkFailsafeSnapshot refreshing_failsafe;
+    refreshing_failsafe.phase = CompanionLinkFailsafePhase::reading_parameters;
+    const auto recovered_stop =
+        only_action(runtime.update(vehicle,
+                        startup,
+                        refreshing_failsafe,
+                        start + std::chrono::milliseconds(200)),
+            FlightAction::yaw_rate,
+            "recovered controller link");
+    require(recovered_stop.yaw_rate_degrees_per_second == 0.0,
+        "the first command after link recovery must stop stale yaw");
+    require(runtime.snapshot().phase == AutonomyRuntimePhase::suspended,
+        "tracking must wait for the companion-link policy to be revalidated");
+
+    static_cast<void>(runtime.update(vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(450)));
+    require(runtime.snapshot().phase == AutonomyRuntimePhase::active,
+        "tracking must resume after stable link and failsafe recovery");
+
+    const AerialTargetTrackSnapshot recovered_target{
+        .phase = AerialTargetTrackPhase::tracking,
+        .consecutive_observations = 3,
+        .required_observations = 3,
+        .accepted_observations = 10,
+        .observation_age_ms = 0.0,
+        .confidence_percent = 80.0,
+        .horizontal_error = 0.4,
+        .center_y_ratio = 0.4,
+        .width_ratio = 0.1,
+        .height_ratio = 0.1,
+    };
+    const auto resumed_yaw =
+        only_action(runtime.update(vehicle,
+                        startup,
+                        failsafe,
+                        start + std::chrono::milliseconds(460),
+                        std::nullopt,
+                        recovered_target),
+            FlightAction::yaw_rate,
+            "recovered target lock");
+    require(resumed_yaw.yaw_rate_degrees_per_second > 0.0,
+        "recovered tracking must emit fresh yaw guidance");
+}
+
+void prolonged_aerial_link_loss_fails_tracking() {
+    AutonomyRuntime runtime{{
+        .enabled = true,
+        .mode = AutonomyRuntimeMode::aerial_observation,
+        .aerial_link_loss_grace = std::chrono::milliseconds(500),
+    }};
+    auto vehicle = flying_vehicle();
+    const auto startup = completed_startup();
+    const auto failsafe = accepted_failsafe();
+    const TimePoint start{};
+
+    static_cast<void>(runtime.update(vehicle, startup, failsafe, start));
+    vehicle.connected = false;
+    static_cast<void>(runtime.update(vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(100)));
+    static_cast<void>(runtime.update(vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(600)));
+
+    require(runtime.snapshot().phase == AutonomyRuntimePhase::failed,
+        "confirmed aerial link loss must still fail tracking");
+}
+
 void rejected_link_failsafe_stops_runtime_output() {
     AutonomyRuntime runtime{{.enabled = true}};
     CompanionLinkFailsafeSnapshot rejected;
@@ -619,6 +736,8 @@ void run_autonomy_runtime_tests() {
     target_loss_without_alignment_is_not_terminal_handoff();
     prolonged_target_loss_requests_fallback_land();
     link_loss_stops_runtime_output();
+    aerial_tracking_recovers_after_a_transient_link_loss();
+    prolonged_aerial_link_loss_fails_tracking();
     rejected_link_failsafe_stops_runtime_output();
     restart_clears_terminal_autonomy_state();
     operator_controls_runtime_mode_and_rtl_lifecycle();

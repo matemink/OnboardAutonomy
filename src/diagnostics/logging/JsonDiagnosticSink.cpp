@@ -117,6 +117,8 @@ std::string_view autonomy_phase_name(
         return "waiting_for_startup";
     case AutonomyRuntimePhase::active:
         return "active";
+    case AutonomyRuntimePhase::suspended:
+        return "suspended";
     case AutonomyRuntimePhase::landing:
         return "landing";
     case AutonomyRuntimePhase::returning_to_launch:
