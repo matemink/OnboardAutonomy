@@ -409,6 +409,9 @@ Json snapshot_json(const mission::AppSnapshot& snapshot,
                             .aerial_commanded_yaw_rate_degrees_per_second)}}},
     };
     result["motion_commands_allowed"] = snapshot.motion_commands_allowed;
+    result["precision_landing_available"] =
+        snapshot.precision_landing_available;
+    result["aerial_tracking_available"] = snapshot.aerial_tracking_available;
     result["link_events"] = Json::array();
     for (const auto& event : snapshot.link_events) {
         result["link_events"].push_back(link_event_json(event));

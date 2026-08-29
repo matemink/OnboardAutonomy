@@ -114,6 +114,8 @@ void disconnected_snapshot_is_waiting() {
 void command_bus_shows_both_directions() {
     onboard_autonomy::mission::AppSnapshot snapshot;
     snapshot.motion_commands_allowed = true;
+    snapshot.precision_landing_available = true;
+    snapshot.aerial_tracking_available = true;
     snapshot.flight_startup.phase =
         onboard_autonomy::mission::FlightStartupPhase::completed;
     snapshot.flight_startup.detail = "Takeoff complete";
@@ -149,8 +151,9 @@ void command_bus_shows_both_directions() {
     require(output.find("SET_MODE") != std::string::npos &&
                 output.find("ACCEPTED") != std::string::npos,
         "command and acknowledgement labels must be visible");
-    require(output.find("[1] LAND ON APRILTAG") != std::string::npos &&
-                output.find("[2] TRACK SHAHED-136 (HOLD + YAW)") !=
+    require(output.find("[1] FIDUCIAL LANDING (VALIDATION)") !=
+                    std::string::npos &&
+                output.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=
                     std::string::npos &&
                 output.find("[R] ABORT MISSION + RTL") != std::string::npos &&
                 output.find("[Q] QUIT") != std::string::npos,
@@ -159,6 +162,16 @@ void command_bus_shows_both_directions() {
                 output.find("STARTUP: COMPLETE") != std::string::npos &&
                 output.find("Vision target F/R/D") != std::string::npos,
         "production startup and runtime state must be visible");
+
+    snapshot.precision_landing_available = false;
+    const auto tracking_only =
+        onboard_autonomy::operator_interface::ui::render_console(snapshot,
+            "udp://127.0.0.1:14550",
+            false);
+    require(tracking_only.find("FIDUCIAL LANDING") == std::string::npos &&
+                tracking_only.find("TRACK AIRBORNE TARGET") !=
+                    std::string::npos,
+        "the console must advertise only configured missions");
 
     snapshot.elapsed = std::chrono::milliseconds(1320);
     const auto dim_pulse =
