@@ -493,24 +493,49 @@ void aerial_tracking_recovers_after_a_transient_link_loss() {
     const TimePoint start{};
 
     static_cast<void>(runtime.update(vehicle, startup, failsafe, start));
+    const AerialTargetTrackSnapshot initial_target{
+        .phase = AerialTargetTrackPhase::tracking,
+        .consecutive_observations = 3,
+        .required_observations = 3,
+        .accepted_observations = 9,
+        .observation_age_ms = 0.0,
+        .confidence_percent = 80.0,
+        .horizontal_error = 0.4,
+        .center_y_ratio = 0.4,
+        .width_ratio = 0.1,
+        .height_ratio = 0.1,
+    };
+    static_cast<void>(runtime.update(vehicle,
+        startup,
+        failsafe,
+        start + std::chrono::milliseconds(10),
+        std::nullopt,
+        initial_target));
     vehicle.connected = false;
-    require(runtime
-                .update(vehicle,
-                    startup,
-                    failsafe,
-                    start + std::chrono::milliseconds(100))
-                .empty(),
-        "transient link loss must suppress aerial yaw output");
+    const auto disconnected_stop =
+        only_action(runtime.update(vehicle,
+                        startup,
+                        failsafe,
+                        start + std::chrono::milliseconds(100)),
+            FlightAction::yaw_rate,
+            "transient link loss");
+    require(disconnected_stop.yaw_rate_degrees_per_second == 0.0,
+        "transient link loss must attempt to stop active yaw");
     require(runtime.snapshot().phase == AutonomyRuntimePhase::suspended,
         "transient link loss must suspend aerial tracking");
 
     vehicle.connected = true;
     CompanionLinkFailsafeSnapshot refreshing_failsafe;
     refreshing_failsafe.phase = CompanionLinkFailsafePhase::reading_parameters;
-    static_cast<void>(runtime.update(vehicle,
-        startup,
-        refreshing_failsafe,
-        start + std::chrono::milliseconds(200)));
+    const auto recovered_stop =
+        only_action(runtime.update(vehicle,
+                        startup,
+                        refreshing_failsafe,
+                        start + std::chrono::milliseconds(200)),
+            FlightAction::yaw_rate,
+            "recovered controller link");
+    require(recovered_stop.yaw_rate_degrees_per_second == 0.0,
+        "the first command after link recovery must stop stale yaw");
     require(runtime.snapshot().phase == AutonomyRuntimePhase::suspended,
         "tracking must wait for the companion-link policy to be revalidated");
 

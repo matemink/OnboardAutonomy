@@ -136,6 +136,8 @@ class AutonomyRuntime {
         const mission::VehicleSnapshot& vehicle,
         mission::TimePoint now,
         const std::optional<AerialTargetTrackSnapshot>& aerial_target);
+    [[nodiscard]] std::optional<FlightActionRequest> pending_aerial_yaw_stop(
+        const mission::VehicleSnapshot& vehicle);
     [[nodiscard]] std::vector<FlightActionRequest> stop_aerial_yaw();
     void clear_aerial_yaw_guidance();
     void update_terminal_alignment(const mission::VehicleSnapshot& vehicle,
@@ -186,6 +188,7 @@ class AutonomyRuntime {
     bool rtl_acknowledged_{false};
     bool vision_landing_target_active_{false};
     bool aerial_yaw_active_{false};
+    bool aerial_yaw_stop_pending_{false};
     std::optional<std::uint64_t> last_aerial_observation_count_;
     std::optional<double> current_aerial_yaw_rate_degrees_per_second_;
     std::optional<double> aerial_horizontal_error_;

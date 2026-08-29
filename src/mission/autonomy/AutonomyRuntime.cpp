@@ -80,8 +80,16 @@ std::vector<FlightActionRequest> AutonomyRuntime::update(
     if (phase_ == AutonomyRuntimePhase::returning_to_launch) {
         return update_return_to_launch(vehicle, now);
     }
-    if (!prepare_active_runtime(startup, companion_link_failsafe, now) ||
-        !validate_runtime_context(vehicle, companion_link_failsafe, now)) {
+    if (!prepare_active_runtime(startup, companion_link_failsafe, now)) {
+        return {};
+    }
+    const bool runtime_context_valid =
+        validate_runtime_context(vehicle, companion_link_failsafe, now);
+    if (const auto yaw_stop = pending_aerial_yaw_stop(vehicle);
+        yaw_stop.has_value()) {
+        return {*yaw_stop};
+    }
+    if (!runtime_context_valid) {
         return {};
     }
 
@@ -227,6 +235,7 @@ std::vector<FlightActionRequest> AutonomyRuntime::stop_aerial_yaw() {
         aerial_yaw_active_ && vehicle_system_id_.has_value();
     const auto vehicle_system_id = vehicle_system_id_;
     clear_aerial_yaw_guidance();
+    aerial_yaw_stop_pending_ = false;
     if (!should_send_stop) {
         return {};
     }
@@ -236,6 +245,22 @@ std::vector<FlightActionRequest> AutonomyRuntime::stop_aerial_yaw() {
         .confirmation = 0,
         .yaw_rate_degrees_per_second = 0.0,
     }};
+}
+
+std::optional<FlightActionRequest> AutonomyRuntime::pending_aerial_yaw_stop(
+    const mission::VehicleSnapshot& vehicle) {
+    if (!aerial_yaw_stop_pending_ || !vehicle_system_id_.has_value()) {
+        return std::nullopt;
+    }
+    if (vehicle.connected) {
+        aerial_yaw_stop_pending_ = false;
+    }
+    return FlightActionRequest{
+        .action = FlightAction::yaw_rate,
+        .vehicle_system_id = vehicle.system_id.value_or(*vehicle_system_id_),
+        .confirmation = 0,
+        .yaw_rate_degrees_per_second = 0.0,
+    };
 }
 
 void AutonomyRuntime::clear_aerial_yaw_guidance() {
@@ -312,6 +337,7 @@ bool AutonomyRuntime::suspend_aerial_tracking_for_link_loss(
     if (!aerial_link_loss_since_.has_value()) {
         aerial_link_loss_since_ = now;
     }
+    aerial_yaw_stop_pending_ = aerial_yaw_stop_pending_ || aerial_yaw_active_;
     clear_aerial_yaw_guidance();
     motion_safety_status_ = MotionSafetyStatus::flight_controller_disconnected;
     if (now - *aerial_link_loss_since_ >= config_.aerial_link_loss_grace) {
@@ -634,6 +660,7 @@ void AutonomyRuntime::reset_runtime_state() {
     awaiting_rtl_ack_ = false;
     rtl_acknowledged_ = false;
     vision_landing_target_active_ = false;
+    aerial_yaw_stop_pending_ = false;
     terminal_alignment_confirmed_ = false;
     terminal_descent_active_ = false;
     aerial_link_loss_since_.reset();
