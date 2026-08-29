@@ -66,8 +66,9 @@ jobs:
           retention-days: 14
 
   arm64-build:
-    # Keep the required-check context stable; compilation runs on native ARM64.
-    name: "ARM64 Cross-Build"
+    # GitHub compiles directly on an ARM64 host; local packaging remains the
+    # separate x86_64-to-AArch64 cross-build path.
+    name: "ARM64 Native Build"
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
