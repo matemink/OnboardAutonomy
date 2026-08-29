@@ -442,6 +442,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn("--forward-camera-udp-port", sitl_runner)
         self.assertIn("--aerial-observation", sitl_runner)
         self.assertIn("ONBOARD_AUTONOMY_FIDUCIAL_LANDING", sitl_runner)
+        self.assertIn("ONBOARD_AUTONOMY_AUTONOMOUS", sitl_runner)
         self.assertNotIn(
             "ONBOARD_AUTONOMY_FIDUCIAL_LANDING=1",
             gazebo_runner,

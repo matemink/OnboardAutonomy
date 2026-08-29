@@ -55,7 +55,9 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
         --camera-preview-port
         "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
     )
-    if [[ "${ONBOARD_AUTONOMY_FIDUCIAL_LANDING:-0}" == "1" ]]; then
+    if [[ "${ONBOARD_AUTONOMY_FIDUCIAL_LANDING:-0}" == "1" ||
+          ( "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" &&
+            "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" != "1" ) ]]; then
         arguments+=(
             --apriltag
             --camera-calibration
