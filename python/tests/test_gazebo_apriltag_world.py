@@ -100,6 +100,19 @@ TARGET_SPAWNER = (
 TARGET_LAUNCHER = (
     PROJECT_ROOT / "StartOnboardAutonomyAerialTracking.cmd"
 )
+FIXED_WING_WORLD = (
+    PROJECT_ROOT / "simulation" / "worlds" / "fixed_wing_follow.sdf"
+)
+FIXED_WING_LAUNCHER = (
+    PROJECT_ROOT / "StartOnboardAutonomyFixedWingFollow.cmd"
+)
+X8_PREPARER = PROJECT_ROOT / "scripts" / "prepare_skywalker_x8_sitl.sh"
+X8_GAZEBO_RUNNER = (
+    PROJECT_ROOT / "scripts" / "run_gazebo_fixed_wing_follow.sh"
+)
+X8_ARDUPLANE_RUNNER = (
+    PROJECT_ROOT / "scripts" / "run_arduplane_skywalker_x8.sh"
+)
 CAMERA_PREVIEW_PAGE = PROJECT_ROOT / "assets" / "camera-preview" / "index.html"
 
 
@@ -424,6 +437,58 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertLess(spawn_index, sitl_index)
         self.assertLess(spawn_index, preview_index)
 
+    def test_fixed_wing_lab_replaces_the_copter_with_arduplane(self) -> None:
+        world = element_tree.parse(FIXED_WING_WORLD).getroot().find("world")
+        self.assertIsNotNone(world)
+        self.assertEqual(world.attrib["name"], "fixed_wing_follow")
+
+        includes = {
+            include.findtext("uri"): include for include in world.findall("include")
+        }
+        self.assertEqual(
+            set(includes),
+            {
+                "model://lightweight_grass_ground",
+                "model://skywalker_x8",
+                "model://scripted_fixed_wing_target",
+            },
+        )
+        self.assertNotIn("model://iris_with_landing_camera", includes)
+        self.assertNotIn("model://apriltag_landing_pad", includes)
+        self.assertEqual(
+            includes["model://skywalker_x8"].findtext("name"),
+            "Skywalker_X8_ArduPlane",
+        )
+        self.assertEqual(
+            includes["model://skywalker_x8"].findtext("pose"),
+            "0 0 0.246 0 0 0",
+        )
+
+    def test_fixed_wing_lab_uses_pinned_official_x8_assets(self) -> None:
+        preparer = X8_PREPARER.read_text(encoding="utf-8")
+        gazebo_runner = X8_GAZEBO_RUNNER.read_text(encoding="utf-8")
+        plane_runner = X8_ARDUPLANE_RUNNER.read_text(encoding="utf-8")
+        launcher = FIXED_WING_LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "25bc38ed8c6c0345840159a8cbc0b02781d52f3c",
+            preparer,
+        )
+        self.assertIn("https://github.com/ArduPilot/SITL_Models.git", preparer)
+        self.assertIn("rev-parse --verify", preparer)
+        self.assertIn('checkout --detach "${sitl_models_commit}"', preparer)
+        self.assertIn("./waf plane", preparer)
+        self.assertIn(".local/vendor/SITL_Models/Gazebo", gazebo_runner)
+        self.assertIn("simulation/worlds/fixed_wing_follow.sdf", gazebo_runner)
+        self.assertIn('exec bash "${script_dir}/run_gazebo_iris.sh"', gazebo_runner)
+        self.assertIn("skywalker_x8.param", plane_runner)
+        self.assertIn("--master=tcp:127.0.0.1:5760", plane_runner)
+        self.assertIn("--sitl=127.0.0.1:5501", plane_runner)
+        self.assertIn("-I0", plane_runner)
+        self.assertIn("prepare_skywalker_x8_sitl.sh", launcher)
+        self.assertIn("run_gazebo_fixed_wing_follow_weather.sh", launcher)
+        self.assertIn("run_arduplane_skywalker_x8_weather.sh", launcher)
+
     def test_dual_camera_preview_keeps_streams_independent(self) -> None:
         preview = CAMERA_PREVIEW_PAGE.read_text(encoding="utf-8")
         gazebo_runner = (
@@ -476,6 +541,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertNotIn("wsl --shutdown", demo_launcher)
         self.assertIn("pkill", cleanup_script)
         self.assertIn("arducopter", cleanup_script)
+        self.assertIn("arduplane", cleanup_script)
         self.assertIn("onboard_autonomy", cleanup_script)
         self.assertIn("gz", cleanup_script)
 
