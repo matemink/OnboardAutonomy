@@ -475,9 +475,12 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             preparer,
         )
         self.assertIn("https://github.com/ArduPilot/SITL_Models.git", preparer)
+        self.assertIn("rev-parse --verify", preparer)
+        self.assertIn('checkout --detach "${sitl_models_commit}"', preparer)
         self.assertIn("./waf plane", preparer)
         self.assertIn(".local/vendor/SITL_Models/Gazebo", gazebo_runner)
         self.assertIn("simulation/worlds/fixed_wing_follow.sdf", gazebo_runner)
+        self.assertIn('exec bash "${script_dir}/run_gazebo_iris.sh"', gazebo_runner)
         self.assertIn("skywalker_x8.param", plane_runner)
         self.assertIn("--master=tcp:127.0.0.1:5760", plane_runner)
         self.assertIn("--sitl=127.0.0.1:5501", plane_runner)

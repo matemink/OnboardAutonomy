@@ -18,10 +18,18 @@ mkdir -p "${vendor_root}"
 if [[ ! -d "${sitl_models_dir}/.git" ]]; then
     mkdir -p "${sitl_models_dir}"
     git -C "${sitl_models_dir}" init
-    git -C "${sitl_models_dir}" remote add origin "${sitl_models_url}"
-    git -C "${sitl_models_dir}" fetch --depth 1 origin "${sitl_models_commit}"
-    git -C "${sitl_models_dir}" checkout --detach FETCH_HEAD
 fi
+
+if ! git -C "${sitl_models_dir}" remote get-url origin >/dev/null 2>&1; then
+    git -C "${sitl_models_dir}" remote add origin "${sitl_models_url}"
+fi
+
+if ! git -C "${sitl_models_dir}" rev-parse --verify \
+    "${sitl_models_commit}^{commit}" >/dev/null 2>&1; then
+    git -C "${sitl_models_dir}" fetch --depth 1 origin "${sitl_models_commit}"
+fi
+
+git -C "${sitl_models_dir}" checkout --detach "${sitl_models_commit}"
 
 actual_commit="$(git -C "${sitl_models_dir}" rev-parse HEAD)"
 if [[ "${actual_commit}" != "${sitl_models_commit}" ]]; then

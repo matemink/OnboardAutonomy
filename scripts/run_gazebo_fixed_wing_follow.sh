@@ -15,4 +15,4 @@ fi
 
 export GZ_SIM_RESOURCE_PATH="${sitl_models_dir}/models:${sitl_models_dir}/worlds:${GZ_SIM_RESOURCE_PATH:-}"
 export ONBOARD_AUTONOMY_GAZEBO_WORLD="${world_file}"
-exec "${script_dir}/run_gazebo_iris.sh" "$@"
+exec bash "${script_dir}/run_gazebo_iris.sh" "$@"

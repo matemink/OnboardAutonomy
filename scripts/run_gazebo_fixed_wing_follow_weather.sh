@@ -23,7 +23,7 @@ stop_gazebo() {
 
 trap stop_gazebo EXIT INT TERM
 
-"${script_dir}/run_gazebo_fixed_wing_follow.sh" "$@" &
+bash "${script_dir}/run_gazebo_fixed_wing_follow.sh" "$@" &
 gazebo_pid=$!
 
 wind_ready=0
