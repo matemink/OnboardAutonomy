@@ -12,14 +12,35 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Determine analysis scope
+        id: scope
+        env:
+          CLANG_TIDY_BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          scope_args=(--project-root .)
+          if [[ -n "$CLANG_TIDY_BASE_REF" ]]; then
+            scope_args+=(--base-ref "$CLANG_TIDY_BASE_REF")
+          fi
+          scope="$(python3 scripts/clang_tidy_scope.py "${scope_args[@]}")"
+          mode="$(printf '%s\n' "$scope" | head -n 1)"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          printf 'clang-tidy scope: %s\n' "$mode"
       - name: Install clang-tidy
+        if: steps.scope.outputs.mode != 'skip'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-tidy-18 libopencv-dev ninja-build
       - name: Analyze project sources
+        if: steps.scope.outputs.mode != 'skip'
         env:
           CLANG_TIDY_JOBS: "2"
+          CLANG_TIDY_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: bash scripts/run_static_analysis.sh "$RUNNER_TEMP/onboard-autonomy-tidy"
+      - name: Confirm analysis is not required
+        if: steps.scope.outputs.mode == 'skip'
+        run: echo "No C++-relevant changes; clang-tidy is not required."
 
   native-linux:
     name: "Linux Build & Tests"

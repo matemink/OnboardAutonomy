@@ -58,6 +58,12 @@ checks provided by clang-tidy 18. The enabled checks and limits are defined in
 `.clang-tidy`; changing them requires an explicit review rather than silently
 accepting a violation.
 
+Pull requests analyze only changed implementation files. Changes to headers,
+CMake, `.clang-tidy`, the CI workflow, or the analyzer scripts trigger a full
+scan because they can affect every translation unit. Pull requests without
+C++-relevant changes skip `clang-tidy`; pushes to `main` always run the full
+scan. Set `CLANG_TIDY_BASE_REF` locally to apply the same incremental selection.
+
 The Core Guidelines profile excludes checks that conflict with required C API
 boundaries (POSIX, GStreamer, AprilTag, MAVLink, and `argc`/`argv`), intentional
 non-owning reference members, and matrix indexing. Magic numbers are blocking:
