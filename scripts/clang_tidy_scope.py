@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -83,6 +84,18 @@ def determine_scope(project_root: Path, base_ref: str | None) -> AnalysisScope:
     return select_scope(project_root, paths)
 
 
+def analysis_patterns(project_root: Path, scope: AnalysisScope) -> tuple[str, ...]:
+    if scope.mode == "full":
+        source_root = (project_root / "src").as_posix()
+        return (rf"^{re.escape(source_root)}/.*\.(?:cc|cpp|cxx)$",)
+    if scope.mode == "partial":
+        return tuple(
+            rf"^{re.escape((project_root / path).as_posix())}$"
+            for path in scope.files
+        )
+    return ()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-root", type=Path, required=True)
@@ -95,8 +108,8 @@ def main() -> None:
     project_root = args.project_root.resolve()
     scope = determine_scope(project_root, args.base_ref)
     print(scope.mode)
-    for path in scope.files:
-        print(path)
+    for pattern in analysis_patterns(project_root, scope):
+        print(pattern)
 
 
 if __name__ == "__main__":

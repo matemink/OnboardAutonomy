@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import sys
 import tempfile
 import unittest
@@ -84,6 +85,34 @@ class ClangTidyScopeTests(unittest.TestCase):
     def test_no_base_ref_keeps_full_main_analysis(self) -> None:
         scope = self.selector.determine_scope(self.project_root, None)
         self.assertEqual(scope.mode, "full")
+
+    def test_analysis_patterns_escape_literal_paths(self) -> None:
+        project_root = Path("/tmp/work[1]/repo+")
+        partial_scope = self.selector.AnalysisScope(
+            "partial",
+            ("src/Target+.cpp",),
+        )
+        partial_pattern = self.selector.analysis_patterns(
+            project_root,
+            partial_scope,
+        )[0]
+
+        expected_path = "/tmp/work[1]/repo+/src/Target+.cpp"
+        self.assertIsNotNone(re.fullmatch(partial_pattern, expected_path))
+        self.assertIsNone(
+            re.fullmatch(partial_pattern, "/tmp/work1/repo/src/Targettt.cpp")
+        )
+
+        full_pattern = self.selector.analysis_patterns(
+            project_root,
+            self.selector.AnalysisScope("full"),
+        )[0]
+        self.assertIsNotNone(
+            re.fullmatch(full_pattern, "/tmp/work[1]/repo+/src/main.cpp")
+        )
+        self.assertIsNone(
+            re.fullmatch(full_pattern, "/tmp/work[1]/repo+/tests/main.cpp")
+        )
 
 
 if __name__ == "__main__":

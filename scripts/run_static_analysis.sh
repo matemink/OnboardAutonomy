@@ -21,12 +21,8 @@ if [[ "${scope_mode}" == "skip" ]]; then
     exit 0
 fi
 
-analysis_patterns=("${project_root}/src/.*\\.(cc|cpp|cxx)$")
+analysis_patterns=("${scope_lines[@]:1}")
 if [[ "${scope_mode}" == "partial" ]]; then
-    analysis_patterns=()
-    for relative_path in "${scope_lines[@]:1}"; do
-        analysis_patterns+=("${project_root}/${relative_path}")
-    done
     printf 'Running clang-tidy on %d changed implementation file(s).\n' \
         "${#analysis_patterns[@]}"
 else
