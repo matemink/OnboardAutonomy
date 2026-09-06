@@ -5,10 +5,10 @@
 [![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20ARM64-FCC624.svg)](https://www.raspberrypi.com/)
 
 OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs. Its
-primary simulation scenario detects an airborne object with a forward camera,
-maintains a stable visual lock, and sends supervised yaw guidance over MAVLink.
-The same runtime also runs observation-only on a Raspberry Pi 5 with a Pixhawk
-6C.
+primary simulation scenario uses a forward camera to detect and visually track
+an airborne object, keep it near the center of the frame, and send supervised
+guidance over MAVLink. The same runtime also runs observation-only on a
+Raspberry Pi 5 with a Pixhawk 6C.
 
 ## Demo
 
@@ -18,6 +18,19 @@ The same runtime also runs observation-only on a Raspberry Pi 5 with a Pixhawk
 - **Wind-disturbance validation** (`36 s`) - the fiducial scenario under severe
   simulated gusts.
   [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=eqdRw3oofTI)
+
+## Current pursuit lab
+
+One Gazebo scene contains a Holybro S500 multicopter, a Skywalker X8
+fixed-wing pursuer, and a physics-backed Shahed-136 visual target. The scene
+starts first; the operator then selects the pursuer in the console with the
+arrow keys and Enter. Only the selected vehicle receives mission commands.
+
+The S500 path supports takeoff and camera-based yaw tracking. Skywalker
+selection, telemetry, camera routing, and ArduPlane guidance are integrated,
+while its reliable simulated launch and sustained pursuit remain in progress.
+The Shahed model follows a controlled ArduPlane flight path, responds to wind,
+and loses propulsion after contact instead of moving on a scripted rail.
 
 ## System overview
 
@@ -53,11 +66,12 @@ and telemetry data into supervised guidance for either SITL or a real Pixhawk.
 
 - MAVLink 2 telemetry and acknowledged commands over SITL UDP or Linux
   USB/UART serial transport.
-- SITL-only forward-object lock confirms spatial and temporal continuity,
-  then applies bounded yaw centering while the vehicle remains in GUIDED hold.
+- Forward-object lock confirms spatial and temporal continuity, then applies
+  bounded yaw guidance to keep the tracked object near the image center.
 - Transient controller-link recovery pauses stale yaw guidance, revalidates the
   failsafe, and resumes tracking without restarting the mission.
-- Dual-camera YUV420/OpenCV processing with forward ONNX object detection.
+- Dual-camera YUV420/OpenCV processing with COCO airplane detection through a
+  YOLOX ONNX model.
 - Optional AprilTag-based precision landing remains as a deterministic
   validation scenario with target-loss and link-loss fallbacks.
 - Automatic serial and camera recovery after disconnects or process stalls.
