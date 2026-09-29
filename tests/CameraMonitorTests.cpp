@@ -201,6 +201,21 @@ void gstreamer_pipeline_is_explicit_and_machine_readable() {
         "GStreamer camera pipeline must decode RTP/H.264 into I420");
 }
 
+void gstreamer_rejects_padded_i420_rows() {
+    for (const std::uint32_t width : {642U, 644U, 646U}) {
+        bool rejected = false;
+        try {
+            static_cast<void>(onboard_autonomy::hardware::camera::
+                make_gstreamer_camera_arguments({.width = width, .height = 480}));
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        require(rejected, "padded I420 planes cannot be read as packed YUV420");
+    }
+    static_cast<void>(onboard_autonomy::hardware::camera::
+        make_gstreamer_camera_arguments({.width = 648, .height = 482}));
+}
+
 void recovery_timings_must_be_non_zero() {
     onboard_autonomy::hardware::camera::GStreamerCameraConfig gstreamer;
     gstreamer.frame_timeout_ms = 0;
@@ -329,6 +344,7 @@ void run_camera_monitor_tests() {
     monitor_calculates_frame_rate_latency_and_gaps();
     metadata_parser_accepts_only_frame_wall_clock();
     gstreamer_pipeline_is_explicit_and_machine_readable();
+    gstreamer_rejects_padded_i420_rows();
     recovery_timings_must_be_non_zero();
     monitor_exposes_camera_recovery_state();
     monitor_exposes_processed_frames_without_a_preview_dependency();

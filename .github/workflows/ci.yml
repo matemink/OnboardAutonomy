@@ -77,6 +77,10 @@ jobs:
         run: >-
           python -m unittest discover -s python/tests -v
           2>&1 | tee artifacts/ci/python-tests.log
+      - name: Test synthetic UDP telemetry
+        run: >-
+          python python/run_integration_check.py --companion "$PWD/build/onboard_autonomy"
+          2>&1 | tee artifacts/ci/udp-integration.log
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

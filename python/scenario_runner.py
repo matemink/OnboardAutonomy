@@ -66,10 +66,21 @@ def send_observation(connection, scenario: Scenario) -> None:
         cog=0,
         satellites_visible=scenario.satellites,
     )
+    healthy_sensors = (
+        mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO
+        | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_BATTERY
+    )
+    connection.mav.param_value_send(
+        b"BATT_ARM_VOLT",
+        10.5,
+        mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
+        1,
+        0,
+    )
     connection.mav.sys_status_send(
-        onboard_control_sensors_present=1,
-        onboard_control_sensors_enabled=1,
-        onboard_control_sensors_health=1,
+        onboard_control_sensors_present=healthy_sensors,
+        onboard_control_sensors_enabled=healthy_sensors,
+        onboard_control_sensors_health=healthy_sensors,
         load=100,
         voltage_battery=15200,
         current_battery=40,

@@ -1,8 +1,8 @@
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 
 #include "../PosixError.hpp"
+#include "ChildProcess.hpp"
 
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -32,16 +32,19 @@ constexpr int kChildSetupFailureExitCode = 126;
 constexpr int kChildExecFailureExitCode = 127;
 constexpr std::size_t kLineReadBufferSize = 4096;
 constexpr int kPipePollTimeoutMs = 100;
+// GStreamer aligns every I420 plane row to four bytes, including half-width U/V.
+constexpr std::uint32_t kPackedI420WidthAlignment = 8;
 constexpr auto kRestartPollInterval = std::chrono::milliseconds{25};
 
 std::size_t checked_frame_size(const GStreamerCameraConfig& config) {
     if (config.width == 0U || config.height == 0U || config.udp_port == 0U ||
         config.frame_timeout_ms == 0U || config.restart_delay_ms == 0U ||
-        config.width % 2U != 0U || config.height % 2U != 0U) {
+        config.width % kPackedI420WidthAlignment != 0U ||
+        config.height % 2U != 0U) {
         throw std::invalid_argument(
             "GStreamer camera dimensions and UDP port must be "
             "positive, recovery timings must be non-zero; "
-            "I420 dimensions must be even");
+            "I420 width must be divisible by 8 and height must be even");
     }
 
     const std::uint64_t pixels = static_cast<std::uint64_t>(config.width) *
@@ -68,7 +71,6 @@ class GStreamerCameraSource final : public mission::ports::CameraSource {
 
     ~GStreamerCameraSource() override {
         worker_.request_stop();
-        stop_child();
     }
 
     GStreamerCameraSource(const GStreamerCameraSource&) = delete;
@@ -157,7 +159,6 @@ class GStreamerCameraSource final : public mission::ports::CameraSource {
             _exit(kChildExecFailureExitCode);
         }
 
-        child_pid_.store(child);
         ::close(video_pipe[1]);
         video_pipe[1] = -1;
         ::close(error_pipe[1]);
@@ -195,13 +196,7 @@ class GStreamerCameraSource final : public mission::ports::CameraSource {
             publish(std::move(frame));
         }
 
-        if (!stop_token.stop_requested()) {
-            ::kill(child, SIGINT);
-        }
-        int child_status = 0;
-        while (::waitpid(child, &child_status, 0) == -1 && errno == EINTR) {
-        }
-        child_pid_.store(-1);
+        const int child_status = stop_camera_child(child);
 
         ::close(video_pipe[0]);
         error_reader.join();
@@ -369,13 +364,6 @@ class GStreamerCameraSource final : public mission::ports::CameraSource {
         status_.phase = mission::ports::CameraSourcePhase::stopped;
     }
 
-    void stop_child() {
-        const pid_t child = child_pid_.load();
-        if (child > 0) {
-            ::kill(child, SIGINT);
-        }
-    }
-
     GStreamerCameraConfig config_;
     std::size_t frame_size_{0U};
     mutable std::mutex state_mutex_;
@@ -383,7 +371,6 @@ class GStreamerCameraSource final : public mission::ports::CameraSource {
     std::optional<mission::ports::CameraFrame> latest_frame_;
     std::string last_process_message_;
     std::uint64_t next_sequence_{0U};
-    std::atomic<pid_t> child_pid_{-1};
     std::jthread worker_;
 };
 

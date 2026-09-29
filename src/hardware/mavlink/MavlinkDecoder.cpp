@@ -121,6 +121,13 @@ void MavlinkDecoder::ingest(const std::span<const std::uint8_t> bytes,
 
 void MavlinkDecoder::handle_message(const mavlink_message_t& message,
     const mission::TimePoint now) {
+    if (message.msgid != MAVLINK_MSG_ID_HEARTBEAT) {
+        const auto vehicle = state_.snapshot(now);
+        if (!vehicle.connected || message.sysid != vehicle.system_id ||
+            message.compid != vehicle.component_id) {
+            return;
+        }
+    }
     switch (message.msgid) {
     case MAVLINK_MSG_ID_HEARTBEAT:
         handle_heartbeat(message, now);
@@ -164,7 +171,13 @@ void MavlinkDecoder::handle_heartbeat(const mavlink_message_t& message,
     const mission::TimePoint now) {
     mavlink_heartbeat_t heartbeat{};
     mavlink_msg_heartbeat_decode(&message, &heartbeat);
-    if (heartbeat.autopilot == MAV_AUTOPILOT_INVALID) {
+    if (heartbeat.autopilot == MAV_AUTOPILOT_INVALID ||
+        message.compid != MAV_COMP_ID_AUTOPILOT1) {
+        return;
+    }
+    const auto vehicle = state_.snapshot(now);
+    if (vehicle.connected && (message.sysid != vehicle.system_id ||
+                                 message.compid != vehicle.component_id)) {
         return;
     }
     state_.on_heartbeat(message.sysid,
@@ -224,7 +237,8 @@ void MavlinkDecoder::handle_system_status(const mavlink_message_t& message,
     mavlink_sys_status_t status{};
     mavlink_msg_sys_status_decode(&message, &status);
     const auto voltage =
-        status.voltage_battery > 0
+        status.voltage_battery > 0 &&
+                status.voltage_battery != std::numeric_limits<std::uint16_t>::max()
             ? std::optional<double>{static_cast<double>(
                                         status.voltage_battery) /
                                     1000.0}

@@ -201,7 +201,14 @@ class HttpCameraPreviewServer final
             if (!listened && !stopping_.load()) {
                 failed_.store(true);
             }
+            // Wake wait_until_ready even if listening fails before readiness.
+            server_.decommission();
         });
+        // stop() only closes an already running server in the pinned httplib.
+        server_.wait_until_ready();
+        if (!server_.is_running()) {
+            worker_.join();
+        }
     }
 
     ~HttpCameraPreviewServer() override {

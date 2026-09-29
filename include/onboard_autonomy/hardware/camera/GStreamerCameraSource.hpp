@@ -17,6 +17,7 @@ struct GStreamerCameraConfig {
     static constexpr std::uint32_t kDefaultFrameTimeoutMs = 2000;
     static constexpr std::uint32_t kDefaultRestartDelayMs = 500;
 
+    // Packed I420 requires width divisible by eight and an even height.
     std::uint32_t width{kDefaultWidth};
     std::uint32_t height{kDefaultHeight};
     std::uint16_t udp_port{kDefaultUdpPort};
