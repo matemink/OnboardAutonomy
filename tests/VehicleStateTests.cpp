@@ -85,6 +85,7 @@ void quiet_prearm_warning_stops_blocking_but_remains_visible() {
         now);
     state.on_status_text(6, "PreArm: Accels inconsistent", now);
 
+    state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, now + std::chrono::seconds(3));
     const auto later = now + std::chrono::seconds(6);
     state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, later);
     state.on_gps(3, 12, later);
@@ -207,9 +208,87 @@ void voltage_below_ardupilot_threshold_blocks_readiness() {
         "voltage below BATT_ARM_VOLT must not be ready");
 }
 
+void battery_fields_expire_independently() {
+    using namespace std::chrono_literals;
+    onboard_autonomy::mission::VehicleState state;
+    const onboard_autonomy::mission::TimePoint start{};
+    state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, start);
+    configure_battery_threshold(state, start);
+    state.on_battery(15.2, 0.4, 88, start);
+    for (int second = 1; second <= 11; ++second) {
+        const auto now = start + std::chrono::seconds{second};
+        state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, now);
+        state.on_gps(3, 12, now);
+        state.on_system_status(kHealthySensorFlags, kHealthySensorFlags,
+            std::nullopt, 0.5, std::nullopt, now);
+    }
+    const auto expired = state.snapshot(start + 11s);
+    require(expired.system_health_ok && expired.gps_ready &&
+            expired.battery_current_a == 0.5,
+        "other live fields must still be observable");
+    require(!expired.battery_voltage_v && !expired.battery_remaining_pct &&
+            !expired.battery_ready && !expired.armable,
+        "current-only samples must not keep old voltage or charge alive");
+    state.on_battery(15.0, std::nullopt, std::nullopt, start + 11s);
+    const auto refreshed = state.snapshot(start + 11s);
+    require(refreshed.battery_voltage_v == 15.0 &&
+            refreshed.battery_arming_voltage_v == 10.5 &&
+            !refreshed.battery_remaining_pct,
+        "new voltage must not resurrect the expired percentage");
+}
+
+void unknown_battery_samples_do_not_refresh_measurements() {
+    onboard_autonomy::mission::VehicleState state;
+    const onboard_autonomy::mission::TimePoint start{};
+    state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, start);
+    state.on_battery(15.2, 0.4, 88, start);
+    for (int second = 1; second <= 11; ++second) {
+        const auto now = start + std::chrono::seconds{second};
+        state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, now);
+        state.on_battery(std::nullopt, std::nullopt, std::nullopt, now);
+    }
+    const auto snapshot = state.snapshot(start + std::chrono::seconds{11});
+    require(!snapshot.battery_voltage_v && !snapshot.battery_current_a &&
+            !snapshot.battery_remaining_pct,
+        "unknown battery reports must not extend measurement freshness");
+}
+
+void controller_change_or_reconnect_discards_previous_telemetry() {
+    for (const bool change_controller : {false, true}) {
+        onboard_autonomy::mission::VehicleState state;
+        const onboard_autonomy::mission::TimePoint start{};
+        state.on_heartbeat(1, 1, 2, 3, 0, 0, 3, start);
+        configure_battery_threshold(state, start);
+        state.on_system_status(kHealthySensorFlags, kHealthySensorFlags,
+            15.2, 0.4, 88, start);
+        state.on_gps(3, 12, start);
+        state.on_global_position(2500, start);
+        state.on_local_position(1.0F, 2.0F, 3.0F, start);
+        state.on_attitude(0.1F, 0.2F, 0.3F, 0.0F, start);
+        state.on_autopilot_metadata({});
+        state.on_status_text(4, "old controller warning", start);
+        const auto now = start + std::chrono::seconds{change_controller ? 1 : 4};
+        state.on_heartbeat(change_controller ? 2 : 1, 1, 2, 3, 0, 0, 3, now);
+        const auto snapshot = state.snapshot(now);
+        require(snapshot.connected && !snapshot.gps_fix_type &&
+                !snapshot.battery_voltage_v && !snapshot.battery_current_a &&
+                !snapshot.battery_remaining_pct && !snapshot.system_health_known &&
+                !snapshot.relative_altitude_m && !snapshot.local_north_m &&
+                !snapshot.yaw_rad && !snapshot.autopilot_metadata &&
+                snapshot.warnings.empty(),
+            "a new connection must not inherit previous-session telemetry");
+        state.on_battery(15.2, std::nullopt, std::nullopt, now);
+        require(!state.snapshot(now).battery_arming_voltage_v,
+            "new voltage must not resurrect the previous arming threshold");
+    }
+}
+
 } // namespace
 
 void run_vehicle_state_tests() {
+    battery_fields_expire_independently();
+    unknown_battery_samples_do_not_refresh_measurements();
+    controller_change_or_reconnect_discards_previous_telemetry();
     healthy_vehicle_is_armable();
     prearm_warning_blocks_readiness();
     quiet_prearm_warning_stops_blocking_but_remains_visible();

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <iterator>
 #include <string_view>
 
@@ -69,7 +70,7 @@ void VehicleState::on_heartbeat(const std::uint8_t system_id,
         (system_id_.has_value() && *system_id_ != system_id) ||
         (component_id_.has_value() && *component_id_ != component_id);
     if (reconnecting || controller_changed) {
-        autopilot_metadata_.reset();
+        reset_telemetry_locked();
     }
     last_heartbeat_ = now;
     system_id_ = system_id;
@@ -79,6 +80,20 @@ void VehicleState::on_heartbeat(const std::uint8_t system_id,
     system_status_ = system_status;
     flight_mode_ = custom_mode;
     armed_ = (base_mode & kMavModeFlagSafetyArmed) != 0;
+}
+
+void VehicleState::reset_telemetry_locked() {
+    last_gps_.reset();
+    last_global_position_.reset();
+    last_local_position_.reset();
+    last_attitude_.reset();
+    last_battery_voltage_.reset();
+    last_battery_current_.reset();
+    last_battery_remaining_.reset();
+    last_system_status_.reset();
+    battery_arming_voltage_v_.reset();
+    autopilot_metadata_.reset();
+    warnings_.clear();
 }
 
 void VehicleState::on_gps(const std::uint8_t fix_type,
@@ -126,15 +141,19 @@ void VehicleState::update_battery_locked(const std::optional<double> voltage_v,
     const std::optional<double> current_a,
     const std::optional<std::int8_t> remaining_pct,
     const TimePoint now) {
-    last_battery_ = now;
-    if (voltage_v.has_value()) {
+    if (voltage_v.has_value() && std::isfinite(*voltage_v) && *voltage_v > 0.0) {
         battery_voltage_v_ = voltage_v;
+        last_battery_voltage_ = now;
     }
-    if (current_a.has_value()) {
+    if (current_a.has_value() && std::isfinite(*current_a) && *current_a >= 0.0) {
         battery_current_a_ = current_a;
+        last_battery_current_ = now;
     }
-    if (remaining_pct.has_value()) {
+    constexpr std::int8_t kMaximumBatteryPercent = 100;
+    if (remaining_pct.has_value() && *remaining_pct >= 0 &&
+        *remaining_pct <= kMaximumBatteryPercent) {
         battery_remaining_pct_ = remaining_pct;
+        last_battery_remaining_ = now;
     }
 }
 
@@ -263,11 +282,14 @@ VehicleSnapshot VehicleState::snapshot(const TimePoint now) {
             return contains_battery(warning.text);
         });
 
-    const bool battery_fresh = is_fresh(last_battery_, now, kBatteryTimeout);
-    if (battery_fresh) {
-        result.battery_voltage_v = battery_voltage_v_;
+    if (is_fresh(last_battery_current_, now, kBatteryTimeout)) {
         result.battery_current_a = battery_current_a_;
+    }
+    if (is_fresh(last_battery_remaining_, now, kBatteryTimeout)) {
         result.battery_remaining_pct = battery_remaining_pct_;
+    }
+    if (is_fresh(last_battery_voltage_, now, kBatteryTimeout)) {
+        result.battery_voltage_v = battery_voltage_v_;
         result.battery_arming_voltage_v = battery_arming_voltage_v_;
         const bool voltage_meets_arming_threshold =
             battery_voltage_v_.has_value() &&
@@ -277,8 +299,8 @@ VehicleSnapshot VehicleState::snapshot(const TimePoint now) {
         result.battery_ready =
             voltage_meets_arming_threshold && battery_sensor_healthy &&
             !has_battery_warning &&
-            (!battery_remaining_pct_.has_value() ||
-                *battery_remaining_pct_ >= kMinimumBatteryPercent);
+            (!result.battery_remaining_pct.has_value() ||
+                *result.battery_remaining_pct >= kMinimumBatteryPercent);
     }
 
     result.system_health_known = system_status_fresh;

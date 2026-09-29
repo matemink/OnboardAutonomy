@@ -30,6 +30,16 @@ std::vector<std::uint8_t> serialize(const mavlink_message_t& message) {
     return {buffer.begin(), buffer.begin() + length};
 }
 
+void connect_decoder(onboard_autonomy::hardware::mavlink::MavlinkDecoder& decoder,
+    const onboard_autonomy::mission::TimePoint now,
+    const std::uint8_t system = 1,
+    const std::uint8_t component = MAV_COMP_ID_AUTOPILOT1) {
+    mavlink_message_t heartbeat{};
+    mavlink_msg_heartbeat_pack(system, component, &heartbeat,
+        MAV_TYPE_QUADROTOR, MAV_AUTOPILOT_ARDUPILOTMEGA, 0, 0, MAV_STATE_STANDBY);
+    decoder.ingest(serialize(heartbeat), now);
+}
+
 void partial_heartbeat_is_reassembled() {
     onboard_autonomy::mission::VehicleState state;
     std::optional<onboard_autonomy::hardware::mavlink::MessageObservation>
@@ -261,6 +271,7 @@ void statustext_prearm_is_extracted() {
     onboard_autonomy::mission::VehicleState state;
     onboard_autonomy::hardware::mavlink::MavlinkDecoder decoder{state};
     const onboard_autonomy::mission::TimePoint now{};
+    connect_decoder(decoder, now);
 
     mavlink_statustext_t status_text{};
     status_text.severity = MAV_SEVERITY_INFO;
@@ -281,6 +292,7 @@ void autopilot_version_is_unpacked_into_domain_metadata() {
     onboard_autonomy::mission::VehicleState state;
     onboard_autonomy::hardware::mavlink::MavlinkDecoder decoder{state};
     const onboard_autonomy::mission::TimePoint now{};
+    connect_decoder(decoder, now);
 
     mavlink_autopilot_version_t version{};
     version.flight_sw_version =
@@ -363,6 +375,7 @@ void command_ack_is_forwarded_to_its_handler() {
         },
     };
     const onboard_autonomy::mission::TimePoint now{std::chrono::seconds(5)};
+    connect_decoder(decoder, now);
 
     mavlink_message_t message{};
     mavlink_msg_command_ack_pack(1,
@@ -403,6 +416,8 @@ void parameter_value_is_forwarded_to_its_handler() {
         },
     };
 
+    connect_decoder(decoder, onboard_autonomy::mission::TimePoint{});
+
     mavlink_param_value_t parameter{};
     parameter.param_value = 5.0F;
     parameter.param_type = MAV_PARAM_TYPE_INT8;
@@ -422,9 +437,124 @@ void parameter_value_is_forwarded_to_its_handler() {
         "PARAM_VALUE handler must preserve typed parameter data");
 }
 
+void foreign_sources_cannot_update_selected_vehicle() {
+    using namespace onboard_autonomy;
+    mission::VehicleState state;
+    std::size_t acknowledgements = 0;
+    std::size_t parameters = 0;
+    hardware::mavlink::MavlinkDecoder decoder{state,
+        [&acknowledgements](const auto&, const auto) { ++acknowledgements; },
+        {}, [&parameters](const auto&, const auto) { ++parameters; }};
+    const mission::TimePoint now{};
+    connect_decoder(decoder, now, 1, MAV_COMP_ID_ONBOARD_COMPUTER);
+    require(!state.snapshot(now).connected,
+        "a non-autopilot component must not select the vehicle");
+    connect_decoder(decoder, now);
+
+    for (const auto& source : std::array<std::array<std::uint8_t, 2>, 2>{{
+             {2, MAV_COMP_ID_AUTOPILOT1}, {1, MAV_COMP_ID_ONBOARD_COMPUTER}}}) {
+        const auto system = source[0];
+        const auto component = source[1];
+        connect_decoder(decoder, now, system, component);
+        mavlink_message_t message{};
+        mavlink_gps_raw_int_t gps{};
+        gps.fix_type = 3;
+        gps.satellites_visible = 12;
+        mavlink_msg_gps_raw_int_encode(system, component, &message, &gps);
+        decoder.ingest(serialize(message), now);
+        mavlink_sys_status_t status{};
+        status.voltage_battery = 15200;
+        status.battery_remaining = 88;
+        mavlink_msg_sys_status_encode(system, component, &message, &status);
+        decoder.ingest(serialize(message), now);
+        mavlink_battery_status_t battery{};
+        battery.voltages[0] = 15200;
+        mavlink_msg_battery_status_encode(system, component, &message, &battery);
+        decoder.ingest(serialize(message), now);
+        mavlink_global_position_int_t global{};
+        global.relative_alt = 2500;
+        mavlink_msg_global_position_int_encode(system, component, &message, &global);
+        decoder.ingest(serialize(message), now);
+        mavlink_local_position_ned_t local{};
+        local.x = 12.5F;
+        mavlink_msg_local_position_ned_encode(system, component, &message, &local);
+        decoder.ingest(serialize(message), now);
+        mavlink_attitude_t attitude{};
+        attitude.yaw = 1.5F;
+        mavlink_msg_attitude_encode(system, component, &message, &attitude);
+        decoder.ingest(serialize(message), now);
+        mavlink_autopilot_version_t version{};
+        mavlink_msg_autopilot_version_encode(system, component, &message, &version);
+        decoder.ingest(serialize(message), now);
+        mavlink_statustext_t warning{};
+        std::memcpy(warning.text, "PreArm: foreign warning", 23);
+        mavlink_msg_statustext_encode(system, component, &message, &warning);
+        decoder.ingest(serialize(message), now);
+        mavlink_param_value_t parameter{};
+        std::memcpy(parameter.param_id, "BATT_ARM_VOLT", 14);
+        parameter.param_value = 10.5F;
+        mavlink_msg_param_value_encode(system, component, &message, &parameter);
+        decoder.ingest(serialize(message), now);
+        mavlink_command_ack_t ack{};
+        mavlink_msg_command_ack_encode(system, component, &message, &ack);
+        decoder.ingest(serialize(message), now);
+    }
+    const auto snapshot = state.snapshot(now);
+    require(snapshot.system_id == 1 && snapshot.component_id == MAV_COMP_ID_AUTOPILOT1,
+        "foreign heartbeat must not replace a connected controller");
+    require(!snapshot.gps_fix_type && !snapshot.battery_voltage_v &&
+            !snapshot.system_health_known && !snapshot.relative_altitude_m &&
+            !snapshot.local_north_m && !snapshot.yaw_rad &&
+            !snapshot.autopilot_metadata && snapshot.warnings.empty(),
+        "foreign telemetry must not be combined with the selected controller");
+    require(acknowledgements == 0 && parameters == 0,
+        "foreign replies must not reach command or parameter handlers");
+
+    connect_decoder(decoder, now + std::chrono::seconds{4}, 2);
+    require(state.snapshot(now + std::chrono::seconds{4}).system_id == 2,
+        "a disconnected controller can be replaced by a new autopilot");
+}
+
+void telemetry_requires_a_live_autopilot_heartbeat() {
+    onboard_autonomy::mission::VehicleState state;
+    onboard_autonomy::hardware::mavlink::MavlinkDecoder decoder{state};
+    const onboard_autonomy::mission::TimePoint now{};
+    mavlink_gps_raw_int_t gps{};
+    gps.fix_type = 3;
+    mavlink_message_t message{};
+    mavlink_msg_gps_raw_int_encode(1, 1, &message, &gps);
+    decoder.ingest(serialize(message), now);
+    connect_decoder(decoder, now);
+    require(!state.snapshot(now).gps_ready,
+        "telemetry preceding identity selection must not seed vehicle state");
+    decoder.ingest(serialize(message), now + std::chrono::seconds{4});
+    connect_decoder(decoder, now + std::chrono::seconds{4});
+    require(!state.snapshot(now + std::chrono::seconds{4}).gps_ready,
+        "telemetry on a stale link must not seed the reconnected session");
+}
+
+void unknown_sys_status_voltage_is_not_a_measurement() {
+    onboard_autonomy::mission::VehicleState state;
+    onboard_autonomy::hardware::mavlink::MavlinkDecoder decoder{state};
+    const onboard_autonomy::mission::TimePoint now{};
+    connect_decoder(decoder, now);
+    mavlink_sys_status_t status{};
+    status.voltage_battery = UINT16_MAX;
+    status.current_battery = -1;
+    status.battery_remaining = -1;
+    mavlink_message_t message{};
+    mavlink_msg_sys_status_encode(1, 1, &message, &status);
+    decoder.ingest(serialize(message), now);
+    require(!state.snapshot(now).battery_voltage_v,
+        "UINT16_MAX means unknown voltage, not 65.535 volts");
+}
+
 } // namespace
 
 void run_mavlink_decoder_tests() {
+    foreign_sources_cannot_update_selected_vehicle();
+    telemetry_requires_a_live_autopilot_heartbeat();
+    unknown_sys_status_voltage_is_not_a_measurement();
     partial_heartbeat_is_reassembled();
     multiple_frames_in_one_read_are_decoded();
     inbound_burst_preserves_every_frame();

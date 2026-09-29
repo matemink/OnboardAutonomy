@@ -1,8 +1,8 @@
 #include "onboard_autonomy/hardware/camera/RpicamCameraSource.hpp"
 
 #include "../PosixError.hpp"
+#include "ChildProcess.hpp"
 
-#include <atomic>
 #include <charconv>
 #include <chrono>
 #include <condition_variable>
@@ -74,7 +74,6 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
 
     ~RpicamCameraSource() override {
         worker_.request_stop();
-        stop_child();
         metadata_ready_.notify_all();
     }
 
@@ -171,7 +170,6 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
             _exit(kChildExecFailureExitCode);
         }
 
-        child_pid_.store(child);
         ::close(video_pipe[1]);
         video_pipe[1] = -1;
         ::close(metadata_pipe[1]);
@@ -236,13 +234,7 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
             publish(std::move(frame));
         }
 
-        if (!stop_token.stop_requested()) {
-            ::kill(child, SIGINT);
-        }
-        int child_status = 0;
-        while (::waitpid(child, &child_status, 0) == -1 && errno == EINTR) {
-        }
-        child_pid_.store(-1);
+        const int child_status = stop_camera_child(child);
 
         ::close(video_pipe[0]);
         metadata_reader.join();
@@ -466,13 +458,6 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
         status_.phase = mission::ports::CameraSourcePhase::stopped;
     }
 
-    void stop_child() {
-        const pid_t child = child_pid_.load();
-        if (child > 0) {
-            ::kill(child, SIGINT);
-        }
-    }
-
     RpicamCameraConfig config_;
     std::size_t frame_size_{0};
     mutable std::mutex state_mutex_;
@@ -483,7 +468,6 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
     std::mutex metadata_mutex_;
     std::condition_variable metadata_ready_;
     std::deque<std::int64_t> metadata_timestamps_;
-    std::atomic<pid_t> child_pid_{-1};
     std::jthread worker_;
 };
 

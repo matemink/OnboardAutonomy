@@ -494,4 +494,40 @@ if(BUILD_TESTING)
     )
     onboard_autonomy_enable_warnings(onboard_autonomy_tests)
     add_test(NAME onboard_autonomy_tests COMMAND onboard_autonomy_tests)
+    add_executable(
+        onboard_autonomy_preview_lifecycle_tests
+        tests/HttpCameraPreviewLifecycleTests.cpp
+    )
+    target_link_libraries(
+        onboard_autonomy_preview_lifecycle_tests
+        PRIVATE onboard_autonomy_diagnostics_preview Threads::Threads
+    )
+    target_include_directories(
+        onboard_autonomy_preview_lifecycle_tests
+        SYSTEM PRIVATE ${cpp_httplib_source_SOURCE_DIR}
+    )
+    target_compile_definitions(
+        onboard_autonomy_preview_lifecycle_tests
+        PRIVATE ONBOARD_AUTONOMY_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    )
+    onboard_autonomy_enable_warnings(onboard_autonomy_preview_lifecycle_tests)
+    add_test(NAME preview_lifecycle COMMAND onboard_autonomy_preview_lifecycle_tests)
+    set_tests_properties(preview_lifecycle PROPERTIES TIMEOUT 20)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(onboard_autonomy_camera_fixture tests/CameraProcessFixture.cpp)
+        add_executable(onboard_autonomy_camera_lifecycle_tests tests/CameraLifecycleTests.cpp)
+        target_link_libraries(
+            onboard_autonomy_camera_lifecycle_tests
+            PRIVATE onboard_autonomy_hardware_camera Threads::Threads
+        )
+        onboard_autonomy_enable_warnings(onboard_autonomy_camera_fixture)
+        onboard_autonomy_enable_warnings(onboard_autonomy_camera_lifecycle_tests)
+        add_test(
+            NAME camera_lifecycle
+            COMMAND onboard_autonomy_camera_lifecycle_tests
+                $<TARGET_FILE:onboard_autonomy_camera_fixture>
+        )
+        set_tests_properties(camera_lifecycle PROPERTIES TIMEOUT 20)
+    endif()
 endif()

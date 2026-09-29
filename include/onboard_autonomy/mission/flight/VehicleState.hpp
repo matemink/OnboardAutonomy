@@ -108,6 +108,8 @@ class VehicleState {
         TimePoint last_seen;
     };
 
+    void reset_telemetry_locked();
+
     void update_battery_locked(std::optional<double> voltage_v,
         std::optional<double> current_a,
         std::optional<std::int8_t> remaining_pct,
@@ -119,7 +121,9 @@ class VehicleState {
     std::optional<TimePoint> last_global_position_;
     std::optional<TimePoint> last_local_position_;
     std::optional<TimePoint> last_attitude_;
-    std::optional<TimePoint> last_battery_;
+    std::optional<TimePoint> last_battery_voltage_;
+    std::optional<TimePoint> last_battery_current_;
+    std::optional<TimePoint> last_battery_remaining_;
     std::optional<TimePoint> last_system_status_;
     std::optional<std::uint8_t> system_id_;
     std::optional<std::uint8_t> component_id_;
