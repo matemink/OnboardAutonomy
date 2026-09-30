@@ -1,6 +1,6 @@
 #pragma once
 
-#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/SnapshotSink.hpp"
 
 #include <iosfwd>
 #include <memory>
@@ -12,7 +12,7 @@ class BoardTypeResolver;
 
 namespace onboard_autonomy::operator_interface::ui {
 
-class ConsoleSnapshotSink final : public bootstrap::RuntimeSnapshotSink {
+class ConsoleSnapshotSink final : public mission::ports::RuntimeSnapshotSink {
   public:
     ConsoleSnapshotSink(std::ostream& output,
         std::string transport_description,

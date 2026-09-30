@@ -1,8 +1,11 @@
 #pragma once
 
+#include "onboard_autonomy/mission/flight/FlightStartupSnapshot.hpp"
+
 #include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
 #include "onboard_autonomy/mission/flight/FlightCommand.hpp"
-#include "onboard_autonomy/mission/flight/VehicleState.hpp"
+#include "onboard_autonomy/mission/flight/VehicleSnapshot.hpp"
+#include "onboard_autonomy/mission/Clock.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -11,32 +14,12 @@
 
 namespace onboard_autonomy::mission {
 
-enum class FlightStartupPhase {
-    disabled,
-    idle,
-    waiting_for_vehicle,
-    waiting_for_readiness,
-    setting_guided,
-    arming,
-    taking_off,
-    completed,
-    failed,
-};
-
 struct FlightStartupConfig {
     static constexpr double kDefaultTakeoffAltitudeM = 8.0;
 
     bool enabled{false};
     bool start_automatically{true};
     double takeoff_altitude_m{kDefaultTakeoffAltitudeM};
-};
-
-struct FlightStartupSnapshot {
-    FlightStartupPhase phase{FlightStartupPhase::disabled};
-    std::string detail{"Flight startup disabled"};
-    double target_altitude_m{0.0};
-    std::size_t attempt{0};
-    std::optional<std::uint8_t> failure_result;
 };
 
 class FlightStartupController {

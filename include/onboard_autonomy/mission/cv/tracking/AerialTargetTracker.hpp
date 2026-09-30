@@ -1,7 +1,7 @@
 #pragma once
 
 #include "onboard_autonomy/mission/cv/detection/TargetObservation.hpp"
-#include "onboard_autonomy/mission/flight/VehicleState.hpp"
+#include "onboard_autonomy/mission/Clock.hpp"
 
 #include <chrono>
 #include <cstdint>

@@ -85,6 +85,7 @@ endfunction()
 add_library(
     onboard_autonomy_mission_types
     src/mission/cv/calibration/CameraCalibration.cpp
+    src/mission/safety/CompanionLinkFailsafeSnapshot.cpp
     src/mission/flight/VehicleState.cpp
 )
 target_link_libraries(
@@ -275,7 +276,6 @@ target_link_libraries(
         onboard_autonomy_mission
         onboard_autonomy_public_headers
     PRIVATE
-        onboard_autonomy_mission_cv_detection
         onboard_autonomy_hardware_camera
         onboard_autonomy_hardware_transport
 )
@@ -290,7 +290,7 @@ add_library(
 target_link_libraries(
     onboard_autonomy_operator_ui
     PUBLIC
-        onboard_autonomy_mission
+        onboard_autonomy_mission_types
         onboard_autonomy_public_headers
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_operator_ui)
@@ -298,11 +298,12 @@ onboard_autonomy_enable_warnings(onboard_autonomy_operator_ui)
 add_library(
     onboard_autonomy_diagnostics_logging
     src/diagnostics/logging/JsonDiagnosticSink.cpp
+    src/diagnostics/logging/SnapshotJson.cpp
 )
 target_link_libraries(
     onboard_autonomy_diagnostics_logging
     PUBLIC
-        onboard_autonomy_mission
+        onboard_autonomy_mission_types
         onboard_autonomy_public_headers
     PRIVATE
         nlohmann_json::nlohmann_json
@@ -335,8 +336,13 @@ target_link_libraries(
         onboard_autonomy_operator_ui
         onboard_autonomy_diagnostics_logging
         onboard_autonomy_mission_runtime
+        onboard_autonomy_mission_cv_detection
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
+
+include(cmake/Architecture.cmake)
+onboard_autonomy_assert_model_dependencies(onboard_autonomy_operator_ui)
+onboard_autonomy_assert_model_dependencies(onboard_autonomy_diagnostics_logging)
 
 include(GNUInstallDirs)
 install(

@@ -14,6 +14,7 @@ struct AppSnapshot;
 namespace onboard_autonomy::mission::ports {
 class CameraSource;
 struct CameraFrame;
+class RuntimeSnapshotSink;
 } // namespace onboard_autonomy::mission::ports
 
 namespace onboard_autonomy::diagnostics::preview {
@@ -21,8 +22,6 @@ class CameraPreviewSink;
 }
 
 namespace onboard_autonomy::bootstrap {
-
-class RuntimeSnapshotSink;
 
 enum class RuntimeCommand {
     start_aerial_tracking,
@@ -47,7 +46,7 @@ class CompanionRunner {
         mission::CompanionApplication& application,
         mission::AsyncCameraMonitor* forward_camera_monitor,
         RuntimeCommandSource* command_source,
-        std::vector<RuntimeSnapshotSink*> snapshot_sinks,
+        std::vector<mission::ports::RuntimeSnapshotSink*> snapshot_sinks,
         std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks);
 
     [[nodiscard]] int run();
@@ -63,7 +62,7 @@ class CompanionRunner {
     mission::CompanionApplication& application_;
     mission::AsyncCameraMonitor* forward_camera_monitor_;
     RuntimeCommandSource* command_source_;
-    std::vector<RuntimeSnapshotSink*> snapshot_sinks_;
+    std::vector<mission::ports::RuntimeSnapshotSink*> snapshot_sinks_;
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks_;
     std::chrono::milliseconds snapshot_interval_;
     std::chrono::steady_clock::time_point next_snapshot_;

@@ -22,8 +22,10 @@ serialization. Source and public headers share the same package paths.
 
 `CMakeLists.txt` defines the compiled libraries and their dependencies. Interface
 libraries expose transport, camera, detector, and preview contracts. Public
-headers currently share one include root, so CMake boundaries alone do not
-prevent a source file from including another package's header.
+headers share one include root. Python architecture checks enforce package
+include rules, reject cycles, and verify that the presentation model cannot
+transitively import controllers. CMake configuration rejects direct or transitive
+execution-library dependencies from console and logging targets.
 
 ## Data flow
 
@@ -80,8 +82,16 @@ utilities remain available independently of flight behavior. Detection results
 contain image coordinates and confidence. Marker pose, metric marker tracking,
 and camera-to-body landing transforms have been removed.
 
-`AppSnapshot` is the neutral presentation model. Console and JSON consumers
-format it independently. Python owns process orchestration, failure injection,
+`AppSnapshot` includes value snapshots, not controller headers. Each owning
+package keeps its snapshot next to the controller or monitor that produces it.
+`mission/Clock.hpp` supplies scheduling time without a dependency on vehicle
+state. `mission/SnapshotSink.hpp` is the output port used by bootstrap and
+implemented by console and JSON consumers.
+
+Console and logging targets link the model library rather than the mission
+runtime. JSON mapping lives in the private `SnapshotJson` implementation;
+`JsonDiagnosticSink` owns record writing and sampled transition detection.
+Python owns process orchestration, failure injection,
 and independent protocol evidence; production runtime state remains in C++.
 
 ## Maintenance boundaries
@@ -89,6 +99,15 @@ and independent protocol evidence; production runtime state remains in C++.
 Changes to protocol handling belong in the MAVLink adapter and vehicle model;
 formatting belongs in the snapshot consumers. Keep orchestration focused on
 routing and lifecycle rather than adding detector, UI, or transport details to
-`CompanionApplication`. Its size and the shared include root are still useful
-review targets; this document describes the implemented boundaries, not a
-claim that every boundary is enforced automatically.
+`CompanionApplication`.
+
+The application currently routes MAVLink protocol records itself. The include
+policy permits that dependency only in `src/mission/CompanionApplication.cpp`;
+mission headers and controllers cannot include hardware adapters. This is an
+explicit existing coupling, not a permission for the whole mission package.
+
+`python/tests/test_architecture_boundaries.py` checks source/public-header
+package dependencies, presentation-model dependencies, and public-header
+cycles. `cmake/Architecture.cmake` checks presentation link dependencies,
+including generator expressions. These checks do not establish correctness of
+flight behavior, event delivery, or hardware recovery.

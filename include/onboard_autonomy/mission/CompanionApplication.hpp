@@ -1,6 +1,8 @@
 #pragma once
 
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/autonomy/AutonomyRuntime.hpp"
+#include "onboard_autonomy/mission/flight/FlightStartupController.hpp"
 #include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 
