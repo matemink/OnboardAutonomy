@@ -76,8 +76,9 @@ ready and releases its worker after a startup failure.
 
 The primary camera supplies observation frames. The optional forward detector
 uses OpenCV DNN with YOLOX preprocessing and output decoding. Calibration
-utilities remain available independently of flight behavior. Marker pose
-estimation and camera-to-body landing transforms have been removed.
+utilities remain available independently of flight behavior. Detection results
+contain image coordinates and confidence. Marker pose, metric marker tracking,
+and camera-to-body landing transforms have been removed.
 
 `AppSnapshot` is the neutral presentation model. Console and JSON consumers
 format it independently. Python owns process orchestration, failure injection,

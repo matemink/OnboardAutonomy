@@ -50,20 +50,6 @@ std::string_view camera_phase_name(
     return "failed";
 }
 
-std::string_view target_track_phase_name(
-    const mission::TargetTrackPhase phase) {
-    using mission::TargetTrackPhase;
-    switch (phase) {
-    case TargetTrackPhase::searching:
-        return "searching";
-    case TargetTrackPhase::acquiring:
-        return "acquiring";
-    case TargetTrackPhase::tracking:
-        return "tracking";
-    }
-    return "searching";
-}
-
 std::string_view telemetry_state_name(
     const mission::TelemetrySetupState state) {
     using mission::TelemetrySetupState;
@@ -232,52 +218,13 @@ Json camera_json(const std::optional<mission::CameraSnapshot>& camera) {
     };
 }
 
-Json target_pose_json(const std::optional<mission::TargetPose>& pose) {
-    if (!pose.has_value()) {
-        return nullptr;
-    }
-    return Json{
-        {"frame", "camera_optical"},
-        {"right_m", pose->position.right_m},
-        {"down_m", pose->position.down_m},
-        {"forward_m", pose->position.forward_m},
-        {"object_space_error", pose->object_space_error},
-        {"rotation_tag_to_camera", pose->rotation_tag_to_camera},
-    };
-}
-
 Json target_json(const mission::TargetObservation& target) {
     return Json{
         {"id", target.id},
         {"family", target.family},
         {"center_x_px", target.center.x_px},
         {"center_y_px", target.center.y_px},
-        {"corrected_bits", target.corrected_bits},
-        {"decision_margin", target.decision_margin},
-        {"pose", target_pose_json(target.pose)},
-    };
-}
-
-Json track_json(const mission::TargetTrackSnapshot& track) {
-    Json position = nullptr;
-    if (track.position.has_value()) {
-        position = {
-            {"frame", "camera_optical"},
-            {"right_m", track.position->right_m},
-            {"down_m", track.position->down_m},
-            {"forward_m", track.position->forward_m},
-        };
-    }
-    return Json{
-        {"phase", target_track_phase_name(track.phase)},
-        {"target_id", optional_number(track.target_id)},
-        {"consecutive_observations", track.consecutive_observations},
-        {"required_observations", track.required_observations},
-        {"accepted_observations", track.accepted_observations},
-        {"observation_age_ms", optional_number(track.observation_age_ms)},
-        {"latest_decision_margin",
-            optional_number(track.latest_decision_margin)},
-        {"position", std::move(position)},
+        {"confidence_percent", target.confidence_percent},
     };
 }
 
@@ -302,7 +249,6 @@ Json vision_json(const std::optional<mission::VisionSnapshot>& vision) {
         {"last_detection_age_ms",
             optional_number(vision->last_detection_age_ms)},
         {"targets", std::move(targets)},
-        {"target_track", track_json(vision->target_track)},
     };
 }
 
@@ -420,12 +366,6 @@ std::int64_t unix_milliseconds(
         .count();
 }
 
-bool target_tracked(const mission::AppSnapshot& snapshot) {
-    return snapshot.vision.has_value() &&
-           snapshot.vision->target_track.phase ==
-               mission::TargetTrackPhase::tracking;
-}
-
 bool camera_streaming(const mission::AppSnapshot& snapshot) {
     return snapshot.camera.has_value() &&
            snapshot.camera->phase ==
@@ -481,8 +421,7 @@ class JsonDiagnosticSink::Impl {
             snapshot,
             "diagnostic sink attached",
             {{"vehicle_connected", snapshot.vehicle.connected},
-                {"camera_streaming", camera_streaming(snapshot)},
-                {"target_tracked", target_tracked(snapshot)}});
+                {"camera_streaming", camera_streaming(snapshot)}});
     }
 
     void write_connection_events(const mission::AppSnapshot& previous,
@@ -508,16 +447,6 @@ class JsonDiagnosticSink::Impl {
                 recorded_at_ms,
                 snapshot,
                 detail);
-        }
-
-        const bool was_tracked = target_tracked(previous);
-        const bool is_tracked = target_tracked(snapshot);
-        if (was_tracked != is_tracked) {
-            event(is_tracked ? "target_acquired" : "target_lost",
-                recorded_at_ms,
-                snapshot,
-                is_tracked ? "confirmed target track"
-                           : "confirmed target track unavailable");
         }
     }
 

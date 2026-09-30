@@ -6,7 +6,6 @@ void run_json_diagnostic_sink_tests();
 void run_mavlink_decoder_tests();
 void run_mavlink_encoder_tests();
 void run_telemetry_stream_configurator_tests();
-void run_target_tracker_tests();
 void run_aerial_target_tracker_tests();
 void run_aerial_yaw_controller_tests();
 void run_console_view_tests();

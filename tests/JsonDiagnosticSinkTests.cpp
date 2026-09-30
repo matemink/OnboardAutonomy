@@ -92,7 +92,7 @@ void snapshot_keeps_runtime_state_without_camera_data() {
         "snapshot diagnostics must preserve safety and setup state");
 }
 
-void snapshot_serializes_camera_and_metric_vision() {
+void snapshot_serializes_camera_and_object_detections() {
     AppSnapshot snapshot;
     snapshot.camera = onboard_autonomy::mission::CameraSnapshot{
         .phase = onboard_autonomy::mission::ports::CameraSourcePhase::streaming,
@@ -121,37 +121,12 @@ void snapshot_serializes_camera_and_metric_vision() {
         .last_detection_age_ms = 20.0,
         .latest_targets = {{
             .id = 0,
-            .family = "tagStandard41h12",
+            .family = "object",
             .center = {.x_px = 160.0, .y_px = 120.0},
             .corners = {},
-            .corrected_bits = 0,
-            .decision_margin = 80.0,
-            .pose =
-                onboard_autonomy::mission::TargetPose{
-                    .position = {.right_m = 0.1,
-                        .down_m = -0.2,
-                        .forward_m = 1.25},
-                    .rotation_tag_to_camera =
-                        {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0},
-                    .object_space_error = 0.003,
-                },
+
+            .confidence_percent = 80.0,
         }},
-        .target_track =
-            {
-                .phase = onboard_autonomy::mission::TargetTrackPhase::tracking,
-                .target_id = 0,
-                .consecutive_observations = 4,
-                .required_observations = 3,
-                .accepted_observations = 4,
-                .observation_age_ms = 12.0,
-                .latest_decision_margin = 80.0,
-                .position =
-                    onboard_autonomy::mission::CameraFramePosition{
-                        .right_m = 0.09,
-                        .down_m = -0.18,
-                        .forward_m = 1.20,
-                    },
-            },
     };
 
     const auto json = serialize_snapshot(snapshot);
@@ -160,12 +135,14 @@ void snapshot_serializes_camera_and_metric_vision() {
                 json.at("camera").at("source") == "Camera Module 3 \"Wide\"" &&
                 json.at("camera").at("latest_latency_ms") == 21.5,
         "diagnostic adapter must preserve camera state and JSON escaping");
-    require(json.at("vision").at("processed_frames") == 10 &&
-                json.at("vision").at("targets").at(0).at("id") == 0 &&
-                json.at("vision").at("targets").at(0).at("pose").at(
-                    "forward_m") == 1.25 &&
-                json.at("vision").at("target_track").at("phase") == "tracking",
-        "diagnostic adapter must preserve typed metric vision results");
+    const auto& vision = json.at("vision");
+    const auto& target = vision.at("targets").at(0);
+    require(vision.at("processed_frames") == 10 && target.at("id") == 0 &&
+                target.at("confidence_percent") == 80.0,
+        "diagnostics must preserve object detections");
+    require(!vision.contains("target_track") && !target.contains("pose") &&
+                !target.contains("corrected_bits"),
+        "diagnostics must not retain the removed marker-landing schema");
 }
 
 void transition_events_reconstruct_runtime_failures() {
@@ -205,8 +182,6 @@ void transition_events_reconstruct_runtime_failures() {
     active.camera->phase =
         onboard_autonomy::mission::ports::CameraSourcePhase::streaming;
     active.camera->error.clear();
-    active.vision->target_track.phase =
-        onboard_autonomy::mission::TargetTrackPhase::tracking;
     active.flight_startup.phase =
         onboard_autonomy::mission::FlightStartupPhase::setting_guided;
     active.flight_startup.detail = "GUIDED command accepted";
@@ -233,8 +208,6 @@ void transition_events_reconstruct_runtime_failures() {
     failed.camera->phase =
         onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting;
     failed.camera->error = "frame stalled";
-    failed.vision->target_track.phase =
-        onboard_autonomy::mission::TargetTrackPhase::searching;
     failed.flight_startup.phase =
         onboard_autonomy::mission::FlightStartupPhase::failed;
     failed.flight_startup.detail = "arm command rejected";
@@ -270,9 +243,8 @@ void transition_events_reconstruct_runtime_failures() {
     require(has_event("flight_controller_recovered") &&
                 has_event("flight_controller_lost") &&
                 has_event("camera_stream_recovered") &&
-                has_event("camera_stream_stalled") &&
-                has_event("target_acquired") && has_event("target_lost"),
-        "diagnostics must record hardware and target transitions");
+                has_event("camera_stream_stalled"),
+        "diagnostics must record hardware transitions");
     require(has_event("flight_startup_phase_changed") &&
                 has_event("autonomy_phase_changed") &&
                 has_event("companion_link_failsafe_phase_changed") &&
@@ -285,6 +257,6 @@ void transition_events_reconstruct_runtime_failures() {
 
 void run_json_diagnostic_sink_tests() {
     snapshot_keeps_runtime_state_without_camera_data();
-    snapshot_serializes_camera_and_metric_vision();
+    snapshot_serializes_camera_and_object_detections();
     transition_events_reconstruct_runtime_failures();
 }

@@ -293,18 +293,11 @@
   </main>
 
   <script>
-    const defaultTrack = {
-      phase: "searching",
-      target_id: null
-    };
-
     function drawTargets(
       context,
       canvas,
       targets,
-      targetTrack,
-      color,
-      showObjectClass
+      color
     ) {
       context.lineWidth = Math.max(2, canvas.width / 240);
       context.font = `${Math.max(14, canvas.width / 36)}px Lucida Console`;
@@ -329,13 +322,8 @@
         context.arc(centerX, centerY, 5, 0, Math.PI * 2);
         context.fill();
 
-        const tracked = targetTrack.target_id === target.id &&
-          targetTrack.phase !== "searching";
-        const label = showObjectClass
-          ? `${target.family.toUpperCase()} ` +
-            `${target.decision_margin.toFixed(0)}%`
-          : `TAG ${target.id}` +
-            (tracked ? ` / ${targetTrack.phase.toUpperCase()}` : "");
+        const label = `${target.family.toUpperCase()} ` +
+          `${target.confidence_percent.toFixed(0)}%`;
         const labelY = Math.max(22, corners[0][1] - 10);
         context.fillStyle = "rgb(5 12 12 / 82%)";
         context.fillRect(
@@ -349,30 +337,13 @@
       }
     }
 
-    function targetSummary(targets, track) {
-      if (track.phase !== "searching" && track.target_id !== null) {
-        const phase = track.phase === "acquiring"
-          ? `ACQUIRING ${track.consecutive_observations}/` +
-            `${track.required_observations}`
-          : "TRACKING";
-        return `TAG ${track.target_id} / ${phase}`;
-      }
-      if (targets.length === 0) {
-        return "OBSERVATION ONLY";
-      }
-      return targets
-        .map((target) => `TAG ${target.id} / MARGIN ` +
-          target.decision_margin.toFixed(1))
-        .join("   ");
-    }
-
     function aerialObjectSummary(targets) {
       if (targets.length === 0) {
         return "SEARCHING FOR AERIAL OBJECT";
       }
       return targets
         .map((target) => `${(target.family || "object").toUpperCase()} ` +
-          `${target.decision_margin.toFixed(0)}%`)
+          `${target.confidence_percent.toFixed(0)}%`)
         .join("   ");
     }
 
@@ -414,10 +385,6 @@
           const sequence = response.headers.get("X-Frame-Sequence");
           const targets = JSON.parse(
             response.headers.get("X-OnboardAutonomy-Targets") || "[]"
-          );
-          const targetTrack = JSON.parse(
-            response.headers.get("X-OnboardAutonomy-Target-Track") ||
-              JSON.stringify(defaultTrack)
           );
           const yuv420 = new Uint8Array(await response.arrayBuffer());
           const lumaSize = width * height;
@@ -473,19 +440,15 @@
               context,
               canvas,
               targets,
-              targetTrack,
-              "#49d9ff",
-              false
+              "#49d9ff"
             );
-            analysisText.textContent = targetSummary(targets, targetTrack);
+            analysisText.textContent = "OBSERVATION ONLY";
           } else {
             drawTargets(
               context,
               canvas,
               targets,
-              targetTrack,
-              "#ffbd5c",
-              true
+              "#ffbd5c"
             );
             analysisText.textContent = aerialObjectSummary(targets);
           }

@@ -29,3 +29,8 @@ Evidence documents record the setup they actually measured. The historical
 runtime profile includes a detector removed from the current workload; it
 requires a new measurement before being used as a current performance claim.
 Uncommitted development work and unrun flight experiments are not release evidence.
+
+The remaining marker pose model, metric marker tracker, undistortion helper,
+and marker fields in JSON/HTTP preview have also been removed. Object detection
+reports image coordinates and `confidence_percent`; it does not report marker
+pose or a marker track. Historical JSONL records retain their original schema.

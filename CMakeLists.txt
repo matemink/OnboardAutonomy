@@ -139,7 +139,6 @@ onboard_autonomy_enable_warnings(onboard_autonomy_hardware_camera)
 
 add_library(
     onboard_autonomy_mission_cv_detection
-    src/mission/cv/detection/CameraGeometry.cpp
     src/mission/cv/detection/OpenCvDnnTargetDetector.cpp
     src/mission/cv/detection/YoloXImagePreprocessor.cpp
     src/mission/cv/detection/YoloXOutputDecoder.cpp
@@ -250,7 +249,6 @@ add_library(
     src/mission/flight/FlightStartupController.cpp
     src/mission/safety/MotionSafetyPolicy.cpp
     src/mission/cv/tracking/AerialTargetTracker.cpp
-    src/mission/cv/tracking/TargetTracker.cpp
     src/mission/cv/VisionMonitor.cpp
     src/mission/CompanionApplication.cpp
 )
@@ -403,7 +401,6 @@ if(BUILD_TESTING)
         tests/MavlinkEncoderTests.cpp
         tests/MotionSafetyPolicyTests.cpp
         tests/TelemetryStreamConfiguratorTests.cpp
-        tests/TargetTrackerTests.cpp
         tests/TransportTests.cpp
         tests/VehicleStateTests.cpp
         tests/YoloXImagePreprocessorTests.cpp

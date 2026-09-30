@@ -111,8 +111,7 @@ void CompanionRunner::publish_downward_camera_frame() {
         if (sink != nullptr) {
             sink->publish(diagnostics::preview::CameraPreviewStream::downward,
                 processed->frame,
-                processed->targets,
-                processed->target_track);
+                processed->targets);
         }
     }
 }
@@ -137,8 +136,7 @@ void CompanionRunner::publish_forward_camera_frame() {
         if (sink != nullptr) {
             sink->publish(diagnostics::preview::CameraPreviewStream::forward,
                 processed->frame,
-                processed->targets,
-                processed->target_track);
+                processed->targets);
         }
     }
 }

@@ -20,8 +20,8 @@ AerialTargetTracker::make_candidate(
     const std::uint32_t frame_width,
     const std::uint32_t frame_height) const {
     if (frame_width == 0U || frame_height == 0U ||
-        !std::isfinite(observation.decision_margin) ||
-        observation.decision_margin < config_.minimum_confidence_percent) {
+        !std::isfinite(observation.confidence_percent) ||
+        observation.confidence_percent < config_.minimum_confidence_percent) {
         return std::nullopt;
     }
 
@@ -58,7 +58,7 @@ AerialTargetTracker::make_candidate(
         .center_y_ratio = center_y_ratio,
         .width_ratio = (right - left) / width,
         .height_ratio = (bottom - top) / height,
-        .confidence_percent = observation.decision_margin,
+        .confidence_percent = observation.confidence_percent,
     };
 }
 

@@ -280,37 +280,12 @@ void vision_pipeline_and_target_are_visible() {
             {
                 {
                     .id = 0,
-                    .family = "tagStandard41h12",
+                    .family = "object",
                     .center = {.x_px = 319.5, .y_px = 239.5},
                     .corners = {},
-                    .corrected_bits = 0,
-                    .decision_margin = 88.4,
-                    .pose =
-                        onboard_autonomy::mission::TargetPose{
-                            .position =
-                                {
-                                    .right_m = 0.12,
-                                    .down_m = -0.05,
-                                    .forward_m = 1.42,
-                                },
-                        },
+
+                    .confidence_percent = 88.4,
                 },
-            },
-        .target_track =
-            {
-                .phase = onboard_autonomy::mission::TargetTrackPhase::tracking,
-                .target_id = 0,
-                .consecutive_observations = 3,
-                .required_observations = 3,
-                .accepted_observations = 3,
-                .observation_age_ms = 8.0,
-                .latest_decision_margin = 88.4,
-                .position =
-                    onboard_autonomy::mission::CameraFramePosition{
-                        .right_m = 0.12,
-                        .down_m = -0.05,
-                        .forward_m = 1.42,
-                    },
             },
     };
 
@@ -318,15 +293,16 @@ void vision_pipeline_and_target_are_visible() {
         onboard_autonomy::operator_interface::ui::render_console(snapshot,
             "serial:///dev/ttyACM0?baud=115200",
             false);
-    require(output.find("VISION synthetic detector") !=
-                    std::string::npos &&
+    require(output.find("VISION synthetic detector") != std::string::npos &&
                 output.find("4.8 MS AVG") != std::string::npos,
         "console must show the active vision detector");
-    require(output.find("TARGET ID 0   |   TRACKING") != std::string::npos,
-        "console must show the confirmed target track");
-    require(output.find("X RIGHT 0.12 M   |   Y DOWN -0.05 M   |   "
-                        "Z FORWARD 1.42 M") != std::string::npos,
-        "metric target pose must be explicit in camera coordinates");
+    require(output.find("object   |   CENTER 319.5/239.5 PX") !=
+                    std::string::npos &&
+                output.find("CONFIDENCE 88.4%") != std::string::npos,
+        "console must show the detected object in image coordinates");
+    require(output.find("TAG") == std::string::npos &&
+                output.find("X RIGHT") == std::string::npos,
+        "console must not show removed marker pose or tracking");
 }
 
 } // namespace

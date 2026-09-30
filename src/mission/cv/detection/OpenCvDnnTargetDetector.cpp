@@ -158,10 +158,8 @@ mission::TargetObservation make_observation(const ::cv::Rect& box,
             {.x_px = right, .y_px = bottom},
             {.x_px = left, .y_px = bottom},
         }},
-        .corrected_bits = 0,
-        .decision_margin =
+        .confidence_percent =
             static_cast<double>(candidate.confidence) * kConfidenceAsPercentage,
-        .pose = std::nullopt,
     };
 }
 

@@ -469,71 +469,22 @@ std::string vision_pipeline_detail(const mission::VisionSnapshot& vision) {
 }
 
 std::string vision_target_detail(const mission::VisionSnapshot& vision) {
-    const auto& track = vision.target_track;
-    if (track.phase != mission::TargetTrackPhase::searching &&
-        track.position.has_value()) {
-        std::ostringstream detail;
-        detail << std::fixed << std::setprecision(2)
-               << "TARGET POSITION   |   X RIGHT " << track.position->right_m
-               << " M" << "   |   Y DOWN " << track.position->down_m << " M"
-               << "   |   Z FORWARD " << track.position->forward_m << " M";
-        return detail.str();
-    }
-
     if (vision.latest_targets.empty()) {
-        return "TARGET NOT VISIBLE";
+        return "NO OBJECT DETECTED";
     }
-
     const auto& target = vision.latest_targets.front();
     std::ostringstream detail;
-    detail << "TARGET ID " << target.id;
-    if (target.pose.has_value()) {
-        detail << std::fixed << std::setprecision(2) << "   |   X RIGHT "
-               << target.pose->position.right_m << " M" << "   |   Y DOWN "
-               << target.pose->position.down_m << " M" << "   |   Z FORWARD "
-               << target.pose->position.forward_m << " M";
-    } else {
-        detail << "   |   CENTER " << std::fixed << std::setprecision(1)
-               << target.center.x_px << "/" << target.center.y_px << " PX"
-               << "   |   MARGIN " << target.decision_margin
-               << "   |   CORRECTED " << target.corrected_bits;
-    }
+    detail << target.family << "   |   CENTER " << std::fixed
+           << std::setprecision(1) << target.center.x_px << "/"
+           << target.center.y_px << " PX   |   CONFIDENCE "
+           << target.confidence_percent << "%";
     if (vision.latest_targets.size() > 1U) {
-        detail << "   |   " << vision.latest_targets.size() << " TAGS";
-    }
-    return detail.str();
-}
-
-std::optional<std::string> vision_track_status_detail(
-    const mission::VisionSnapshot& vision) {
-    const auto& track = vision.target_track;
-    if (track.phase == mission::TargetTrackPhase::searching ||
-        !track.target_id.has_value()) {
-        return std::nullopt;
-    }
-
-    std::ostringstream detail;
-    detail << "TARGET ID " << *track.target_id;
-    if (track.phase == mission::TargetTrackPhase::acquiring) {
-        detail << "   |   ACQUIRING " << track.consecutive_observations << "/"
-               << track.required_observations;
-    } else {
-        detail << "   |   TRACKING";
-    }
-    if (track.observation_age_ms.has_value()) {
-        detail << std::fixed << std::setprecision(0) << "   |   AGE "
-               << *track.observation_age_ms << " MS";
+        detail << "   |   " << vision.latest_targets.size() << " OBJECTS";
     }
     return detail.str();
 }
 
 Tone vision_target_tone(const mission::VisionSnapshot& vision) {
-    if (vision.target_track.phase == mission::TargetTrackPhase::tracking) {
-        return Tone::good;
-    }
-    if (vision.target_track.phase == mission::TargetTrackPhase::acquiring) {
-        return Tone::waiting;
-    }
     return vision.latest_targets.empty() ? Tone::dim : Tone::good;
 }
 
@@ -829,10 +780,6 @@ void write_camera_and_vision(std::ostringstream& output,
         vision_pipeline_detail(*snapshot.vision),
         Tone::accent,
         use_color);
-    if (const auto status = vision_track_status_detail(*snapshot.vision);
-        status.has_value()) {
-        write_centered_line(output, *status, target_tone, use_color);
-    }
     write_centered_line(output,
         vision_target_detail(*snapshot.vision),
         target_tone,

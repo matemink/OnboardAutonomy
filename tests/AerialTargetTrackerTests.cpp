@@ -41,8 +41,8 @@ TargetObservation airplane(const double center_x,
             {.x_px = right, .y_px = bottom},
             {.x_px = left, .y_px = bottom},
         }},
-        .decision_margin = confidence,
-        .pose = std::nullopt,
+        .confidence_percent = confidence,
+
     };
 }
 
