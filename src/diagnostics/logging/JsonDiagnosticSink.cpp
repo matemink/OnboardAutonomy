@@ -119,8 +119,6 @@ std::string_view autonomy_phase_name(
         return "active";
     case AutonomyRuntimePhase::suspended:
         return "suspended";
-    case AutonomyRuntimePhase::landing:
-        return "landing";
     case AutonomyRuntimePhase::returning_to_launch:
         return "returning_to_launch";
     case AutonomyRuntimePhase::completed:
@@ -388,10 +386,6 @@ Json snapshot_json(const mission::AppSnapshot& snapshot,
     result["autonomy"] = {
         {"phase", autonomy_phase_name(snapshot.autonomy.phase)},
         {"detail", snapshot.autonomy.detail},
-        {"vision_landing_target_active",
-            snapshot.autonomy.vision_landing_target_active},
-        {"terminal_descent_active", snapshot.autonomy.terminal_descent_active},
-        {"land_attempt", snapshot.autonomy.land_attempt},
         {"aerial_yaw",
             {{"horizontal_error",
                  optional_number(snapshot.autonomy.aerial_horizontal_error)},
@@ -409,8 +403,6 @@ Json snapshot_json(const mission::AppSnapshot& snapshot,
                             .aerial_commanded_yaw_rate_degrees_per_second)}}},
     };
     result["motion_commands_allowed"] = snapshot.motion_commands_allowed;
-    result["precision_landing_available"] =
-        snapshot.precision_landing_available;
     result["aerial_tracking_available"] = snapshot.aerial_tracking_available;
     result["link_events"] = Json::array();
     for (const auto& event : snapshot.link_events) {

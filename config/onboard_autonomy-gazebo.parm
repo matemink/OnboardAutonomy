@@ -1,9 +1,5 @@
 # OnboardAutonomy SITL-only behavior.
-# Use MAVLink LANDING_TARGET from the production autonomy runtime.
-PLND_ENABLED 1
-PLND_TYPE 1
-PLND_STRICT 0
-PLND_EST_TYPE 0
+PLND_ENABLED 0
 
 # ArduPilot independently lands if the companion heartbeat disappears.
 # The companion runs as MAVLink system 1, component 191 in this setup.

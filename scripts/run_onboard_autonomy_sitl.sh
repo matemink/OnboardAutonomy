@@ -5,7 +5,6 @@ set -euo pipefail
 ONBOARD_AUTONOMY_BUILD_DIR="${ONBOARD_AUTONOMY_BUILD_DIR:-${HOME}/build/onboard_autonomy}"
 COMPANION="${ONBOARD_AUTONOMY_BUILD_DIR}/onboard_autonomy"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-project_dir="$(cd -- "${script_dir}/.." && pwd)"
 
 if [[ ! -x "${COMPANION}" ]]; then
     printf 'OnboardAutonomy is not built: %s\n' "${COMPANION}" >&2
@@ -55,18 +54,6 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
         --camera-preview-port
         "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
     )
-    if [[ "${ONBOARD_AUTONOMY_FIDUCIAL_LANDING:-0}" == "1" ||
-          ( "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" &&
-            "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" != "1" ) ]]; then
-        arguments+=(
-            --apriltag
-            --camera-calibration
-            "${project_dir}/config/gazebo-landing-camera-640x480.json"
-            --camera-extrinsics
-            "${project_dir}/config/gazebo-landing-camera-extrinsics.json"
-            --apriltag-size-mm 2000
-        )
-    fi
     if [[ -n "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-}" ]]; then
         arguments+=(
             --forward-camera-udp-port
@@ -83,12 +70,6 @@ fi
 
 if [[ "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" == "1" ]]; then
     arguments+=(--aerial-observation)
-elif [[ "${ONBOARD_AUTONOMY_AUTONOMOUS:-0}" == "1" ]]; then
-    arguments+=(--autonomous)
-fi
-
-if [[ "${ONBOARD_AUTONOMY_EXIT_AFTER_AUTONOMY:-0}" == "1" ]]; then
-    arguments+=(--exit-after-autonomy)
 fi
 
 if [[ "${ONBOARD_AUTONOMY_JSON:-0}" == "1" ]]; then

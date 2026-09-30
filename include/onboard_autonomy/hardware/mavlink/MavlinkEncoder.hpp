@@ -74,11 +74,5 @@ std::vector<std::uint8_t> encode_local_position_target(
     double down_m,
     std::uint8_t component_id = kCompanionComponentId);
 
-std::vector<std::uint8_t> encode_landing_target(std::uint8_t vehicle_system_id,
-    std::uint64_t time_usec,
-    double forward_m,
-    double right_m,
-    double down_m,
-    std::uint8_t component_id = kCompanionComponentId);
 
 } // namespace onboard_autonomy::hardware::mavlink

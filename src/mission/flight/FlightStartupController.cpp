@@ -60,7 +60,6 @@ std::string action_name(const FlightAction action) {
         return "RTL";
     case FlightAction::land:
         return "land";
-    case FlightAction::landing_target:
         return "landing target";
     case FlightAction::condition_yaw:
         return "yaw";

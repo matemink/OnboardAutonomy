@@ -28,11 +28,6 @@ void handle_signal(int) {
     keep_running = 0;
 }
 
-bool terminal_phase(const mission::AutonomyRuntimePhase phase) {
-    return phase == mission::AutonomyRuntimePhase::completed ||
-           phase == mission::AutonomyRuntimePhase::failed;
-}
-
 } // namespace
 
 CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
@@ -74,12 +69,11 @@ int CompanionRunner::run() {
 
         const auto snapshot = application_.snapshot(now);
         publish_snapshot(snapshot);
-        update_terminal_state(snapshot);
         next_snapshot_ = now + snapshot_interval_;
         std::this_thread::sleep_for(kEventLoopSleep);
     }
 
-    return autonomy_failed_ ? 2 : 0;
+    return 0;
 }
 
 void CompanionRunner::handle_runtime_commands() {
@@ -88,12 +82,7 @@ void CompanionRunner::handle_runtime_commands() {
     }
     while (const auto command = command_source_->poll()) {
         const auto command_time = std::chrono::steady_clock::now();
-        if (*command == RuntimeCommand::start_precision_landing) {
-            static_cast<void>(application_.request_autonomy_start(
-                mission::AutonomyRuntimeMode::precision_landing,
-                command_time));
-            next_snapshot_ = command_time;
-        } else if (*command == RuntimeCommand::start_aerial_tracking) {
+        if (*command == RuntimeCommand::start_aerial_tracking) {
             static_cast<void>(application_.request_autonomy_start(
                 mission::AutonomyRuntimeMode::aerial_observation,
                 command_time));
@@ -162,18 +151,6 @@ void CompanionRunner::publish_snapshot(
             sink->consume(snapshot, recorded_at);
         }
     }
-}
-
-void CompanionRunner::update_terminal_state(
-    const mission::AppSnapshot& snapshot) {
-    if (!options_.exit_after_autonomy ||
-        !terminal_phase(snapshot.autonomy.phase)) {
-        return;
-    }
-
-    autonomy_failed_ =
-        snapshot.autonomy.phase == mission::AutonomyRuntimePhase::failed;
-    keep_running = 0;
 }
 
 } // namespace onboard_autonomy::bootstrap

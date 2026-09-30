@@ -16,8 +16,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
-from autonomy_sitl_acceptance import wait_for_gazebo_camera
-from sitl_harness import ProcessSupervisor, require_available_port
+from sitl_harness import (
+    ProcessSupervisor,
+    require_available_port,
+    wait_for_gazebo_camera,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PORT = 14550
@@ -122,7 +125,7 @@ def snapshot_records_link_loss(snapshot: dict[str, object]) -> bool:
         snapshot.get("connected") is False
         and isinstance(autonomy, dict)
         and autonomy.get("phase") == "failed"
-        and "heartbeat was lost" in str(autonomy.get("detail", ""))
+        and "heartbeat" in str(autonomy.get("detail", ""))
     )
 
 
@@ -383,6 +386,8 @@ def run_acceptance(
         (RELAY_PORT, socket.SOCK_DGRAM),
         (MONITOR_PORT, socket.SOCK_DGRAM),
         (CAMERA_PORT, socket.SOCK_DGRAM),
+        (5602, socket.SOCK_DGRAM),
+        (8089, socket.SOCK_STREAM),
     ):
         require_available_port(port, kind)
 
@@ -404,7 +409,7 @@ def run_acceptance(
             "w", encoding="utf-8"
         ) as gazebo_log:
             gazebo = subprocess.Popen(
-                ["bash", "scripts/run_gazebo_apriltag.sh"],
+                ["bash", "scripts/run_gazebo_camera.sh"],
                 cwd=PROJECT_ROOT,
                 stdout=gazebo_log,
                 stderr=subprocess.STDOUT,
@@ -449,14 +454,9 @@ def run_acceptance(
             "--camera-udp-port", str(CAMERA_PORT),
             "--camera-width", "640",
             "--camera-height", "480",
-            "--apriltag",
-            "--camera-calibration",
-            str(PROJECT_ROOT / "config/gazebo-landing-camera-640x480.json"),
-            "--apriltag-size-mm", "2000",
-            "--camera-extrinsics",
-            str(PROJECT_ROOT / "config/gazebo-landing-camera-extrinsics.json"),
-            "--autonomous",
-            "--exit-after-autonomy",
+            "--camera-preview", "--camera-preview-port", "8089",
+            "--forward-camera-udp-port", "5602",
+            "--aerial-observation",
             "--json",
         ]
         with (artifacts / "companion.stderr.log").open(

@@ -20,7 +20,7 @@ readonly -a command_patterns=(
     'scripts/run_arduplane_skywalker_x8'
     'scripts/run_arducopter_gazebo'
     'scripts/run_gazebo_fixed_wing'
-    'scripts/run_gazebo_apriltag'
+    'scripts/run_gazebo_camera'
     'scripts/run_gazebo_gui.sh'
     'scripts/run_gazebo_iris.sh'
     'scripts/run_onboard_autonomy_gazebo'

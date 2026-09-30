@@ -35,12 +35,6 @@ struct GStreamerCameraOptions {
 
 using CameraSourceOptions = std::variant<RpicamOptions, GStreamerCameraOptions>;
 
-struct AprilTagOptions {
-    std::string calibration_file;
-    std::string extrinsics_file;
-    std::optional<double> tag_size_m;
-};
-
 struct CameraPreviewOptions {
     std::uint16_t port{defaults::kCameraPreviewPort};
 };
@@ -54,18 +48,15 @@ struct CameraOptions {
     CameraSourceOptions source{RpicamOptions{}};
     std::uint32_t frame_width{defaults::kCameraFrameWidth};
     std::uint32_t frame_height{defaults::kCameraFrameHeight};
-    std::optional<AprilTagOptions> apriltag;
 };
 
 enum class AutonomyMode {
-    precision_landing,
     aerial_observation,
 };
 
 struct AutonomyOptions {
     bool enabled{};
-    AutonomyMode mode{AutonomyMode::precision_landing};
-    bool exit_when_finished{};
+    AutonomyMode mode{AutonomyMode::aerial_observation};
 };
 
 struct OperatorInterfaceOptions {

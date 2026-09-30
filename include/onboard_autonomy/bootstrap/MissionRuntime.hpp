@@ -48,15 +48,8 @@ struct GStreamerMissionSource {
 using MissionCameraSource =
     std::variant<RpicamMissionSource, GStreamerMissionSource>;
 
-struct AprilTagMissionConfig {
-    std::string calibration_file;
-    std::string extrinsics_file;
-    std::optional<double> tag_size_m;
-};
-
 struct MissionCameraConfig {
     MissionCameraSource source;
-    std::optional<AprilTagMissionConfig> apriltag;
     std::uint32_t frame_width{};
     std::uint32_t frame_height{};
 };
@@ -70,7 +63,7 @@ struct MissionRuntimeConfig {
     bool start_automatically{true};
     bool aerial_tracking_allowed{false};
     mission::AutonomyRuntimeMode autonomy_mode{
-        mission::AutonomyRuntimeMode::precision_landing};
+        mission::AutonomyRuntimeMode::aerial_observation};
     bool motion_commands_requested{};
 };
 

@@ -41,12 +41,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-FetchContent_Declare(
-    apriltag_source
-    GIT_REPOSITORY https://github.com/AprilRobotics/apriltag.git
-    GIT_TAG 94be783968e5091bcc9972c72c84fd63efce2935
-    GIT_SHALLOW FALSE
-)
 
 FetchContent_Declare(
     cpp_httplib_source
@@ -58,22 +52,6 @@ FetchContent_GetProperties(cpp_httplib_source)
 if(NOT cpp_httplib_source_POPULATED)
     FetchContent_Populate(cpp_httplib_source)
 endif()
-FetchContent_GetProperties(apriltag_source)
-if(NOT apriltag_source_POPULATED)
-    FetchContent_Populate(apriltag_source)
-    set(BUILD_SHARED_LIBS OFF)
-    set(BUILD_EXAMPLES OFF)
-    set(BUILD_PYTHON_WRAPPER OFF)
-    set(onboard_autonomy_build_testing_before_apriltag ${BUILD_TESTING})
-    set(BUILD_TESTING OFF)
-    add_subdirectory(
-        ${apriltag_source_SOURCE_DIR}
-        ${apriltag_source_BINARY_DIR}
-        EXCLUDE_FROM_ALL
-    )
-    set(BUILD_TESTING ${onboard_autonomy_build_testing_before_apriltag})
-endif()
-
 add_library(onboard_autonomy_public_headers INTERFACE)
 target_include_directories(
     onboard_autonomy_public_headers
@@ -107,7 +85,6 @@ endfunction()
 add_library(
     onboard_autonomy_mission_types
     src/mission/cv/calibration/CameraCalibration.cpp
-    src/mission/cv/extrinsics/TargetTransform.cpp
     src/mission/flight/VehicleState.cpp
 )
 target_link_libraries(
@@ -162,7 +139,6 @@ onboard_autonomy_enable_warnings(onboard_autonomy_hardware_camera)
 
 add_library(
     onboard_autonomy_mission_cv_detection
-    src/mission/cv/detection/AprilTagTargetDetector.cpp
     src/mission/cv/detection/CameraGeometry.cpp
     src/mission/cv/detection/OpenCvDnnTargetDetector.cpp
     src/mission/cv/detection/YoloXImagePreprocessor.cpp
@@ -172,8 +148,6 @@ target_link_libraries(
     onboard_autonomy_mission_cv_detection
     PUBLIC
         onboard_autonomy_mission_target_detector_port
-    PRIVATE
-        apriltag
 )
 if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
     target_compile_definitions(
@@ -189,17 +163,11 @@ if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
         SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS}
     )
 endif()
-target_include_directories(
-    onboard_autonomy_mission_cv_detection
-    SYSTEM PRIVATE
-        ${apriltag_source_SOURCE_DIR}
-)
 onboard_autonomy_enable_warnings(onboard_autonomy_mission_cv_detection)
 
 add_library(
     onboard_autonomy_mission_cv_geometry
     src/mission/cv/calibration/CameraCalibrationLoader.cpp
-    src/mission/cv/extrinsics/CameraExtrinsicsLoader.cpp
 )
 target_link_libraries(
     onboard_autonomy_mission_cv_geometry
@@ -279,14 +247,11 @@ add_library(
     src/mission/cv/AsyncCameraMonitor.cpp
     src/mission/cv/CameraMonitor.cpp
     src/mission/safety/CompanionLinkFailsafe.cpp
-    src/mission/autonomy/DecisionEngine.cpp
     src/mission/flight/FlightStartupController.cpp
     src/mission/safety/MotionSafetyPolicy.cpp
-    src/mission/safety/SafetySupervisor.cpp
     src/mission/cv/tracking/AerialTargetTracker.cpp
     src/mission/cv/tracking/TargetTracker.cpp
     src/mission/cv/VisionMonitor.cpp
-    src/mission/autonomy/WorldState.cpp
     src/mission/CompanionApplication.cpp
 )
 target_link_libraries(
@@ -314,7 +279,6 @@ target_link_libraries(
     PRIVATE
         onboard_autonomy_mission_cv_detection
         onboard_autonomy_hardware_camera
-        onboard_autonomy_mission_cv_geometry
         onboard_autonomy_hardware_transport
 )
 onboard_autonomy_enable_warnings(onboard_autonomy_mission_runtime)
@@ -392,11 +356,6 @@ install(
     RENAME ArduPilot-COPYING.txt
 )
 install(
-    FILES ${apriltag_source_SOURCE_DIR}/LICENSE.md
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OnboardAutonomy
-    RENAME AprilTag-LICENSE.md
-)
-install(
     FILES ${cpp_httplib_source_SOURCE_DIR}/LICENSE
     DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OnboardAutonomy
     RENAME cpp-httplib-LICENSE
@@ -417,15 +376,8 @@ install(
 )
 install(
     FILES
-        assets/apriltag/tagStandard41h12-id0-90mm-a4.svg
-        assets/apriltag/tagStandard41h12-id0-90mm-a4-300dpi.png
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/onboard_autonomy
-)
-install(
-    FILES
         config/camera-module-3-wide-640x480.json
-        config/gazebo-landing-camera-640x480.json
-        config/gazebo-landing-camera-extrinsics.json
+        config/gazebo-camera-640x480.json
     DESTINATION ${CMAKE_INSTALL_DATADIR}/onboard_autonomy
 )
 
@@ -436,7 +388,6 @@ if(BUILD_TESTING)
         onboard_autonomy_tests
         tests/CompanionApplicationTests.cpp
         tests/JsonDiagnosticSinkTests.cpp
-        tests/AutonomyCoreTests.cpp
         tests/AutonomyRuntimeTests.cpp
         tests/AerialTargetTrackerTests.cpp
         tests/AerialYawControllerTests.cpp
@@ -446,7 +397,6 @@ if(BUILD_TESTING)
         tests/CommandLineTests.cpp
         tests/CompanionLinkFailsafeTests.cpp
         tests/CameraCalibrationLoaderTests.cpp
-        tests/CameraExtrinsicsLoaderTests.cpp
         tests/VisionMonitorTests.cpp
         tests/ConsoleViewTests.cpp
         tests/MavlinkDecoderTests.cpp
@@ -454,7 +404,6 @@ if(BUILD_TESTING)
         tests/MotionSafetyPolicyTests.cpp
         tests/TelemetryStreamConfiguratorTests.cpp
         tests/TargetTrackerTests.cpp
-        tests/TargetTransformTests.cpp
         tests/TransportTests.cpp
         tests/VehicleStateTests.cpp
         tests/YoloXImagePreprocessorTests.cpp
@@ -479,18 +428,12 @@ if(BUILD_TESTING)
             onboard_autonomy_diagnostics_logging
             onboard_autonomy_hardware_transport
             onboard_autonomy_mission_transport_port
-            apriltag
             nlohmann_json::nlohmann_json
     )
     target_compile_definitions(
         onboard_autonomy_tests
         PRIVATE
             ONBOARD_AUTONOMY_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
-    )
-    target_include_directories(
-        onboard_autonomy_tests
-        SYSTEM PRIVATE
-            ${apriltag_source_SOURCE_DIR}
     )
     onboard_autonomy_enable_warnings(onboard_autonomy_tests)
     add_test(NAME onboard_autonomy_tests COMMAND onboard_autonomy_tests)

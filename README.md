@@ -4,77 +4,61 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg)](https://isocpp.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20ARM64-FCC624.svg)](https://www.raspberrypi.com/)
 
-OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs. Its
-primary simulation scenario detects an airborne object with a forward camera,
-maintains a stable visual lock, and sends supervised yaw guidance over MAVLink.
-The same runtime also runs observation-only on a Raspberry Pi 5 with a Pixhawk
-6C.
+OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs.
+It brings together MAVLink telemetry, camera capture, operator diagnostics,
+and fault recovery. The physical Raspberry Pi 5 / Pixhawk 6C bench runs in
+observation mode. Automated motion is restricted to explicitly configured SITL.
 
-## Demo
+## Runtime
 
-- **Fiducial landing validation** (`39 s`) - a deterministic end-to-end test of
-  takeoff, visual guidance, and landing.
-  [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=rsuRYYDfZZI)
-- **Wind-disturbance validation** (`36 s`) - the fiducial scenario under severe
-  simulated gusts.
-  [![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=eqdRw3oofTI)
+- MAVLink 2 over UDP or Linux USB/UART, with controller identity filtering,
+  telemetry freshness, command acknowledgements, and bounded retries.
+- Independent camera streams through GStreamer or `rpicam-vid`, with automatic
+  recovery after producer failure or stalled frames.
+- Forward-camera OpenCV DNN / YOLOX processing and temporal observation tracking
+  in simulation.
+- Console status, JSONL diagnostics, and a browser camera preview.
+- ArduPilot-owned companion-link failsafe validation and explicit separation
+  between simulation and physical endpoints.
 
-## System overview
+ArduPilot owns stabilization, navigation, and flight control. The companion
+runtime observes its telemetry and runs the configured simulation workflow.
 
 ```mermaid
 flowchart LR
-    Camera["Camera Module 3"]
-
-    subgraph Pi["Raspberry Pi 5"]
-        Runtime["OnboardAutonomy"]
-    end
-
-    subgraph FC["Pixhawk 6C"]
-        Firmware["ArduPilot firmware"]
-    end
-
-    Camera --> Runtime
-    Runtime --> Firmware
-    Runtime --> SITL["ArduPilot SITL"]
-    SITL <--> Gazebo["Gazebo Harmonic"]
-
-    classDef hardware fill:#FFF3C4,stroke:#B7791F,color:#3D2C00,stroke-width:2px
-    classDef software fill:#DCEBFF,stroke:#2563EB,color:#0F2A52,stroke-width:2px
-    class Camera hardware
-    class Runtime,Firmware,SITL,Gazebo software
-    style Pi fill:#FFF8DE,stroke:#B7791F,stroke-width:2px,color:#3D2C00
-    style FC fill:#FFF8DE,stroke:#B7791F,stroke-width:2px,color:#3D2C00
+    Cameras --> Runtime[OnboardAutonomy]
+    Pixhawk[Pixhawk / ArduPilot] <--> Runtime
+    SITL[ArduPilot SITL] <--> Runtime
+    Gazebo --> Cameras
+    Gazebo <--> SITL
+    Runtime --> Console
+    Runtime --> Diagnostics[JSONL / camera preview]
 ```
 
-ArduPilot owns stabilization and flight control. OnboardAutonomy turns camera
-and telemetry data into supervised guidance for either SITL or a real Pixhawk.
+## Build and check
 
-## Highlights
+The verified development environment is Ubuntu 24.04 / WSL2; CI also builds
+natively on ARM64. Follow the [development runbook](docs/development.md) for
+system dependencies, then:
 
-- MAVLink 2 telemetry and acknowledged commands over SITL UDP or Linux
-  USB/UART serial transport.
-- SITL-only forward-object lock confirms spatial and temporal continuity,
-  then applies bounded yaw centering while the vehicle remains in GUIDED hold.
-- Transient controller-link recovery pauses stale yaw guidance, revalidates the
-  failsafe, and resumes tracking without restarting the mission.
-- Dual-camera YUV420/OpenCV processing with forward ONNX object detection.
-- Optional AprilTag-based precision landing remains as a deterministic
-  validation scenario with target-loss and link-loss fallbacks.
-- Automatic serial and camera recovery after disconnects or process stalls.
-- Motion is SITL-gated; physical endpoints remain observation-only. CI covers
-  C++ tests, Python integration and fault injection, plus a native ARM64 build.
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+PYTHONPATH=python python3 -m unittest discover -s python/tests -v
+ruff check python scripts
+```
 
-## Built and tested with
-
-- **Simulation:** ArduCopter SITL, Gazebo Harmonic, OpenCV, and GStreamer.
-- **Hardware:** Raspberry Pi 5, Camera Module 3 Wide, and Pixhawk 6C over USB
-  and TELEM2 UART.
-- **Evidence:** repeatable precision-landing runs, companion-link failsafe
-  injection, camera and serial recovery, and ARM runtime profiling.
+CMake fetches pinned dependencies. ONNX model weights are downloaded separately
+with `scripts/download_yolox_model.sh` and are not committed to the repository.
 
 ## Explore
 
-- [Architecture](docs/architecture.md)
-- [Run the Gazebo demo](docs/simulation.md)
-- [Hardware bench and evidence](docs/raspberry-pi-5-bench.md)
-- [Release status and verified scope](docs/release-status.md)
+- [Architecture and package responsibilities](docs/architecture.md)
+- [Gazebo camera simulation](docs/simulation.md)
+- [Raspberry Pi 5 hardware bench](docs/raspberry-pi-5-bench.md)
+- [Release status and evidence boundaries](docs/release-status.md)
+
+Historical hardware measurements identify their tested binary and workload;
+they do not automatically describe the current revision. CI covers C++ tests,
+Python integration and fault injection, static analysis, and native ARM64 builds.

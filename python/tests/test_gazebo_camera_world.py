@@ -4,22 +4,12 @@ import unittest
 import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
-import cv2
-import numpy as np
-
 PROJECT_ROOT = Path(__file__).parents[2]
 CAMERA_MODEL = (
     PROJECT_ROOT
     / "simulation"
     / "models"
-    / "iris_with_landing_camera"
-    / "model.sdf"
-)
-PAD_MODEL = (
-    PROJECT_ROOT
-    / "simulation"
-    / "models"
-    / "apriltag_landing_pad"
+    / "iris_with_cameras"
     / "model.sdf"
 )
 GROUND_MODEL_DIR = (
@@ -33,31 +23,16 @@ WORLD = (
     PROJECT_ROOT
     / "simulation"
     / "worlds"
-    / "apriltag_landing.sdf"
+    / "camera_observation.sdf"
 )
 SHOWCASE_WORLD = (
     PROJECT_ROOT
     / "simulation"
     / "worlds"
-    / "apriltag_showcase.sdf"
+    / "camera_showcase.sdf"
 )
 CALIBRATION = (
-    PROJECT_ROOT / "config" / "gazebo-landing-camera-640x480.json"
-)
-SOURCE_TAG = (
-    PROJECT_ROOT
-    / "assets"
-    / "apriltag"
-    / "tagStandard41h12-id0.png"
-)
-TEXTURE = (
-    PROJECT_ROOT
-    / "simulation"
-    / "models"
-    / "apriltag_landing_pad"
-    / "materials"
-    / "textures"
-    / "tagStandard41h12-id0-quiet-zone.png"
+    PROJECT_ROOT / "config" / "gazebo-camera-640x480.json"
 )
 WEATHER_DEFAULTS = (
     PROJECT_ROOT / "config" / "onboard_autonomy-gazebo-weather.parm"
@@ -68,7 +43,7 @@ WEATHER_APP_SCRIPT = (
     / "run_onboard_autonomy_gazebo_weather_vision.sh"
 )
 WEATHER_GAZEBO_SCRIPT = (
-    PROJECT_ROOT / "scripts" / "run_gazebo_apriltag_weather.sh"
+    PROJECT_ROOT / "scripts" / "run_gazebo_camera_weather.sh"
 )
 WEATHER_PROFILE_LOADER = (
     PROJECT_ROOT / "scripts" / "weather_profile.sh"
@@ -122,7 +97,7 @@ SHAHED_ARDUPLANE_RUNNER = (
 CAMERA_PREVIEW_PAGE = PROJECT_ROOT / "assets" / "camera-preview" / "index.html"
 
 
-class GazeboAprilTagWorldTests(unittest.TestCase):
+class GazeboCameraWorldTests(unittest.TestCase):
     def test_analytic_calibration_matches_camera_sdf(self) -> None:
         model = element_tree.parse(CAMERA_MODEL).getroot()
         sensor = model.find(
@@ -159,13 +134,6 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         )
         self.assertEqual(document["distortion"]["coefficients"], [0.0] * 5)
 
-    def test_pad_geometry_has_a_two_metre_detection_span(self) -> None:
-        model = element_tree.parse(PAD_MODEL).getroot()
-        plane_size = model.findtext(".//visual/geometry/plane/size")
-        width_m, height_m = (float(value) for value in plane_size.split())
-
-        self.assertEqual((width_m, height_m), (4.4, 4.4))
-        self.assertAlmostEqual(width_m * 5.0 / 11.0, 2.0)
 
     def test_forward_camera_is_visible_and_streams_independently(self) -> None:
         model = element_tree.parse(CAMERA_MODEL).getroot()
@@ -198,27 +166,8 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertEqual(sensor.findtext("camera/image/width"), "640")
         self.assertEqual(sensor.findtext("camera/image/height"), "480")
 
-    def test_texture_preserves_the_pinned_tag_and_quiet_zone(self) -> None:
-        source = cv2.imread(str(SOURCE_TAG), cv2.IMREAD_GRAYSCALE)
-        texture = cv2.imread(str(TEXTURE), cv2.IMREAD_GRAYSCALE)
 
-        self.assertIsNotNone(source)
-        self.assertIsNotNone(texture)
-        self.assertEqual(source.shape, (9, 9))
-        self.assertEqual(texture.shape, (1100, 1100))
-
-        for cell_y in range(11):
-            for cell_x in range(11):
-                expected = 255
-                if 0 < cell_x < 10 and 0 < cell_y < 10:
-                    expected = int(source[cell_y - 1, cell_x - 1])
-                block = texture[
-                    cell_y * 100 : (cell_y + 1) * 100,
-                    cell_x * 100 : (cell_x + 1) * 100,
-                ]
-                self.assertTrue(np.all(block == expected))
-
-    def test_world_uses_project_camera_and_pad_models(self) -> None:
+    def test_world_uses_project_camera_models(self) -> None:
         world = element_tree.parse(WORLD).getroot()
         includes = {
             include.findtext("uri"): include
@@ -228,32 +177,13 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             set(includes),
             {
                 "model://lightweight_grass_ground",
-                "model://apriltag_landing_pad",
-                "model://iris_with_landing_camera",
+                "model://iris_with_cameras",
             },
         )
 
-        pad_pose = [
-            float(value)
-            for value in includes[
-                "model://apriltag_landing_pad"
-            ].findtext("pose").split()
-        ]
-        vehicle_pose = [
-            float(value)
-            for value in includes[
-                "model://iris_with_landing_camera"
-            ].findtext("pose").split()
-        ]
-        separation_m = math.hypot(
-            pad_pose[0] - vehicle_pose[0],
-            pad_pose[1] - vehicle_pose[1],
-        )
-
-        self.assertAlmostEqual(separation_m, 3.0)
         self.assertEqual(
             includes[
-                "model://iris_with_landing_camera"
+                "model://iris_with_cameras"
             ].findtext("name"),
             "Holybro_S500",
         )
@@ -338,7 +268,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             PROJECT_ROOT / "StartOnboardAutonomyGazeboShowcase.cmd"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "simulation/worlds/apriltag_landing.sdf",
+            "simulation/worlds/camera_observation.sdf",
             demo_launcher,
         )
         self.assertIn(
@@ -346,7 +276,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
             demo_launcher,
         )
         self.assertIn(
-            "simulation/worlds/apriltag_showcase.sdf",
+            "simulation/worlds/camera_showcase.sdf",
             showcase_launcher,
         )
 
@@ -459,8 +389,7 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
                 "model://shahed_136_arduplane",
             },
         )
-        self.assertNotIn("model://iris_with_landing_camera", includes)
-        self.assertNotIn("model://apriltag_landing_pad", includes)
+        self.assertNotIn("model://iris_with_cameras", includes)
         self.assertEqual(
             includes["model://skywalker_x8"].findtext("name"),
             "Skywalker_X8_ArduPlane",
@@ -528,8 +457,8 @@ class GazeboAprilTagWorldTests(unittest.TestCase):
         self.assertIn("ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT", gazebo_runner)
         self.assertIn("--forward-camera-udp-port", sitl_runner)
         self.assertIn("--aerial-observation", sitl_runner)
-        self.assertIn("ONBOARD_AUTONOMY_FIDUCIAL_LANDING", sitl_runner)
-        self.assertIn("ONBOARD_AUTONOMY_AUTONOMOUS", sitl_runner)
+        self.assertNotIn("ONBOARD_AUTONOMY_FIDUCIAL_LANDING", sitl_runner)
+        self.assertNotIn("ONBOARD_AUTONOMY_AUTONOMOUS", sitl_runner)
         self.assertNotIn(
             "ONBOARD_AUTONOMY_FIDUCIAL_LANDING=1",
             gazebo_runner,

@@ -51,10 +51,7 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     snapshot.autonomy.phase =
         onboard_autonomy::mission::AutonomyRuntimePhase::active;
     snapshot.autonomy.detail = "Autonomy active";
-    snapshot.autonomy.vision_landing_target_active = true;
-    snapshot.autonomy.terminal_descent_active = true;
     snapshot.motion_commands_allowed = true;
-    snapshot.precision_landing_available = true;
     snapshot.aerial_tracking_available = true;
     snapshot.vehicle.gps_ready = false;
     snapshot.vehicle.navigation_ready = true;
@@ -83,12 +80,9 @@ void snapshot_keeps_runtime_state_without_camera_data() {
     require(json.at("camera").is_null() && json.at("vision").is_null(),
         "missing camera and vision data must remain explicit nulls");
     require(json.at("flight_startup").at("phase") == "waiting_for_vehicle" &&
-                json.at("autonomy").at("phase") == "active" &&
-                json.at("autonomy").at("vision_landing_target_active") &&
-                json.at("autonomy").at("terminal_descent_active"),
+                json.at("autonomy").at("phase") == "active",
         "snapshot diagnostics must preserve mission runtime state");
     require(json.at("motion_commands_allowed") == true &&
-                json.at("precision_landing_available") == true &&
                 json.at("aerial_tracking_available") == true &&
                 json.at("navigation_ready") == true &&
                 json.at("gps_ready") == false &&
@@ -117,7 +111,7 @@ void snapshot_serializes_camera_and_metric_vision() {
         .latest_frame_age_ms = std::nullopt,
     };
     snapshot.vision = onboard_autonomy::mission::VisionSnapshot{
-        .detector = "AprilTag 3 / tagStandard41h12",
+        .detector = "synthetic detector",
         .processed_frames = 10,
         .frames_with_targets = 1,
         .total_targets = 1,
@@ -218,7 +212,7 @@ void transition_events_reconstruct_runtime_failures() {
     active.flight_startup.detail = "GUIDED command accepted";
     active.autonomy.phase =
         onboard_autonomy::mission::AutonomyRuntimePhase::active;
-    active.autonomy.detail = "precision landing active";
+    active.autonomy.detail = "aerial observation active";
     active.companion_link_failsafe.phase =
         onboard_autonomy::mission::CompanionLinkFailsafePhase::accepted;
     active.companion_link_failsafe.detail = "failsafe parameters accepted";

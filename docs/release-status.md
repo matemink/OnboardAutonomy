@@ -1,48 +1,31 @@
 # Release status
 
-OnboardAutonomy 1.0 is complete as a hardware-backed companion-computer
-prototype. Autonomous motion is verified in ArduPilot SITL with Gazebo;
-physical Raspberry Pi 5 and Pixhawk 6C testing remains deliberately
-observation-only until a legal and safe flight test is possible.
-
-## Delivered
-
-- C++20 runtime with MAVLink UDP, USB, and TELEM2 UART transports.
-- Readiness-gated startup, command acknowledgement, safety supervision, and
-  companion-link failsafe validation.
-- Gazebo forward-camera streaming, ONNX object detection, temporal target
-  locking, and adaptive yaw-rate centering through GStreamer and OpenCV.
-- Optional AprilTag pose estimation and vision-guided precision landing as a
-  deterministic validation scenario.
-- Raspberry Pi 5 deployment with Camera Module 3 Wide, `systemd`, bounded JSONL
-  logging, recovery after camera or serial loss, and runtime profiling.
-- Linux tests, Python integration and fault-injection tests, C++ static
-  analysis, and native ARM64 CI builds.
-- Architecture documentation and two short demonstration videos linked from
-  the project README.
-
-## Evidence
-
-- [Precision landing in SITL](evidence/precision-landing-sitl.md)
-- [Independent companion-link failsafe](evidence/companion-link-failsafe-sitl.md)
-- [Physical AprilTag scale](evidence/physical-apriltag-scale.md)
-- [Raspberry Pi runtime profile](evidence/raspberry-pi-runtime-profile.md)
-- [Serial recovery](evidence/serial-recovery.md)
-- [Pixhawk TELEM2 UART](evidence/uart-hardware.md)
+OnboardAutonomy is a companion-computer prototype with a Raspberry Pi 5 /
+Pixhawk 6C observation bench and ArduPilot SITL integration. Physical testing
+uses no automated motion. The build version is recorded in `CMakeLists.txt`.
 
 ## Current scope
 
-- ArduPilot owns stabilization, state estimation, arming, and low-level flight
-  control.
-- The forward-object demo receives only camera frames. It does not receive the
-  simulated target pose, infer range, pursue a target, or command a standoff
-  distance.
-- GPS supplies the current navigation estimate. Camera-based target tracking
-  does not replace vehicle localization.
-- Forward-object yaw tracking and the optional fiducial landing scenario are
-  verified in simulation; the physical bench verifies the compute, camera,
-  flight controller, and transport paths without propellers.
+- C++20 runtime, MAVLink UDP and Linux USB/UART transports.
+- Controller identity filtering, freshness-aware telemetry, acknowledged
+  commands, and automatic reconnect.
+- Independent camera capture, process recovery, browser preview, and JSONL logs.
+- Forward-camera OpenCV DNN observations and the existing simulation runtime.
+- Explicit SITL motion gate and ArduPilot-owned companion-link failsafe checks.
+- Linux C++ / Python tests, static analysis, and native ARM64 CI.
 
-There is no committed future-feature backlog. New work should start from a
-measured limitation and a dedicated GitHub issue with explicit acceptance
-criteria.
+Marker detection and marker-guided landing have been removed, including their
+CLI, protocol output, dependencies, assets, and acceptance harness. Ordinary
+ArduPilot LAND and RTL remain flight-controller operations.
+
+## Evidence
+
+- [Companion-link failsafe](evidence/companion-link-failsafe-sitl.md)
+- [Serial recovery](evidence/serial-recovery.md)
+- [Pixhawk TELEM2 UART](evidence/uart-hardware.md)
+- [Historical Raspberry Pi runtime profile](evidence/raspberry-pi-runtime-profile.md)
+
+Evidence documents record the setup they actually measured. The historical
+runtime profile includes a detector removed from the current workload; it
+requires a new measurement before being used as a current performance claim.
+Uncommitted development work and unrun flight experiments are not release evidence.

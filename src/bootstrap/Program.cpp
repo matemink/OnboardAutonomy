@@ -40,13 +40,6 @@ using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
 using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
 using RuntimeSnapshotSink = bootstrap::RuntimeSnapshotSink;
 
-mission::AutonomyRuntimeMode autonomy_runtime_mode(
-    const operator_interface::cli::AutonomyMode mode) {
-    return mode == operator_interface::cli::AutonomyMode::aerial_observation
-               ? mission::AutonomyRuntimeMode::aerial_observation
-               : mission::AutonomyRuntimeMode::precision_landing;
-}
-
 std::vector<std::string_view> command_line_arguments(const int argc,
     char** argv) {
     std::vector<std::string_view> arguments;
@@ -55,16 +48,6 @@ std::vector<std::string_view> command_line_arguments(const int argc,
         arguments.emplace_back(argv[index]);
     }
     return arguments;
-}
-
-const operator_interface::cli::AutonomyOptions& autonomy_options(
-    const operator_interface::cli::CommandLineOptions& options) {
-    return std::visit(
-        [](const auto& launch)
-            -> const operator_interface::cli::AutonomyOptions& {
-            return launch.autonomy;
-        },
-        options);
 }
 
 const operator_interface::cli::OperatorInterfaceOptions& operator_options(
@@ -143,17 +126,8 @@ std::optional<MissionCameraConfig> make_mission_camera(
         return std::nullopt;
     }
 
-    std::optional<AprilTagMissionConfig> apriltag;
-    if (configured->apriltag.has_value()) {
-        apriltag = AprilTagMissionConfig{
-            .calibration_file = configured->apriltag->calibration_file,
-            .extrinsics_file = configured->apriltag->extrinsics_file,
-            .tag_size_m = configured->apriltag->tag_size_m,
-        };
-    }
     return MissionCameraConfig{
         .source = make_mission_camera_source(configured->source),
-        .apriltag = std::move(apriltag),
         .frame_width = configured->frame_width,
         .frame_height = configured->frame_height,
     };
@@ -169,7 +143,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .autonomous = options.autonomy.enabled,
         .start_automatically = !options.operator_interface.interactive,
         .aerial_tracking_allowed = false,
-        .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
+        .autonomy_mode = mission::AutonomyRuntimeMode::aerial_observation,
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
     };
@@ -190,7 +164,7 @@ MissionRuntimeConfig make_mission_runtime_config(
         .start_automatically = !options.operator_interface.interactive,
         .aerial_tracking_allowed =
             options.diagnostics.forward_camera.has_value(),
-        .autonomy_mode = autonomy_runtime_mode(options.autonomy.mode),
+        .autonomy_mode = mission::AutonomyRuntimeMode::aerial_observation,
         .motion_commands_requested =
             options.autonomy.enabled || options.operator_interface.interactive,
     };
@@ -369,9 +343,6 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
 
     [[nodiscard]] std::optional<RuntimeCommand> poll() override {
         while (const auto key = input_.poll()) {
-            if (*key == '1') {
-                return RuntimeCommand::start_precision_landing;
-            }
             if (*key == '2') {
                 return RuntimeCommand::start_aerial_tracking;
             }
@@ -394,7 +365,6 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
 int run_program(const int argc, char** argv) {
     const auto options = operator_interface::cli::parse_command_line(
         command_line_arguments(argc, argv));
-    const auto& autonomy = autonomy_options(options);
     const auto& operator_interface = operator_options(options);
     const auto& diagnostics = diagnostics_options(options);
     const std::filesystem::path executable{argv[0]};
@@ -422,7 +392,6 @@ int run_program(const int argc, char** argv) {
 
     CompanionRunner runner{
         {
-            .exit_after_autonomy = autonomy.exit_when_finished,
             .snapshot_interval_ms = snapshot_interval_ms(operator_interface),
         },
         mission.application(),

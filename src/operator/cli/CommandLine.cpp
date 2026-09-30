@@ -22,11 +22,8 @@ enum class CameraBackend {
 
 // Temporary parser buffer. Only validated launch states leave this file.
 struct LaunchArgumentsDraft {
-    std::optional<double> apriltag_tag_size_m;
     std::string udp_bind{defaults::kUdpBindAddress};
     std::string serial_device;
-    std::string camera_calibration_file;
-    std::string camera_extrinsics_file;
     std::string board_types_file;
     std::string diagnostic_log_file;
     std::string forward_detector_model_file;
@@ -43,13 +40,11 @@ struct LaunchArgumentsDraft {
     std::uint16_t camera_udp_port{defaults::kCameraUdpPort};
     std::uint16_t camera_preview_port{defaults::kCameraPreviewPort};
     bool camera_enabled{};
-    bool apriltag_enabled{};
     bool camera_preview_enabled{};
     bool json_output{};
     bool sitl_mode{};
     bool autonomous{};
     bool aerial_observation{};
-    bool exit_after_autonomy{};
     bool interactive{};
 };
 
@@ -65,8 +60,6 @@ struct ExplicitOptions {
     bool camera_fps{false};
     bool camera_preview_port{false};
     bool diagnostic_log_file{false};
-    bool precision_landing{false};
-    bool aerial_observation{false};
 };
 
 template <typename T>
@@ -122,10 +115,7 @@ void validate_camera(const LaunchArgumentsDraft& options,
         explicit_options.camera_fps || explicit_options.camera_preview_port ||
         options.forward_camera_udp_port.has_value() ||
         !options.forward_detector_model_file.empty() ||
-        options.apriltag_enabled || options.camera_preview_enabled ||
-        !options.camera_calibration_file.empty() ||
-        !options.camera_extrinsics_file.empty() ||
-        options.apriltag_tag_size_m.has_value();
+        options.camera_preview_enabled;
     if (camera_setting_used && !options.camera_enabled) {
         throw std::invalid_argument(
             "camera, vision, and preview options require --camera");
@@ -186,50 +176,10 @@ void validate_camera(const LaunchArgumentsDraft& options,
     }
 }
 
-void validate_vision(const LaunchArgumentsDraft& options) {
-    if (!options.camera_enabled) {
-        return;
-    }
-    const bool has_calibration = !options.camera_calibration_file.empty();
-    if (has_calibration != options.apriltag_tag_size_m.has_value()) {
-        throw std::invalid_argument(
-            "--camera-calibration and --apriltag-size-mm must be "
-            "provided together");
-    }
-    if (has_calibration && !options.apriltag_enabled) {
-        throw std::invalid_argument(
-            "calibrated AprilTag pose requires --apriltag");
-    }
-    if (options.apriltag_tag_size_m.has_value() &&
-        (!std::isfinite(*options.apriltag_tag_size_m) ||
-            *options.apriltag_tag_size_m <= 0.0)) {
-        throw std::invalid_argument(
-            "--apriltag-size-mm must be finite and positive");
-    }
-    const bool has_extrinsics = !options.camera_extrinsics_file.empty();
-    if (has_extrinsics && !has_calibration) {
-        throw std::invalid_argument(
-            "--camera-extrinsics requires calibrated AprilTag pose");
-    }
-    if (options.autonomous && !options.aerial_observation && !has_extrinsics) {
-        throw std::invalid_argument(
-            "--autonomous requires --camera-extrinsics");
-    }
-}
-
 void validate_options(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
     if (options.snapshot_interval_ms == 0) {
         throw std::invalid_argument("--snapshot-ms must be positive");
-    }
-    if (options.exit_after_autonomy && !options.autonomous) {
-        throw std::invalid_argument(
-            "--exit-after-autonomy requires --autonomous");
-    }
-    if (explicit_options.precision_landing &&
-        explicit_options.aerial_observation) {
-        throw std::invalid_argument(
-            "--autonomous and --aerial-observation are mutually exclusive");
     }
     if (options.aerial_observation && !options.sitl_mode) {
         throw std::invalid_argument("--aerial-observation requires --sitl");
@@ -238,10 +188,6 @@ void validate_options(const LaunchArgumentsDraft& options,
         !options.forward_camera_udp_port.has_value()) {
         throw std::invalid_argument(
             "--aerial-observation requires --forward-camera-udp-port");
-    }
-    if (options.aerial_observation && options.exit_after_autonomy) {
-        throw std::invalid_argument(
-            "--exit-after-autonomy is unavailable for aerial observation");
     }
     if (options.interactive && options.json_output) {
         throw std::invalid_argument(
@@ -273,7 +219,6 @@ void validate_options(const LaunchArgumentsDraft& options,
     }
     validate_transport(options, explicit_options);
     validate_camera(options, explicit_options);
-    validate_vision(options);
 }
 
 MavlinkConnectionOptions make_connection_options(
@@ -308,20 +253,10 @@ std::optional<CameraOptions> make_camera_options(
         return std::nullopt;
     }
 
-    std::optional<AprilTagOptions> apriltag;
-    if (draft.apriltag_enabled) {
-        apriltag = AprilTagOptions{
-            .calibration_file = draft.camera_calibration_file,
-            .extrinsics_file = draft.camera_extrinsics_file,
-            .tag_size_m = draft.apriltag_tag_size_m,
-        };
-    }
-
     return CameraOptions{
         .source = make_camera_source_options(draft),
         .frame_width = draft.camera_width,
         .frame_height = draft.camera_height,
-        .apriltag = std::move(apriltag),
     };
 }
 
@@ -330,9 +265,7 @@ CommandLineOptions make_command_line_options(
     auto camera = make_camera_options(draft);
     const AutonomyOptions autonomy{
         .enabled = draft.autonomous,
-        .mode = draft.aerial_observation ? AutonomyMode::aerial_observation
-                                         : AutonomyMode::precision_landing,
-        .exit_when_finished = draft.exit_after_autonomy,
+        .mode = AutonomyMode::aerial_observation,
     };
     const OperatorInterfaceOptions operator_interface{
         .interactive = draft.interactive,
@@ -466,16 +399,6 @@ class ArgumentParser {
             draft_.camera_fps =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.camera_fps = true;
-        } else if (argument == "--apriltag") {
-            draft_.apriltag_enabled = true;
-        } else if (argument == "--camera-calibration") {
-            draft_.camera_calibration_file = value_after(argument);
-        } else if (argument == "--camera-extrinsics") {
-            draft_.camera_extrinsics_file = value_after(argument);
-        } else if (argument == "--apriltag-size-mm") {
-            draft_.apriltag_tag_size_m =
-                parse_number<double>(value_after(argument), argument) /
-                defaults::kMillimetresPerMetre;
         } else if (argument == "--camera-preview") {
             draft_.camera_preview_enabled = true;
         } else if (argument == "--camera-preview-port") {
@@ -519,15 +442,9 @@ class ArgumentParser {
                 .turbulence_m_s =
                     parse_number<double>(value_after(argument), argument),
             };
-        } else if (argument == "--autonomous") {
-            draft_.autonomous = true;
-            explicit_.precision_landing = true;
         } else if (argument == "--aerial-observation") {
             draft_.autonomous = true;
             draft_.aerial_observation = true;
-            explicit_.aerial_observation = true;
-        } else if (argument == "--exit-after-autonomy") {
-            draft_.exit_after_autonomy = true;
         } else if (argument == "--interactive") {
             draft_.interactive = true;
         } else {
@@ -544,7 +461,7 @@ class ArgumentParser {
         if (argument == "--scenario" || argument == "--demo-flight" ||
             argument == "--exit-after-scenario") {
             throw std::invalid_argument(
-                std::string(argument) + " was removed; use --autonomous");
+                std::string(argument) + " was removed; use --aerial-observation");
         }
         throw std::invalid_argument(
             "Unknown argument: " + std::string(argument));

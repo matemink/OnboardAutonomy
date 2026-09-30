@@ -3,7 +3,7 @@
 This procedure validates ARM64 Linux deployment and physical MAVLink
 communication without running motors. OnboardAutonomy may request telemetry
 message rates, but the serial hardware mode cannot start ARM, TAKEOFF,
-LAND or autonomous precision-landing behavior.
+automated flight behavior.
 
 ## Safety
 
@@ -238,7 +238,7 @@ Expected behavior:
   `/dev/serial/by-id/...` path because `/dev/ttyACM0` can be renumbered after
   reconnecting USB.
 - `camera.phase` changes from `starting` to `streaming`.
-- On the verified Pi 5 and IMX708 Wide setup, the runtime sustained
+- In the historical Pi 5 and IMX708 Wide benchmark, the runtime sustained
   `30.013 FPS` with zero processing drops and approximately `10 ms`
 sensor-to-application latency.
 
@@ -249,8 +249,7 @@ http://companionpi.local:8080/
 ```
 
 The page reconstructs RGB from the exact I420 frame received by the runtime
-and overlays only confirmed targets. The AprilTag detector intentionally uses
-the same frame's Y plane. It is unauthenticated HTTP intended for
+from the camera capture stream. It is unauthenticated HTTP intended for
 the local trusted bench network. Disable it with:
 
 ```bash

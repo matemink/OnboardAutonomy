@@ -6,6 +6,11 @@ and GNU build ID `a8b8406efac2fd7dbbef33beb9ba7e358f013c66`. The final package
 containing the identical binary has SHA-256
 `cb7a40bc405272c8e75cee71b2b72432734d7485ed4408815a046c0a554cf4a4`.
 
+This is a historical measurement of the binary identified above. Its marker
+detector has since been removed; these numbers are not a benchmark of the
+current camera-only hardware runtime. A new measurement is required before
+claiming current CPU or memory usage.
+
 ## Workload
 
 The 60-second process-group profile ran the complete hardware runtime on a

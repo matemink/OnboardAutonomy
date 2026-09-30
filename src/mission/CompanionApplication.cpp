@@ -158,8 +158,6 @@ std::string flight_action_name(const FlightAction action) {
         return "RTL";
     case FlightAction::land:
         return "LAND";
-    case FlightAction::landing_target:
-        return "LANDING_TARGET";
     case FlightAction::condition_yaw:
         return "YAW";
     case FlightAction::yaw_rate:
@@ -174,8 +172,6 @@ std::string flight_action_message_name(const FlightAction action) {
     switch (action) {
     case FlightAction::invalid:
         return "INVALID";
-    case FlightAction::landing_target:
-        return "LANDING_TARGET";
     case FlightAction::yaw_rate:
     case FlightAction::yaw_target:
         return "SET_POSITION_TARGET_LOCAL_NED";
@@ -192,7 +188,6 @@ std::string flight_action_message_name(const FlightAction action) {
 
 bool action_expects_ack(const FlightAction action) {
     return action != FlightAction::invalid &&
-           action != FlightAction::landing_target &&
            action != FlightAction::yaw_rate &&
            action != FlightAction::yaw_target;
 }
@@ -221,12 +216,6 @@ std::string flight_action_detail(const FlightActionRequest& request) {
     case FlightAction::land:
         detail = "LAND MODE";
         break;
-    case FlightAction::landing_target: {
-        std::ostringstream target;
-        target << std::fixed << std::setprecision(1) << "F/R/D " << request.x_m
-               << "/" << request.y_m << "/" << request.z_m << " M";
-        return target.str();
-    }
     case FlightAction::condition_yaw: {
         std::ostringstream yaw;
         yaw << std::fixed << std::setprecision(1)
@@ -302,13 +291,6 @@ std::vector<std::uint8_t> encode_flight_action(
     case FlightAction::land:
         return hardware::mavlink::encode_land(request.vehicle_system_id,
             request.confirmation);
-    case FlightAction::landing_target:
-        return hardware::mavlink::encode_landing_target(
-            request.vehicle_system_id,
-            request.time_usec,
-            request.x_m,
-            request.y_m,
-            request.z_m);
     case FlightAction::condition_yaw:
         return hardware::mavlink::encode_condition_yaw(
             request.vehicle_system_id,
@@ -340,7 +322,6 @@ class CompanionApplication::Impl {
           simulated_wind_(options.simulated_wind),
           flight_startup_(options.flight_startup),
           autonomy_runtime_(options.autonomy_runtime),
-          camera_extrinsics_(options.camera_extrinsics),
           decoder_{
               vehicle_state_,
               [this](const hardware::mavlink::CommandAck& acknowledgement,
@@ -446,19 +427,6 @@ class CompanionApplication::Impl {
                 options.target_detector);
         } else if (options.target_detector != nullptr) {
             throw std::invalid_argument("vision requires a camera source");
-        }
-        if (camera_extrinsics_.has_value() &&
-            options.target_detector == nullptr) {
-            throw std::invalid_argument(
-                "camera extrinsics require AprilTag pose detection");
-        }
-        const bool precision_landing_enabled =
-            options.autonomy_runtime.enabled &&
-            options.autonomy_runtime.mode ==
-                AutonomyRuntimeMode::precision_landing;
-        if (precision_landing_enabled && !camera_extrinsics_.has_value()) {
-            throw std::invalid_argument(
-                "autonomy runtime requires vision guidance");
         }
     }
 
@@ -646,7 +614,6 @@ class CompanionApplication::Impl {
             flight_startup_.snapshot(),
             companion_link_failsafe_.snapshot(),
             now,
-            current_landing_target(now),
             aerial_target_tracker_.snapshot(now));
         for (const auto& action : autonomy_actions) {
             send_flight_action(action, now, false);
@@ -695,16 +662,6 @@ class CompanionApplication::Impl {
             return false;
         }
 
-        if (mode == AutonomyRuntimeMode::precision_landing &&
-            !camera_extrinsics_.has_value()) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "PRECISION LANDING REQUIRES CAMERA EXTRINSICS",
-                now);
-            return false;
-        }
-
         const auto vehicle = vehicle_state_.snapshot(now);
         if (!vehicle.connected || !vehicle.system_id.has_value()) {
             record_event(LinkEventDirection::outbound,
@@ -748,9 +705,7 @@ class CompanionApplication::Impl {
         record_event(LinkEventDirection::outbound,
             LinkEventStatus::pending,
             "START",
-            mode == AutonomyRuntimeMode::aerial_observation
-                ? "SHAHED-136 VISUAL TRACKING REQUESTED"
-                : "APRILTAG LANDING REQUESTED",
+            "AERIAL OBSERVATION REQUESTED",
             now);
         return true;
     }
@@ -834,7 +789,6 @@ class CompanionApplication::Impl {
             .flight_startup = flight_startup_.snapshot(),
             .autonomy = autonomy_runtime_.snapshot(),
             .motion_commands_allowed = motion_commands_allowed_,
-            .precision_landing_available = camera_extrinsics_.has_value(),
             .aerial_tracking_available = aerial_tracking_allowed_,
             .link_events =
                 {
@@ -869,26 +823,6 @@ class CompanionApplication::Impl {
     }
 
   private:
-    [[nodiscard]] std::optional<mission::BodyFramePosition>
-    current_landing_target(const mission::TimePoint now) const {
-        if (!camera_monitor_.has_value() || !camera_extrinsics_.has_value()) {
-            return std::nullopt;
-        }
-
-        const auto vision = camera_monitor_->vision_snapshot(now);
-        if (!vision.has_value() ||
-            vision->target_track.phase != TargetTrackPhase::tracking ||
-            !vision->target_track.position.has_value() ||
-            !vision->target_track.observation_age_ms.has_value() ||
-            *vision->target_track.observation_age_ms >
-                kMaximumLandingTargetAge.count()) {
-            return std::nullopt;
-        }
-
-        return mission::camera_to_body_frd(*vision->target_track.position,
-            *camera_extrinsics_);
-    }
-
     void record_event(const LinkEventDirection direction,
         const LinkEventStatus status,
         std::string label,
@@ -1034,8 +968,6 @@ class CompanionApplication::Impl {
         std::chrono::seconds(10);
     static constexpr auto kAutopilotVersionRetryInterval =
         std::chrono::seconds(2);
-    static constexpr auto kMaximumLandingTargetAge =
-        std::chrono::milliseconds(250);
     static constexpr std::size_t kMaximumLinkEvents = 8;
 
     ports::Transport& transport_;
@@ -1050,7 +982,6 @@ class CompanionApplication::Impl {
     AutonomyRuntime autonomy_runtime_;
     AerialTargetTracker aerial_target_tracker_;
     std::optional<CameraMonitor> camera_monitor_;
-    std::optional<mission::CameraExtrinsics> camera_extrinsics_;
     hardware::mavlink::MavlinkDecoder decoder_;
     std::array<std::uint8_t, kTransportReceiveBufferSize> receive_buffer_{};
     mission::TimePoint next_heartbeat_{};

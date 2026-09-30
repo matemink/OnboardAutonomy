@@ -25,7 +25,6 @@ namespace onboard_autonomy::bootstrap {
 class RuntimeSnapshotSink;
 
 enum class RuntimeCommand {
-    start_precision_landing,
     start_aerial_tracking,
     return_to_launch,
     shutdown,
@@ -38,7 +37,6 @@ class RuntimeCommandSource {
 };
 
 struct CompanionRunnerOptions {
-    bool exit_after_autonomy{};
     std::uint32_t snapshot_interval_ms{};
 };
 
@@ -60,7 +58,6 @@ class CompanionRunner {
     void publish_downward_camera_frame();
     void publish_forward_camera_frame();
     void publish_snapshot(const mission::AppSnapshot& snapshot) const;
-    void update_terminal_state(const mission::AppSnapshot& snapshot);
 
     CompanionRunnerOptions options_;
     mission::CompanionApplication& application_;
@@ -70,7 +67,6 @@ class CompanionRunner {
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks_;
     std::chrono::milliseconds snapshot_interval_;
     std::chrono::steady_clock::time_point next_snapshot_;
-    bool autonomy_failed_{};
 };
 
 } // namespace onboard_autonomy::bootstrap

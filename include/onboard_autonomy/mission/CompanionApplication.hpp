@@ -3,7 +3,6 @@
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
 #include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
-#include "onboard_autonomy/mission/cv/extrinsics/TargetTransform.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -19,7 +18,6 @@ struct CompanionApplicationOptions {
     bool aerial_tracking_allowed{false};
     ports::CameraSource* camera_source{nullptr};
     ports::TargetDetector* target_detector{nullptr};
-    std::optional<mission::CameraExtrinsics> camera_extrinsics;
     std::optional<SimulatedWindProfile> simulated_wind;
 };
 

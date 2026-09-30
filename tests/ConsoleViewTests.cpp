@@ -114,14 +114,13 @@ void disconnected_snapshot_is_waiting() {
 void command_bus_shows_both_directions() {
     onboard_autonomy::mission::AppSnapshot snapshot;
     snapshot.motion_commands_allowed = true;
-    snapshot.precision_landing_available = true;
     snapshot.aerial_tracking_available = true;
     snapshot.flight_startup.phase =
         onboard_autonomy::mission::FlightStartupPhase::completed;
     snapshot.flight_startup.detail = "Takeoff complete";
     snapshot.autonomy.phase =
         onboard_autonomy::mission::AutonomyRuntimePhase::active;
-    snapshot.autonomy.detail = "Vision target F/R/D 0.4/-0.2/8.1 m";
+    snapshot.autonomy.detail = "TARGET SEARCHING 0.4/-0.2/8.1 m";
     snapshot.elapsed = std::chrono::milliseconds(1200);
     snapshot.tx_activity = onboard_autonomy::mission::LinkActivity{
         .sequence = 1,
@@ -151,8 +150,7 @@ void command_bus_shows_both_directions() {
     require(output.find("SET_MODE") != std::string::npos &&
                 output.find("ACCEPTED") != std::string::npos,
         "command and acknowledgement labels must be visible");
-    require(output.find("[1] FIDUCIAL LANDING (VALIDATION)") !=
-                    std::string::npos &&
+    require(output.find("FIDUCIAL LANDING") == std::string::npos &&
                 output.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=
                     std::string::npos &&
                 output.find("[R] ABORT MISSION + RTL") != std::string::npos &&
@@ -160,10 +158,9 @@ void command_bus_shows_both_directions() {
         "interactive command hints must be visible");
     require(output.find("AUTONOMY: ACTIVE") != std::string::npos &&
                 output.find("STARTUP: COMPLETE") != std::string::npos &&
-                output.find("Vision target F/R/D") != std::string::npos,
+                output.find("TARGET SEARCHING") != std::string::npos,
         "production startup and runtime state must be visible");
 
-    snapshot.precision_landing_available = false;
     const auto tracking_only =
         onboard_autonomy::operator_interface::ui::render_console(snapshot,
             "udp://127.0.0.1:14550",
@@ -271,7 +268,7 @@ void camera_pipeline_metrics_are_visible() {
 void vision_pipeline_and_target_are_visible() {
     onboard_autonomy::mission::AppSnapshot snapshot;
     snapshot.vision = onboard_autonomy::mission::VisionSnapshot{
-        .detector = "AprilTag 3 / tagStandard41h12",
+        .detector = "synthetic detector",
         .processed_frames = 42,
         .frames_with_targets = 3,
         .total_targets = 3,
@@ -321,7 +318,7 @@ void vision_pipeline_and_target_are_visible() {
         onboard_autonomy::operator_interface::ui::render_console(snapshot,
             "serial:///dev/ttyACM0?baud=115200",
             false);
-    require(output.find("VISION AprilTag 3 / tagStandard41h12") !=
+    require(output.find("VISION synthetic detector") !=
                     std::string::npos &&
                 output.find("4.8 MS AVG") != std::string::npos,
         "console must show the active vision detector");

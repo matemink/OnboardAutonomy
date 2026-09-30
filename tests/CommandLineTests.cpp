@@ -105,15 +105,7 @@ void camera_and_autonomy_dependencies_are_validated() {
         "5602",
         "--forward-detector-model",
         "model.onnx",
-        "--apriltag",
-        "--camera-calibration",
-        "camera.json",
-        "--apriltag-size-mm",
-        "2000",
-        "--camera-extrinsics",
-        "mount.json",
-        "--autonomous",
-        "--exit-after-autonomy",
+        "--aerial-observation",
     });
     const auto* simulation = std::get_if<SimulationLaunchOptions>(&gazebo);
     require(simulation != nullptr && simulation->camera.has_value() &&
@@ -123,8 +115,7 @@ void camera_and_autonomy_dependencies_are_validated() {
                 simulation->diagnostics.forward_camera->udp_port == 5602 &&
                 simulation->diagnostics.forward_camera->detector_model_file ==
                     "model.onnx" &&
-                simulation->autonomy.enabled &&
-                simulation->autonomy.exit_when_finished,
+                simulation->autonomy.enabled,
         "valid Gazebo autonomy group must parse");
 
     require_rejected({"--camera-source", "gstreamer"}, "require --camera");
@@ -132,7 +123,7 @@ void camera_and_autonomy_dependencies_are_validated() {
         {"--camera", "--camera-source", "gstreamer", "--camera-fps", "30"},
         "available only");
     require_rejected({"--camera", "--autonomous"},
-        "requires --camera-extrinsics");
+        "Unknown argument");
     require_rejected({"--camera", "--camera-preview-port", "8081"},
         "requires --camera-preview");
     require_rejected({"--camera", "--forward-camera-udp-port", "5602"},
@@ -163,8 +154,7 @@ void aerial_observation_is_a_typed_sitl_only_mode() {
     });
     const auto* simulation = std::get_if<SimulationLaunchOptions>(&options);
     require(simulation != nullptr && simulation->autonomy.enabled &&
-                simulation->autonomy.mode == AutonomyMode::aerial_observation &&
-                !simulation->autonomy.exit_when_finished,
+                simulation->autonomy.mode == AutonomyMode::aerial_observation,
         "aerial observation must map to a distinct non-terminal mission");
 
     require_rejected({"--camera",
@@ -182,7 +172,7 @@ void aerial_observation_is_a_typed_sitl_only_mode() {
                          "5602",
                          "--autonomous",
                          "--aerial-observation"},
-        "mutually exclusive");
+        "Unknown argument");
 }
 
 void simulated_wind_is_typed_and_sitl_only() {
@@ -221,9 +211,14 @@ void diagnostic_log_is_independent_from_console_output() {
 }
 
 void removed_options_provide_migration_guidance() {
+    for (const auto option : {"--apriltag", "--apriltag-size-mm",
+             "--camera-calibration", "--camera-extrinsics", "--autonomous",
+             "--exit-after-autonomy"}) {
+        require_rejected({option}, "Unknown argument");
+    }
     require_rejected({"--serial", "/dev/ttyACM0"},
         "--transport serial --serial-device DEVICE");
-    require_rejected({"--scenario", "5"}, "was removed; use --autonomous");
+    require_rejected({"--scenario", "5"}, "was removed; use --aerial-observation");
 }
 
 } // namespace

@@ -69,9 +69,6 @@ camera_enabled="${ONBOARD_AUTONOMY_CAMERA_ENABLED:-1}"
 camera_width="${ONBOARD_AUTONOMY_CAMERA_WIDTH:-640}"
 camera_height="${ONBOARD_AUTONOMY_CAMERA_HEIGHT:-480}"
 camera_fps="${ONBOARD_AUTONOMY_CAMERA_FPS:-30}"
-apriltag_enabled="${ONBOARD_AUTONOMY_APRILTAG_ENABLED:-0}"
-apriltag_size_mm="${ONBOARD_AUTONOMY_APRILTAG_SIZE_MM:-}"
-camera_calibration="${ONBOARD_AUTONOMY_CAMERA_CALIBRATION:-${script_dir}/../share/onboard_autonomy/camera-module-3-wide-640x480.json}"
 preview_enabled="${ONBOARD_AUTONOMY_CAMERA_PREVIEW_ENABLED:-1}"
 preview_port="${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
 log_dir="${ONBOARD_AUTONOMY_LOG_DIR:-${HOME}/.local/state/onboard_autonomy}"
@@ -106,20 +103,6 @@ if [[ "${camera_enabled}" == "1" ]]; then
         --camera-height "${camera_height}"
         --camera-fps "${camera_fps}"
     )
-    if [[ "${apriltag_enabled}" == "1" ]]; then
-        camera_arguments+=(--apriltag)
-        if [[ -n "${apriltag_size_mm}" ]]; then
-            if [[ ! -f "${camera_calibration}" ]]; then
-                printf 'Camera calibration not found: %s\n' \
-                    "${camera_calibration}" >&2
-                exit 5
-            fi
-            camera_arguments+=(
-                --camera-calibration "${camera_calibration}"
-                --apriltag-size-mm "${apriltag_size_mm}"
-            )
-        fi
-    fi
     if [[ "${preview_enabled}" == "1" ]]; then
         camera_arguments+=(
             --camera-preview
@@ -128,13 +111,6 @@ if [[ "${camera_enabled}" == "1" ]]; then
     fi
     printf '  Camera: %sx%s YUV420 at %s FPS\n\n' \
         "${camera_width}" "${camera_height}" "${camera_fps}"
-    if [[ "${apriltag_enabled}" == "1" ]]; then
-        printf '  Vision: AprilTag tagStandard41h12\n\n'
-        if [[ -n "${apriltag_size_mm}" ]]; then
-            printf '  Pose: %s mm detection span / %s\n\n' \
-                "${apriltag_size_mm}" "${camera_calibration}"
-        fi
-    fi
     if [[ "${preview_enabled}" == "1" ]]; then
         printf '  Preview: http://companionpi.local:%s/\n\n' \
             "${preview_port}"

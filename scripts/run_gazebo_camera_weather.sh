@@ -3,7 +3,7 @@
 set -euo pipefail
 
 readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-readonly wind_topic="/world/apriltag_landing/wind"
+readonly wind_topic="/world/camera_observation/wind"
 
 source "${script_dir}/weather_profile.sh"
 
@@ -23,7 +23,7 @@ stop_gazebo() {
 
 trap stop_gazebo EXIT INT TERM
 
-"${script_dir}/run_gazebo_apriltag.sh" "$@" &
+"${script_dir}/run_gazebo_camera.sh" "$@" &
 gazebo_pid=$!
 
 wind_ready=0

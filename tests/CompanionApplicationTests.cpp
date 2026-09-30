@@ -98,22 +98,6 @@ class FakeTargetDetector final
     std::string description() const override { return "fake detector"; }
 };
 
-onboard_autonomy::mission::CameraExtrinsics identity_extrinsics() {
-    onboard_autonomy::mission::CameraExtrinsics extrinsics;
-    extrinsics.rotation_camera_to_body = {
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-    };
-    return extrinsics;
-}
-
 std::uint32_t message_id(const std::vector<std::uint8_t>& frame) {
     mavlink_message_t receive_buffer{};
     mavlink_status_t receive_status{};
@@ -334,7 +318,7 @@ void interactive_autonomy_restart_is_guarded() {
     onboard_autonomy::mission::CompanionApplication blocked_application{
         blocked_transport};
     require(!blocked_application.request_autonomy_start(
-                AutonomyRuntimeMode::precision_landing,
+                AutonomyRuntimeMode::aerial_observation,
                 start),
         "autonomy start must be blocked without motion permission");
     require(blocked_application.snapshot(start).link_events.back().detail ==
@@ -361,7 +345,6 @@ void interactive_autonomy_restart_is_guarded() {
             .aerial_tracking_allowed = true,
             .camera_source = &camera,
             .target_detector = &detector,
-            .camera_extrinsics = identity_extrinsics(),
             .simulated_wind = std::nullopt,
         }};
     auto snapshot = application.snapshot(start);
@@ -371,7 +354,7 @@ void interactive_autonomy_restart_is_guarded() {
                     onboard_autonomy::mission::AutonomyRuntimePhase::idle,
         "interactive autonomy must remain idle until the operator starts it");
     require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::precision_landing,
+                AutonomyRuntimeMode::aerial_observation,
                 start),
         "autonomy start must be blocked before heartbeat");
 
@@ -382,7 +365,7 @@ void interactive_autonomy_restart_is_guarded() {
                 start + std::chrono::milliseconds(1)),
         "connected idle runtime must accept an operator-selected mission");
     require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::precision_landing,
+                AutonomyRuntimeMode::aerial_observation,
                 start + std::chrono::milliseconds(2)),
         "an active autonomy run must not be restarted");
 
@@ -393,7 +376,7 @@ void interactive_autonomy_restart_is_guarded() {
     transport.enqueue(accepted_rtl_ack());
     application.poll(start + std::chrono::milliseconds(5));
     require(application.request_autonomy_start(
-                AutonomyRuntimeMode::precision_landing,
+                AutonomyRuntimeMode::aerial_observation,
                 start + std::chrono::milliseconds(6)),
         "an acknowledged disarmed RTL must permit another mission");
 
@@ -435,7 +418,6 @@ void operator_rtl_aborts_the_active_mission() {
             .aerial_tracking_allowed = true,
             .camera_source = &camera,
             .target_detector = &detector,
-            .camera_extrinsics = identity_extrinsics(),
             .simulated_wind = std::nullopt,
         }};
     const onboard_autonomy::mission::TimePoint start{};
@@ -490,7 +472,6 @@ void hardware_runtime_rejects_sitl_only_aerial_tracking() {
             .aerial_tracking_allowed = false,
             .camera_source = &camera,
             .target_detector = &detector,
-            .camera_extrinsics = identity_extrinsics(),
             .simulated_wind = std::nullopt,
         }};
     const onboard_autonomy::mission::TimePoint start{};
@@ -505,34 +486,6 @@ void hardware_runtime_rejects_sitl_only_aerial_tracking() {
         "hardware runtime must not bypass the SITL-only aerial guard");
 }
 
-void autonomy_runtime_requires_vision_guidance() {
-    FakeTransport transport;
-    bool rejected = false;
-    try {
-        onboard_autonomy::mission::CompanionApplication application{transport,
-            {
-                .flight_startup =
-                    {
-                        .enabled = true,
-                        .takeoff_altitude_m = 8.0,
-                    },
-                .autonomy_runtime =
-                    {
-                        .enabled = true,
-                    },
-                .motion_commands_allowed = true,
-                .camera_source = nullptr,
-                .target_detector = nullptr,
-                .camera_extrinsics = std::nullopt,
-                .simulated_wind = std::nullopt,
-            }};
-        static_cast<void>(application);
-    } catch (const std::invalid_argument&) {
-        rejected = true;
-    }
-    require(rejected, "autonomy runtime must require vision guidance");
-}
-
 } // namespace
 
 void run_companion_application_tests() {
@@ -541,5 +494,4 @@ void run_companion_application_tests() {
     interactive_autonomy_restart_is_guarded();
     operator_rtl_aborts_the_active_mission();
     hardware_runtime_rejects_sitl_only_aerial_tracking();
-    autonomy_runtime_requires_vision_guidance();
 }
