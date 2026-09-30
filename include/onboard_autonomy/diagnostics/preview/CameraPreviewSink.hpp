@@ -1,6 +1,5 @@
 #pragma once
 
-#include "onboard_autonomy/mission/cv/tracking/TargetTracker.hpp"
 #include "onboard_autonomy/mission/cv/CameraSource.hpp"
 #include "onboard_autonomy/mission/cv/detection/TargetObservation.hpp"
 
@@ -20,8 +19,7 @@ class CameraPreviewSink {
 
     virtual void publish(CameraPreviewStream stream,
         const mission::ports::CameraFrame& frame,
-        std::span<const mission::TargetObservation> targets,
-        const mission::TargetTrackSnapshot& target_track) = 0;
+        std::span<const mission::TargetObservation> targets) = 0;
 
     [[nodiscard]] virtual std::string description() const = 0;
 };

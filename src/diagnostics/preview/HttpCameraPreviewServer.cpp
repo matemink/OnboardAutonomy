@@ -40,7 +40,6 @@ struct PreviewFrame {
     std::chrono::steady_clock::time_point published_at{};
     std::vector<std::uint8_t> yuv420;
     std::vector<mission::TargetObservation> targets;
-    mission::TargetTrackSnapshot target_track;
 };
 
 std::size_t stream_index(const CameraPreviewStream stream) {
@@ -108,67 +107,10 @@ std::string targets_json(
             first_corner = false;
             output << '[' << corner.x_px << ',' << corner.y_px << ']';
         }
-        output << "],\"decision_margin\":" << target.decision_margin
-               << ",\"corrected_bits\":" << target.corrected_bits
-               << ",\"pose\":";
-        const auto pose = target.pose;
-        if (!pose.has_value()) {
-            output << "null";
-        } else {
-            const auto& pose_value = pose.value();
-            output << "{\"right_m\":" << pose_value.position.right_m
-                   << ",\"down_m\":" << pose_value.position.down_m
-                   << ",\"forward_m\":" << pose_value.position.forward_m
-                   << ",\"object_space_error\":"
-                   << pose_value.object_space_error << '}';
-        }
-        output << '}';
+        output << "],\"confidence_percent\":" << target.confidence_percent
+               << '}';
     }
     output << ']';
-    return output.str();
-}
-
-std::string_view target_track_phase_name(
-    const mission::TargetTrackPhase phase) {
-    switch (phase) {
-    case mission::TargetTrackPhase::searching:
-        return "searching";
-    case mission::TargetTrackPhase::acquiring:
-        return "acquiring";
-    case mission::TargetTrackPhase::tracking:
-        return "tracking";
-    }
-    return "searching";
-}
-
-std::string target_track_json(const mission::TargetTrackSnapshot& track) {
-    std::ostringstream output;
-    output << std::fixed << std::setprecision(3);
-    output << "{\"phase\":\"" << target_track_phase_name(track.phase) << '"';
-    output << ",\"target_id\":";
-    if (track.target_id.has_value()) {
-        output << *track.target_id;
-    } else {
-        output << "null";
-    }
-    output << ",\"consecutive_observations\":"
-           << track.consecutive_observations;
-    output << ",\"required_observations\":" << track.required_observations;
-    output << ",\"observation_age_ms\":";
-    if (track.observation_age_ms.has_value()) {
-        output << *track.observation_age_ms;
-    } else {
-        output << "null";
-    }
-    output << ",\"position\":";
-    if (track.position.has_value()) {
-        output << "{\"right_m\":" << track.position->right_m
-               << ",\"down_m\":" << track.position->down_m
-               << ",\"forward_m\":" << track.position->forward_m << '}';
-    } else {
-        output << "null";
-    }
-    output << '}';
     return output.str();
 }
 
@@ -221,8 +163,7 @@ class HttpCameraPreviewServer final
 
     void publish(const CameraPreviewStream stream,
         const mission::ports::CameraFrame& frame,
-        const std::span<const mission::TargetObservation> targets,
-        const mission::TargetTrackSnapshot& target_track) override {
+        const std::span<const mission::TargetObservation> targets) override {
         const auto now = std::chrono::steady_clock::now();
         std::scoped_lock lock(frame_mutex_);
         const auto index = stream_index(stream);
@@ -236,9 +177,8 @@ class HttpCameraPreviewServer final
             static_cast<std::uint64_t>(frame.width) *
             static_cast<std::uint64_t>(frame.height);
         const std::uint64_t yuv420_size = pixel_count + pixel_count / 2U;
-        if (frame.width == 0U || frame.height == 0U ||
-            frame.width % 2U != 0U || frame.height % 2U != 0U ||
-            yuv420_size > frame.yuv420.size() ||
+        if (frame.width == 0U || frame.height == 0U || frame.width % 2U != 0U ||
+            frame.height % 2U != 0U || yuv420_size > frame.yuv420.size() ||
             yuv420_size > static_cast<std::uint64_t>(
                               std::numeric_limits<std::size_t>::max())) {
             return;
@@ -253,7 +193,6 @@ class HttpCameraPreviewServer final
             .published_at = now,
             .yuv420 = {frame.yuv420.begin(), end},
             .targets = {targets.begin(), targets.end()},
-            .target_track = target_track,
         };
         last_published_at_[index] = now;
     }
@@ -303,8 +242,6 @@ class HttpCameraPreviewServer final
         response.set_header("X-OnboardAutonomy-Pixel-Format", "I420");
         response.set_header("X-OnboardAutonomy-Targets",
             targets_json(frame.targets));
-        response.set_header("X-OnboardAutonomy-Target-Track",
-            target_track_json(frame.target_track));
         response.set_content(
             std::string{
                 reinterpret_cast<const char*>(frame.yuv420.data()),

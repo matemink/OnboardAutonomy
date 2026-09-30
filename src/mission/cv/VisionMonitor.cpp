@@ -8,9 +8,7 @@ namespace onboard_autonomy::mission {
 
 class VisionMonitor::Impl {
   public:
-    explicit Impl(ports::TargetDetector& detector,
-        TargetTrackerConfig tracker_config)
-        : detector_(detector), target_tracker_(tracker_config) {}
+    explicit Impl(ports::TargetDetector& detector) : detector_(detector) {}
 
     const std::vector<mission::TargetObservation>&
     process(const ports::CameraFrame& frame, const mission::TimePoint now) {
@@ -31,23 +29,6 @@ class VisionMonitor::Impl {
             ++frames_with_targets_;
             last_detection_at_ = now;
         }
-        target_tracker_.update(latest_targets_, now);
-        const auto track = target_tracker_.snapshot(now);
-        if (track.target_id.has_value() && track.position.has_value()) {
-            const auto tracked = std::find_if(latest_targets_.begin(),
-                latest_targets_.end(),
-                [&track](const auto& target) {
-                    return target.id == *track.target_id &&
-                           target.pose.has_value();
-                });
-            if (tracked != latest_targets_.end()) {
-                auto pose = tracked->pose;
-                if (pose.has_value()) {
-                    pose->position = track.position.value();
-                    tracked->pose = pose;
-                }
-            }
-        }
         return latest_targets_;
     }
 
@@ -62,7 +43,6 @@ class VisionMonitor::Impl {
             .maximum_processing_ms = std::nullopt,
             .last_detection_age_ms = std::nullopt,
             .latest_targets = latest_targets_,
-            .target_track = target_tracker_.snapshot(now),
         };
         if (processed_frames_ > 0U) {
             result.average_processing_ms =
@@ -80,7 +60,6 @@ class VisionMonitor::Impl {
 
   private:
     ports::TargetDetector& detector_;
-    TargetTracker target_tracker_;
     std::uint64_t processed_frames_{0};
     std::uint64_t frames_with_targets_{0};
     std::uint64_t total_targets_{0};
@@ -91,9 +70,8 @@ class VisionMonitor::Impl {
     std::vector<mission::TargetObservation> latest_targets_;
 };
 
-VisionMonitor::VisionMonitor(ports::TargetDetector& detector,
-    TargetTrackerConfig tracker_config)
-    : impl_(std::make_unique<Impl>(detector, tracker_config)) {}
+VisionMonitor::VisionMonitor(ports::TargetDetector& detector)
+    : impl_(std::make_unique<Impl>(detector)) {}
 
 VisionMonitor::~VisionMonitor() = default;
 VisionMonitor::VisionMonitor(VisionMonitor&&) noexcept = default;

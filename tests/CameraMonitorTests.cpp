@@ -85,9 +85,9 @@ class FakeTargetDetector final
                         .family = "fake",
                         .center = {.x_px = 320.0, .y_px = 240.0},
                         .corners = {},
-                        .corrected_bits = 0,
-                        .decision_margin = 50.0,
-                        .pose = std::nullopt,
+
+                        .confidence_percent = 50.0,
+
                     },
                 },
         };
@@ -206,14 +206,16 @@ void gstreamer_rejects_padded_i420_rows() {
         bool rejected = false;
         try {
             static_cast<void>(onboard_autonomy::hardware::camera::
-                make_gstreamer_camera_arguments({.width = width, .height = 480}));
+                    make_gstreamer_camera_arguments(
+                        {.width = width, .height = 480}));
         } catch (const std::invalid_argument&) {
             rejected = true;
         }
         require(rejected, "padded I420 planes cannot be read as packed YUV420");
     }
-    static_cast<void>(onboard_autonomy::hardware::camera::
-        make_gstreamer_camera_arguments({.width = 648, .height = 482}));
+    static_cast<void>(
+        onboard_autonomy::hardware::camera::make_gstreamer_camera_arguments(
+            {.width = 648, .height = 482}));
 }
 
 void recovery_timings_must_be_non_zero() {
@@ -274,9 +276,7 @@ void monitor_exposes_processed_frames_without_a_preview_dependency() {
                 processed->observed_at == observed_at &&
                 processed->frame.yuv420.size() == 640U * 480U * 3U / 2U &&
                 processed->targets.size() == 1U &&
-                processed->targets.front().id == 12 &&
-                processed->target_track.phase ==
-                    onboard_autonomy::mission::TargetTrackPhase::searching,
+                processed->targets.front().id == 12,
         "camera monitor must expose processed data to optional consumers");
     require(!monitor.take_latest_processed_frame().has_value(),
         "processed camera output must be consumed only once");

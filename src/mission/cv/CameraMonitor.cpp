@@ -34,10 +34,8 @@ class CameraMonitor::Impl {
         height_ = frame->height;
         last_frame_observed_at_ = now;
         std::span<const mission::TargetObservation> targets;
-        TargetTrackSnapshot target_track;
         if (vision_monitor_.has_value()) {
             targets = vision_monitor_->process(*frame, now);
-            target_track = vision_monitor_->snapshot(now).target_track;
         }
         if (frame->captured_at.has_value()) {
             ++frames_with_capture_timestamp_;
@@ -61,7 +59,6 @@ class CameraMonitor::Impl {
             .frame = std::move(*frame),
             .observed_at = now,
             .targets = {targets.begin(), targets.end()},
-            .target_track = target_track,
         };
     }
 

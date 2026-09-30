@@ -1,6 +1,5 @@
 #pragma once
 
-#include "onboard_autonomy/mission/cv/tracking/TargetTracker.hpp"
 #include "onboard_autonomy/mission/cv/detection/TargetDetector.hpp"
 #include "onboard_autonomy/mission/flight/VehicleState.hpp"
 
@@ -22,13 +21,11 @@ struct VisionSnapshot {
     std::optional<double> maximum_processing_ms;
     std::optional<double> last_detection_age_ms;
     std::vector<mission::TargetObservation> latest_targets;
-    TargetTrackSnapshot target_track;
 };
 
 class VisionMonitor {
   public:
-    explicit VisionMonitor(ports::TargetDetector& detector,
-        TargetTrackerConfig tracker_config = {});
+    explicit VisionMonitor(ports::TargetDetector& detector);
     ~VisionMonitor();
 
     VisionMonitor(const VisionMonitor&) = delete;

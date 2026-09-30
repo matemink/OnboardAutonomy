@@ -2,7 +2,6 @@
 
 #include <array>
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -10,26 +9,9 @@
 
 namespace onboard_autonomy::mission {
 
-inline constexpr std::size_t kRotationMatrixDimension = 3;
-inline constexpr std::size_t kRotationMatrixElementCount =
-    kRotationMatrixDimension * kRotationMatrixDimension;
-using RotationMatrix = std::array<double, kRotationMatrixElementCount>;
-
 struct ImagePoint {
     double x_px{0.0};
     double y_px{0.0};
-};
-
-struct CameraFramePosition {
-    double right_m{0.0};
-    double down_m{0.0};
-    double forward_m{0.0};
-};
-
-struct TargetPose {
-    CameraFramePosition position;
-    RotationMatrix rotation_tag_to_camera{};
-    double object_space_error{0.0};
 };
 
 struct TargetObservation {
@@ -37,9 +19,7 @@ struct TargetObservation {
     std::string family;
     ImagePoint center;
     std::array<ImagePoint, 4> corners;
-    std::int32_t corrected_bits{0};
-    double decision_margin{0.0};
-    std::optional<TargetPose> pose;
+    double confidence_percent{0.0};
 };
 
 struct TargetDetectionBatch {
