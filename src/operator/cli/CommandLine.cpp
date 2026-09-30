@@ -296,7 +296,7 @@ CommandLineOptions make_command_line_options(
                     .bind_address = draft.udp_bind,
                     .port = draft.udp_port,
                 },
-            .camera = std::move(camera),
+            .camera = camera,
             .wind = draft.simulated_wind,
             .autonomy = autonomy,
             .operator_interface = operator_interface,
@@ -306,7 +306,7 @@ CommandLineOptions make_command_line_options(
 
     return HardwareLaunchOptions{
         .connection = make_connection_options(draft),
-        .camera = std::move(camera),
+        .camera = camera,
         .autonomy = autonomy,
         .operator_interface = operator_interface,
         .diagnostics = diagnostics,
