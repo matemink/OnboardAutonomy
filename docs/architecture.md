@@ -107,7 +107,8 @@ mission headers and controllers cannot include hardware adapters. This is an
 explicit existing coupling, not a permission for the whole mission package.
 
 `python/tests/test_architecture_boundaries.py` checks source/public-header
-package dependencies, presentation-model dependencies, and public-header
-cycles. `cmake/Architecture.cmake` checks presentation link dependencies,
+package dependencies, an explicit model/port allowlist for presentation, and
+public-header cycles, accepting both quoted and angle-bracket project includes.
+`cmake/Architecture.cmake` checks presentation link dependencies,
 including generator expressions. These checks do not establish correctness of
 flight behavior, event delivery, or hardware recovery.
