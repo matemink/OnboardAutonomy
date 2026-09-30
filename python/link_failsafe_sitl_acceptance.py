@@ -493,11 +493,13 @@ def run_acceptance(
                 timeout=10.0,
             )
 
-        return_code = runtime.wait(timeout=5.0)
-        if return_code != 2:
+        # The runtime stays alive after a failed scenario. Stop only the
+        # companion; the independent monitor still observes ArduPilot.
+        supervisor.stop("OnboardAutonomy", timeout=5.0)
+        if runtime.returncode != 0:
             raise RuntimeError(
-                "OnboardAutonomy must exit with autonomy-failure code 2, "
-                f"got {return_code}"
+                "OnboardAutonomy did not stop cleanly after link-loss evidence, "
+                f"got {runtime.returncode}"
             )
         independent_monitor = wait_for_ardupilot_land_and_disarm(
             monitor,

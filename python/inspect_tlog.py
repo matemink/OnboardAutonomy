@@ -75,7 +75,7 @@ def main() -> int:
                         text,
                     )
                 )
-            elif text.startswith("PrecLand:"):
+            elif text:
                 autopilot_statuses.append(text)
         elif message_type == "COMMAND_LONG":
             command = int(message.command)
