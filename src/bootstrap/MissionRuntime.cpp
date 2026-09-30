@@ -3,9 +3,6 @@
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/hardware/camera/RpicamCameraSource.hpp"
 #include "onboard_autonomy/hardware/transport/TransportFactory.hpp"
-#include "onboard_autonomy/mission/cv/detection/AprilTagTargetDetector.hpp"
-#include "onboard_autonomy/mission/cv/calibration/CameraCalibrationLoader.hpp"
-#include "onboard_autonomy/mission/cv/extrinsics/CameraExtrinsicsLoader.hpp"
 #include "onboard_autonomy/mission/CompanionApplication.hpp"
 #include "onboard_autonomy/mission/safety/MotionSafetyPolicy.hpp"
 
@@ -56,49 +53,6 @@ std::unique_ptr<mission::ports::CameraSource> make_camera_source(
     });
 }
 
-std::unique_ptr<mission::ports::TargetDetector> make_target_detector(
-    const MissionRuntimeConfig& config) {
-    const auto& configured_camera = config.camera;
-    if (!configured_camera.has_value() ||
-        !configured_camera->apriltag.has_value()) {
-        return nullptr;
-    }
-
-    const auto& camera = *configured_camera;
-    const auto& apriltag = *camera.apriltag;
-    mission::cv::AprilTagDetectorConfig detector_config;
-    if (!apriltag.calibration_file.empty()) {
-        const auto tag_size = apriltag.tag_size_m;
-        if (!tag_size.has_value()) {
-            throw std::invalid_argument(
-                "camera calibration requires AprilTag size");
-        }
-        auto calibration = mission::cv::CameraCalibrationLoader::from_file(
-            apriltag.calibration_file);
-        if (calibration.image_width != camera.frame_width ||
-            calibration.image_height != camera.frame_height) {
-            throw std::invalid_argument(
-                "camera runtime resolution does not match calibration");
-        }
-        detector_config.pose = mission::cv::AprilTagPoseConfig{
-            .calibration = std::move(calibration),
-            .tag_size_m = tag_size.value(),
-        };
-    }
-    return mission::cv::make_apriltag_target_detector(detector_config);
-}
-
-std::optional<mission::CameraExtrinsics> load_camera_extrinsics(
-    const MissionRuntimeConfig& config) {
-    const auto& camera = config.camera;
-    if (!camera.has_value() || !camera->apriltag.has_value() ||
-        camera->apriltag->extrinsics_file.empty()) {
-        return std::nullopt;
-    }
-    return mission::cv::CameraExtrinsicsLoader::from_file(
-        camera->apriltag->extrinsics_file);
-}
-
 mission::MotionSafetyDecision evaluate_safety(
     const MissionRuntimeConfig& config) {
     const auto decision = mission::evaluate_motion_safety(
@@ -121,8 +75,6 @@ class MissionRuntime::Impl {
   public:
     explicit Impl(const MissionRuntimeConfig& config)
         : safety_(evaluate_safety(config)),
-          camera_extrinsics_(load_camera_extrinsics(config)),
-          target_detector_(make_target_detector(config)),
           transport_(make_transport(config)),
           camera_source_(make_camera_source(config)) {
         // CompanionApplication stores non-owning adapter pointers. The
@@ -148,15 +100,11 @@ class MissionRuntime::Impl {
                         config.environment == MissionEnvironment::simulation &&
                         config.aerial_tracking_allowed,
                     .camera_source = camera_source_.get(),
-                    .target_detector = target_detector_.get(),
-                    .camera_extrinsics = camera_extrinsics_,
                     .simulated_wind = config.simulated_wind,
                 });
     }
 
     mission::MotionSafetyDecision safety_;
-    std::optional<mission::CameraExtrinsics> camera_extrinsics_;
-    std::unique_ptr<mission::ports::TargetDetector> target_detector_;
     std::unique_ptr<mission::ports::Transport> transport_;
     std::unique_ptr<mission::ports::CameraSource> camera_source_;
     std::unique_ptr<mission::CompanionApplication> application_;

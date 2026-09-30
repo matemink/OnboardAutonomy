@@ -4,8 +4,8 @@ set -euo pipefail
 
 readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
-readonly downward_enable_topic="${ONBOARD_AUTONOMY_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide/sensor/Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming}"
-readonly forward_enable_topic="${ONBOARD_AUTONOMY_FORWARD_CAMERA_ENABLE_TOPIC:-/world/apriltag_landing/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide_Forward/sensor/Raspberry_Pi_Camera_Module_3_Wide_Forward/image/enable_streaming}"
+readonly downward_enable_topic="${ONBOARD_AUTONOMY_CAMERA_ENABLE_TOPIC:-/world/camera_observation/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide/sensor/Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming}"
+readonly forward_enable_topic="${ONBOARD_AUTONOMY_FORWARD_CAMERA_ENABLE_TOPIC:-/world/camera_observation/model/Holybro_S500/link/Raspberry_Pi_Camera_Module_3_Wide_Forward/sensor/Raspberry_Pi_Camera_Module_3_Wide_Forward/image/enable_streaming}"
 readonly downward_camera_udp_port="5601"
 readonly forward_camera_udp_port="5602"
 readonly default_forward_detector_model="${project_dir}/.local/models/object_detection_yolox_2022nov.onnx"

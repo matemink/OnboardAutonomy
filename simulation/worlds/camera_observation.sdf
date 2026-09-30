@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
-  <world name="apriltag_landing">
+  <world name="camera_observation">
     <physics name="1ms" type="ignore">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
@@ -93,12 +93,7 @@
     </include>
 
     <include>
-      <uri>model://apriltag_landing_pad</uri>
-      <pose>0 0 0 0 0 0</pose>
-    </include>
-
-    <include>
-      <uri>model://iris_with_landing_camera</uri>
+      <uri>model://iris_with_cameras</uri>
       <name>Holybro_S500</name>
       <pose>-3 0 0.195 0 0 -1.5707963267948966</pose>
     </include>

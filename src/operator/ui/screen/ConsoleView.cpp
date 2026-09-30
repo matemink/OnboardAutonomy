@@ -614,8 +614,6 @@ std::string autonomy_phase_name(const mission::AutonomyRuntimePhase phase) {
         return "ACTIVE";
     case mission::AutonomyRuntimePhase::suspended:
         return "SUSPENDED";
-    case mission::AutonomyRuntimePhase::landing:
-        return "LANDING";
     case mission::AutonomyRuntimePhase::returning_to_launch:
         return "RTL";
     case mission::AutonomyRuntimePhase::completed:
@@ -633,7 +631,6 @@ Tone autonomy_tone(const mission::AutonomyRuntimePhase phase) {
     case mission::AutonomyRuntimePhase::failed:
         return Tone::bad;
     case mission::AutonomyRuntimePhase::active:
-    case mission::AutonomyRuntimePhase::landing:
     case mission::AutonomyRuntimePhase::returning_to_launch:
         return Tone::accent;
     case mission::AutonomyRuntimePhase::disabled:
@@ -902,9 +899,6 @@ void write_runtime_footer(std::ostringstream& output,
         autonomy_tone(autonomy.phase),
         use_color);
     std::string mission_commands;
-    if (snapshot.precision_landing_available) {
-        mission_commands = "[1] FIDUCIAL LANDING (VALIDATION)";
-    }
     if (snapshot.aerial_tracking_available) {
         if (!mission_commands.empty()) {
             mission_commands += "     ";

@@ -385,44 +385,4 @@ std::vector<std::uint8_t> encode_yaw_target(
     return {buffer.begin(), buffer.begin() + length};
 }
 
-std::vector<std::uint8_t> encode_landing_target(
-    const std::uint8_t vehicle_system_id,
-    const std::uint64_t time_usec,
-    const double forward_m,
-    const double right_m,
-    const double down_m,
-    const std::uint8_t component_id) {
-    mavlink_message_t message{};
-    const std::array<float, 4> orientation{
-        1.0F,
-        0.0F,
-        0.0F,
-        0.0F,
-    };
-    const auto distance =
-        std::sqrt(forward_m * forward_m + right_m * right_m + down_m * down_m);
-
-    mavlink_msg_landing_target_pack(vehicle_system_id,
-        component_id,
-        &message,
-        time_usec,
-        0,
-        MAV_FRAME_BODY_FRD,
-        0.0F,
-        0.0F,
-        static_cast<float>(distance),
-        0.0F,
-        0.0F,
-        static_cast<float>(forward_m),
-        static_cast<float>(right_m),
-        static_cast<float>(down_m),
-        orientation.data(),
-        LANDING_TARGET_TYPE_VISION_FIDUCIAL,
-        1);
-
-    std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> buffer{};
-    const auto length = mavlink_msg_to_send_buffer(buffer.data(), &message);
-    return {buffer.begin(), buffer.begin() + length};
-}
-
 } // namespace onboard_autonomy::hardware::mavlink

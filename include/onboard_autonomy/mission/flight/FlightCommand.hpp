@@ -11,7 +11,6 @@ enum class FlightAction {
     takeoff,
     return_to_launch,
     land,
-    landing_target,
     condition_yaw,
     yaw_rate,
     yaw_target,

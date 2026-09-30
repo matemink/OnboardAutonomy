@@ -743,3 +743,38 @@ def log_tails(artifacts: Path, line_count: int = 20) -> str:
             "\n".join(lines[-line_count:])
         )
     return "".join(sections)
+
+
+CAMERA_ENABLE_TOPIC = (
+    "/world/camera_observation/model/Holybro_S500/link/"
+    "Raspberry_Pi_Camera_Module_3_Wide/sensor/"
+    "Raspberry_Pi_Camera_Module_3_Wide/image/enable_streaming"
+)
+
+
+def wait_for_gazebo_camera(
+    gazebo: subprocess.Popen[str],
+    timeout: float,
+) -> None:
+    deadline = time.monotonic() + timeout
+    environment = os.environ.copy()
+    environment["GZ_VERSION"] = "harmonic"
+
+    while time.monotonic() < deadline:
+        if gazebo.poll() is not None:
+            raise RuntimeError(
+                f"Gazebo exited early with code {gazebo.returncode}"
+            )
+        result = subprocess.run(
+            ["gz", "topic", "-l"],
+            capture_output=True,
+            text=True,
+            timeout=3.0,
+            env=environment,
+            check=False,
+        )
+        if CAMERA_ENABLE_TOPIC in result.stdout.splitlines():
+            return
+        time.sleep(0.5)
+
+    raise RuntimeError("Gazebo camera did not become available")

@@ -12,12 +12,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from autonomy_sitl_acceptance import (
+from link_failsafe_sitl_acceptance import wait_for_snapshot
+from sitl_harness import (
     CAMERA_ENABLE_TOPIC,
+    ProcessSupervisor,
+    require_available_port,
     wait_for_gazebo_camera,
 )
-from link_failsafe_sitl_acceptance import wait_for_snapshot
-from sitl_harness import ProcessSupervisor, require_available_port
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PORT = 14559
@@ -81,7 +82,7 @@ def _start_gazebo(
     environment["ONBOARD_AUTONOMY_GAZEBO_HEADLESS"] = "1"
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(
-            ["bash", "scripts/run_gazebo_apriltag.sh"],
+            ["bash", "scripts/run_gazebo_camera.sh"],
             cwd=PROJECT_ROOT,
             stdout=log,
             stderr=subprocess.STDOUT,

@@ -272,7 +272,7 @@
         <header class="card-header">
           <div>
             <h2>Down Camera</h2>
-            <p class="camera-role">Precision landing view / UDP 5601</p>
+            <p class="camera-role">Downward observation / UDP 5601</p>
           </div>
           <div class="badge">
             <span class="dot"></span>
@@ -286,7 +286,7 @@
         </div>
         <footer class="card-footer">
           <div class="frame">NO FRAME</div>
-          <div class="analysis">APRILTAG NOT VISIBLE</div>
+          <div class="analysis">OBSERVATION ONLY</div>
         </footer>
       </article>
     </section>
@@ -358,7 +358,7 @@
         return `TAG ${track.target_id} / ${phase}`;
       }
       if (targets.length === 0) {
-        return "APRILTAG NOT VISIBLE";
+        return "OBSERVATION ONLY";
       }
       return targets
         .map((target) => `TAG ${target.id} / MARGIN ` +

@@ -248,7 +248,7 @@ void flight_commands_use_documented_arducopter_parameters() {
         "yaw guidance must encode a bounded relative counter-clockwise turn");
 }
 
-void movement_and_precision_messages_use_documented_frames() {
+void movement_messages_use_documented_frames() {
     constexpr std::uint8_t system_id{1};
     const auto move_message = decode_message(
         onboard_autonomy::hardware::mavlink::encode_local_position_target(
@@ -280,20 +280,6 @@ void movement_and_precision_messages_use_documented_frames() {
                 std::abs(yaw_rate.yaw_rate + 0.7853982F) < 0.0001F,
         "yaw rate must hold position and preserve its signed angular velocity");
 
-    const auto target_message = decode_message(
-        onboard_autonomy::hardware::mavlink::encode_landing_target(system_id,
-            123'000,
-            -8.0,
-            -4.0,
-            8.0));
-    require(target_message.msgid == MAVLINK_MSG_ID_LANDING_TARGET,
-        "precision step must use LANDING_TARGET");
-    mavlink_landing_target_t target{};
-    mavlink_msg_landing_target_decode(&target_message, &target);
-    require(target.frame == MAV_FRAME_BODY_FRD && target.position_valid == 1 &&
-                target.type == LANDING_TARGET_TYPE_VISION_FIDUCIAL &&
-                target.x == -8.0F && target.y == -4.0F && target.z == 8.0F,
-        "precision target must contain a valid body-FRD position");
 }
 
 } // namespace
@@ -305,5 +291,5 @@ void run_mavlink_encoder_tests() {
     named_parameter_request_uses_parameter_protocol();
     autopilot_version_uses_one_shot_message_request();
     flight_commands_use_documented_arducopter_parameters();
-    movement_and_precision_messages_use_documented_frames();
+    movement_messages_use_documented_frames();
 }
