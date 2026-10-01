@@ -470,31 +470,17 @@ class GazeboCameraWorldTests(unittest.TestCase):
             gazebo_runner,
         )
 
-    def test_windows_launcher_cleans_up_only_the_demo_before_start(self) -> None:
+    def test_windows_launcher_checks_conflicts_without_stopping_other_sessions(self) -> None:
         demo_launcher = (
             PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
         ).read_text(encoding="utf-8")
-        stop_launcher = (
-            PROJECT_ROOT / "StopOnboardAutonomyGazeboDemo.cmd"
-        ).read_text(encoding="utf-8")
-        cleanup_script = (
-            PROJECT_ROOT / "scripts" / "stop_onboard_autonomy_gazebo.sh"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn(
-            "bash scripts/stop_onboard_autonomy_gazebo.sh",
-            demo_launcher,
-        )
-        self.assertIn(
-            "bash scripts/stop_onboard_autonomy_gazebo.sh",
-            stop_launcher,
-        )
+        self.assertIn("python3 scripts/check_camera_demo_environment.py", demo_launcher)
+        self.assertNotIn("stop_onboard_autonomy_gazebo.sh", demo_launcher)
         self.assertNotIn("wsl --shutdown", demo_launcher)
-        self.assertIn("pkill", cleanup_script)
-        self.assertIn("arducopter", cleanup_script)
-        self.assertIn("arduplane", cleanup_script)
-        self.assertIn("onboard_autonomy", cleanup_script)
-        self.assertIn("gz", cleanup_script)
+        self.assertLess(
+            demo_launcher.index("check_camera_demo_environment.py"),
+            demo_launcher.index('start "Gazebo Simulation Server"'),
+        )
 
     def test_vehicle_exposes_the_real_development_rig_names(self) -> None:
         model = element_tree.parse(CAMERA_MODEL).getroot()

@@ -15,8 +15,11 @@
 #include "onboard_autonomy/operator/ui/input/ConsoleInput.hpp"
 #include "onboard_autonomy/operator/ui/screen/ConsoleSnapshotSink.hpp"
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -283,18 +286,45 @@ std::unique_ptr<mission::AsyncCameraMonitor> make_forward_camera_monitor(
     return std::make_unique<mission::AsyncCameraMonitor>(*source, detector);
 }
 
+struct ConsoleTerminalSettings {
+    operator_interface::ui::ConsoleOutputMode output_mode;
+    bool use_color;
+};
+
+ConsoleTerminalSettings detect_console_terminal() {
+    // Read the process environment before runtime construction starts workers.
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
+    const auto* terminal = std::getenv("TERM");
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
+    const auto* no_color = std::getenv("NO_COLOR");
+    const bool live_terminal =
+        isatty(STDOUT_FILENO) == 1 &&
+        (terminal == nullptr || std::string_view{terminal} != "dumb");
+    return {
+        .output_mode = live_terminal
+                           ? operator_interface::ui::ConsoleOutputMode::terminal
+                           : operator_interface::ui::ConsoleOutputMode::plain,
+        .use_color = live_terminal && no_color == nullptr,
+    };
+}
+
 std::uint32_t snapshot_interval_ms(
-    const operator_interface::cli::OperatorInterfaceOptions& options) {
-    return options.json_output ? options.snapshot_interval_ms
-                               : std::min(options.snapshot_interval_ms,
-                                     kMaximumConsoleRefreshIntervalMs);
+    const operator_interface::cli::OperatorInterfaceOptions& options,
+    const ConsoleTerminalSettings& terminal) {
+    return options.json_output ||
+                   terminal.output_mode ==
+                       operator_interface::ui::ConsoleOutputMode::plain
+               ? options.snapshot_interval_ms
+               : std::min(options.snapshot_interval_ms,
+                     kMaximumConsoleRefreshIntervalMs);
 }
 
 std::vector<std::unique_ptr<RuntimeSnapshotSink>> make_snapshot_sinks(
     const operator_interface::cli::OperatorInterfaceOptions& operator_interface,
     const operator_interface::cli::DiagnosticsOptions& diagnostics,
     const mission::ports::Transport& transport,
-    const operator_interface::ui::BoardTypeResolver* board_type_resolver) {
+    const operator_interface::ui::BoardTypeResolver* board_type_resolver,
+    const ConsoleTerminalSettings& terminal) {
     std::vector<std::unique_ptr<RuntimeSnapshotSink>> sinks;
     if (operator_interface.json_output) {
         sinks.push_back(
@@ -305,7 +335,12 @@ std::vector<std::unique_ptr<RuntimeSnapshotSink>> make_snapshot_sinks(
             std::make_unique<operator_interface::ui::ConsoleSnapshotSink>(
                 std::cout,
                 transport.description(),
-                board_type_resolver));
+                board_type_resolver,
+                operator_interface::ui::ConsoleViewOptions{
+                    .use_color = terminal.use_color,
+                    .interactive_input = operator_interface.interactive,
+                },
+                terminal.output_mode));
     }
     if (!diagnostics.log_file.empty()) {
         sinks.push_back(
@@ -369,12 +404,14 @@ int run_program(const int argc, char** argv) {
     const auto& diagnostics = diagnostics_options(options);
     const std::filesystem::path executable{argv[0]};
 
+    const auto console_terminal = detect_console_terminal();
     MissionRuntime mission{make_mission_runtime_config(options)};
     auto board_types = load_board_type_catalog(operator_interface, executable);
     auto snapshot_sinks = make_snapshot_sinks(operator_interface,
         diagnostics,
         mission.transport(),
-        board_types.get());
+        board_types.get(),
+        console_terminal);
     auto camera_preview = make_camera_preview(diagnostics, executable);
     auto forward_preview_camera = make_forward_preview_camera(options);
     auto forward_target_detector = make_forward_target_detector(options);
@@ -392,7 +429,8 @@ int run_program(const int argc, char** argv) {
 
     CompanionRunner runner{
         {
-            .snapshot_interval_ms = snapshot_interval_ms(operator_interface),
+            .snapshot_interval_ms =
+                snapshot_interval_ms(operator_interface, console_terminal),
         },
         mission.application(),
         forward_camera_monitor.get(),

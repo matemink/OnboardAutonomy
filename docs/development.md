@@ -249,3 +249,18 @@ Structured logging can also run alongside the normal console:
 Heartbeat freshness controls `connected`; stale data is not reported as
 healthy. Console rendering and diagnostic serialization are independent
 snapshot consumers.
+
+## Console display
+
+The console groups link status, controller telemetry, health warnings, optional
+camera diagnostics, and the last TX/RX frames. Frame ages remain visible after
+traffic stops. Long text wraps inside an 80-column layout, and every active
+warning is shown. The companion hardware model is not inferred from the target
+configuration.
+
+`--sitl --interactive` enables the existing keyboard commands; their hints
+appear only when input is enabled. A camera alone does not advertise a mission
+start command. `Q` exits an interactive session. Without interactive input, use
+`Ctrl+C`. Redirected output contains separate plain-text
+snapshots without ANSI sequences. Set `NO_COLOR` to disable colors while keeping
+terminal redraws.

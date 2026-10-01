@@ -80,7 +80,7 @@ void ambiguous_board_is_honest_in_the_console() {
     const auto output =
         onboard_autonomy::operator_interface::ui::render_console(snapshot,
             "fake://transport",
-            false,
+            {},
             &catalog);
 
     require(

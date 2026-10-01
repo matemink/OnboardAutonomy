@@ -92,3 +92,9 @@ The link-failsafe harness cuts the telemetry relay and verifies the flight
 controller's independent fallback from protocol evidence. These integration
 checks require their respective local runtime, simulator, and Python dependencies;
 unit tests do not establish that a new Gazebo flight has been executed.
+
+The Windows camera demo checks for a running Gazebo session and occupied camera,
+telemetry, SITL, and preview endpoints before it starts. It asks you to close an
+existing session instead of terminating other simulations. Set
+`ONBOARD_AUTONOMY_BUILD_DIR` to the Linux build directory to select the console
+binary; an unset value uses the development runbook's default build directory.

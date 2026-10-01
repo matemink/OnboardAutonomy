@@ -13,24 +13,38 @@ class ConsoleSnapshotSink::Impl {
     Impl(std::ostream& output,
         std::string transport_description,
         const BoardTypeResolver* board_type_resolver,
-        const bool use_color)
+        ConsoleViewOptions options,
+        const ConsoleOutputMode output_mode)
         : output_(output),
           transport_description_(std::move(transport_description)),
-          board_type_resolver_(board_type_resolver), use_color_(use_color) {
-        output_ << "\x1b[2J\x1b[H\x1b[?25l" << std::flush;
+          board_type_resolver_(board_type_resolver), options_(options),
+          output_mode_(output_mode) {
+        if (output_mode_ == ConsoleOutputMode::terminal) {
+            output_ << "\x1b[2J\x1b[H\x1b[?25l" << std::flush;
+        } else {
+            options_.use_color = false;
+        }
     }
 
-    ~Impl() { output_ << "\x1b[?25h\x1b[0m\n" << std::flush; }
+    ~Impl() {
+        if (output_mode_ == ConsoleOutputMode::terminal) {
+            output_ << "\x1b[?25h\x1b[0m\n" << std::flush;
+        }
+    }
 
     Impl(const Impl&) = delete;
     Impl& operator=(const Impl&) = delete;
 
     void consume(const mission::AppSnapshot& snapshot) {
-        output_ << "\x1b[H"
-                << render_console(snapshot,
-                       transport_description_,
-                       use_color_,
-                       board_type_resolver_)
+        if (output_mode_ == ConsoleOutputMode::terminal) {
+            output_ << "\x1b[H";
+        }
+        output_ << render_console(snapshot,
+            transport_description_,
+            options_,
+            board_type_resolver_);
+        output_ << (output_mode_ == ConsoleOutputMode::terminal ? "\x1b[J"
+                                                                : "\n")
                 << std::flush;
     }
 
@@ -38,17 +52,20 @@ class ConsoleSnapshotSink::Impl {
     std::ostream& output_;
     std::string transport_description_;
     const BoardTypeResolver* board_type_resolver_;
-    bool use_color_;
+    ConsoleViewOptions options_;
+    ConsoleOutputMode output_mode_;
 };
 
 ConsoleSnapshotSink::ConsoleSnapshotSink(std::ostream& output,
     std::string transport_description,
     const BoardTypeResolver* board_type_resolver,
-    const bool use_color)
+    ConsoleViewOptions options,
+    const ConsoleOutputMode output_mode)
     : impl_(std::make_unique<Impl>(output,
           std::move(transport_description),
           board_type_resolver,
-          use_color)) {}
+          options,
+          output_mode)) {}
 
 ConsoleSnapshotSink::~ConsoleSnapshotSink() = default;
 
