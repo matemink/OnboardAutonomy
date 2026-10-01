@@ -8,9 +8,14 @@
 
 namespace onboard_autonomy::operator_interface::ui {
 
+struct ConsoleViewOptions {
+    bool use_color{false};
+    bool interactive_input{false};
+};
+
 std::string render_console(const mission::AppSnapshot& snapshot,
     std::string_view transport_description,
-    bool use_color = true,
+    ConsoleViewOptions options = {},
     const BoardTypeResolver* board_type_resolver = nullptr);
 
 } // namespace onboard_autonomy::operator_interface::ui

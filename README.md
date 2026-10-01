@@ -17,7 +17,8 @@ observation mode. Automated motion is restricted to explicitly configured SITL.
   recovery after producer failure or stalled frames.
 - Forward-camera OpenCV DNN / YOLOX processing and temporal observation tracking
   in simulation.
-- Console status, JSONL diagnostics, and a browser camera preview.
+- A compact console with telemetry, health warnings, optional camera diagnostics,
+  and the last MAVLink frames with their age; JSONL and a browser camera preview.
 - ArduPilot-owned companion-link failsafe validation and explicit separation
   between simulation and physical endpoints.
 

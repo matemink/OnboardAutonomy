@@ -1,15 +1,18 @@
 #include "TestCases.hpp"
 
 #include "onboard_autonomy/operator/ui/screen/BoardTypeCatalog.hpp"
+#include "onboard_autonomy/operator/ui/screen/ConsoleSnapshotSink.hpp"
 #include "onboard_autonomy/operator/ui/screen/ConsoleView.hpp"
 
 #include <chrono>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 namespace {
+
+namespace ui = onboard_autonomy::operator_interface::ui;
+namespace mission = onboard_autonomy::mission;
 
 void require(const bool condition, const std::string& message) {
     if (!condition) {
@@ -18,291 +21,235 @@ void require(const bool condition, const std::string& message) {
 }
 
 void healthy_snapshot_is_human_readable() {
-    onboard_autonomy::mission::AppSnapshot app_snapshot;
-    auto& snapshot = app_snapshot.vehicle;
-    snapshot.connected = true;
-    snapshot.gps_ready = true;
-    snapshot.battery_ready = true;
-    snapshot.system_health_known = true;
-    snapshot.system_health_ok = true;
-    snapshot.armable = true;
-    snapshot.armed = false;
-    snapshot.system_id = 1;
-    snapshot.component_id = 1;
-    snapshot.vehicle_type = 2;
-    snapshot.autopilot_type = 3;
-    snapshot.system_status = 3;
-    snapshot.gps_fix_type = 6;
-    snapshot.satellites_visible = 10;
-    snapshot.battery_voltage_v = 12.6;
-    snapshot.battery_current_a = 0.0;
-    snapshot.battery_remaining_pct = 100;
-    snapshot.autopilot_metadata = onboard_autonomy::mission::AutopilotMetadata{
+    mission::AppSnapshot app;
+    auto& vehicle = app.vehicle;
+    vehicle.connected = true;
+    vehicle.gps_ready = true;
+    vehicle.battery_ready = true;
+    vehicle.system_health_known = true;
+    vehicle.system_health_ok = true;
+    vehicle.armable = true;
+    vehicle.gps_fix_type = 6;
+    vehicle.satellites_visible = 10;
+    vehicle.battery_voltage_v = 12.6;
+    vehicle.battery_remaining_pct = 100;
+    vehicle.autopilot_metadata = mission::AutopilotMetadata{
         .firmware_major = 4,
         .firmware_minor = 6,
         .firmware_patch = 3,
         .firmware_release_type = 255,
-        .capabilities = 0,
         .board_version = (56U << 16U) | 2U,
-        .vendor_id = 0x1209,
-        .product_id = 0x5740,
     };
-    app_snapshot.companion_heartbeat_active = true;
-    app_snapshot.companion_link_failsafe.phase =
-        onboard_autonomy::mission::CompanionLinkFailsafePhase::accepted;
-    app_snapshot.companion_link_failsafe.action =
-        onboard_autonomy::mission::ArduPilotGcsFailsafeAction::land;
-    app_snapshot.companion_link_failsafe.timeout_s = 3.0;
-    app_snapshot.companion_link_failsafe.configured_gcs_system_id = 1;
-    app_snapshot.telemetry.state =
-        onboard_autonomy::mission::TelemetrySetupState::active;
-    app_snapshot.telemetry.completed_requests = 6;
-    app_snapshot.telemetry.total_requests = 6;
-    app_snapshot.simulated_wind =
-        onboard_autonomy::mission::SimulatedWindProfile{
-            .speed_m_s = 3.0,
-            .direction_from_deg = 270.0,
-            .turbulence_m_s = 0.6,
-        };
+    app.companion_heartbeat_active = true;
+    app.companion_link_failsafe.phase =
+        mission::CompanionLinkFailsafePhase::accepted;
+    app.companion_link_failsafe.action =
+        mission::ArduPilotGcsFailsafeAction::land;
+    app.companion_link_failsafe.timeout_s = 3.0;
+    app.companion_link_failsafe.configured_gcs_system_id = 1;
+    app.telemetry.state = mission::TelemetrySetupState::active;
+    app.telemetry.completed_requests = 6;
+    app.telemetry.total_requests = 6;
 
-    std::istringstream board_table{"Reserved \"PX4 [BL] FMU v6C.x\" 56\n"};
-    const auto board_catalog =
-        onboard_autonomy::operator_interface::ui::BoardTypeCatalog::from_stream(
-            board_table);
+    std::istringstream table{"Reserved \"PX4 [BL] FMU v6C.x\" 56\n"};
+    const auto catalog = ui::BoardTypeCatalog::from_stream(table);
     const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(app_snapshot,
-            "udp://127.0.0.1:14550",
-            false,
-            &board_catalog);
-
-    require(output.find("[ READY ]") != std::string::npos,
-        "overall readiness must be prominent");
-    require(output.find("GPS RTK FIXED / 10 SAT") != std::string::npos,
-        "GPS details must be readable");
-    require(output.find("BAT 12.60 V / 100%") != std::string::npos,
-        "battery details must be readable");
-    require(output.find("SIM WIND") == std::string::npos,
-        "simulation weather belongs to the Gazebo HUD");
-    require(output.find("TELEMETRY READY / 6 STREAMS") != std::string::npos &&
-                output.find("FIRMWARE 4.6.3 OFFICIAL") != std::string::npos &&
-                output.find("PX4 [BL] FMU v6C.x / ID 56 / SILICON 2") !=
-                    std::string::npos,
-        "acknowledged telemetry and reported controller metadata "
-        "must be visible");
-    require(output.find("RASPBERRY PI 5") != std::string::npos &&
-                output.find("PX4 [BL] FMU v6C.x") != std::string::npos,
-        "the target hardware names must be visible");
-    require(output.find("NO ACTIVE WARNINGS") != std::string::npos,
-        "healthy state must remain visible without a log section");
-    require(
-        output.find("LINK FAILSAFE READY / ARDUPILOT LAND / 3.0 S / SYSID 1") !=
-            std::string::npos,
-        "operator view must expose the flight-controller-owned fallback");
+        ui::render_console(app, "udp://127.0.0.1:14550", {}, &catalog);
+    for (const auto* expected : {"[ READY ]",
+             "GPS RTK FIXED / 10 SAT",
+             "BAT 12.60 V / 100%",
+             "TELEMETRY READY / 6 STREAMS",
+             "FIRMWARE 4.6.3 OFFICIAL",
+             "PX4 [BL] FMU v6C.x / ID 56 / SILICON 2",
+             "NO ACTIVE WARNINGS",
+             "LINK FAILSAFE READY / ARDUPILOT LAND / 3.0 S / SYSID 1"}) {
+        require(output.find(expected) != std::string::npos,
+            std::string("missing operator information: ") + expected);
+    }
+    require(output.find("RASPBERRY PI 5") == std::string::npos,
+        "configured companion hardware must not be presented as detected "
+        "hardware");
+    require(output.find("CAMERA / VISION") == std::string::npos,
+        "unused camera sections must not consume screen space");
 }
 
 void disconnected_snapshot_is_waiting() {
-    const onboard_autonomy::mission::AppSnapshot snapshot;
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            false);
-
-    require(output.find("WAITING FOR FLIGHT CONTROLLER") != std::string::npos,
-        "disconnected state must not look like a failure");
+    const auto output = ui::render_console({}, "udp://127.0.0.1:14550");
+    require(output.find("WAITING FOR FLIGHT CONTROLLER") != std::string::npos &&
+                output.find("ARM STATE UNKNOWN") != std::string::npos,
+        "a disconnected controller must not look ready or disarmed");
 }
 
-void command_bus_shows_both_directions() {
-    onboard_autonomy::mission::AppSnapshot snapshot;
-    snapshot.motion_commands_allowed = true;
-    snapshot.aerial_tracking_available = true;
-    snapshot.flight_startup.phase =
-        onboard_autonomy::mission::FlightStartupPhase::completed;
-    snapshot.flight_startup.detail = "Takeoff complete";
-    snapshot.autonomy.phase =
-        onboard_autonomy::mission::AutonomyRuntimePhase::active;
-    snapshot.autonomy.detail = "TARGET SEARCHING 0.4/-0.2/8.1 m";
-    snapshot.elapsed = std::chrono::milliseconds(1200);
-    snapshot.tx_activity = onboard_autonomy::mission::LinkActivity{
-        .sequence = 1,
+void link_activity_keeps_the_last_frame_and_its_age() {
+    mission::AppSnapshot app;
+    app.elapsed = std::chrono::milliseconds(1800);
+    app.tx_activity = mission::LinkActivity{
         .observed_at = std::chrono::milliseconds(1100),
         .message_name = "COMMAND_LONG",
         .detail = "SET_MODE",
     };
-    snapshot.rx_activity = onboard_autonomy::mission::LinkActivity{
-        .sequence = 2,
+    app.rx_activity = mission::LinkActivity{
         .observed_at = std::chrono::milliseconds(1100),
         .message_name = "COMMAND_ACK",
         .detail = "SET_MODE ACCEPTED",
     };
+    const auto output = ui::render_console(app, "udp://127.0.0.1:14550");
+    require(
+        output.find("TX  COMMAND_LONG: SET_MODE  / 0.7 S AGO") !=
+                std::string::npos &&
+            output.find("RX  COMMAND_ACK: SET_MODE ACCEPTED  / 0.7 S AGO") !=
+                std::string::npos,
+        "last traffic must remain readable with its age instead of blinking "
+        "and disappearing");
+    app.elapsed = std::chrono::milliseconds(900);
+    require(
+        ui::render_console(app, "udp://127.0.0.1:14550").find("AGE UNKNOWN") !=
+            std::string::npos,
+        "a future frame timestamp must not produce a negative age");
+}
 
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            false);
-
-    require(output.find("RASPBERRY PI 5") != std::string::npos &&
-                output.find("FLIGHT CONTROLLER") != std::string::npos,
-        "command bus endpoints must be visible");
-    require(output.find("==[ COMMAND_LONG: SET_MODE ]") != std::string::npos &&
-                output.find("[ COMMAND_ACK: SET_MODE ACCEPTED ]==") !=
-                    std::string::npos,
-        "command bus must show the actual MAVLink frame in each direction");
-    require(output.find("SET_MODE") != std::string::npos &&
-                output.find("ACCEPTED") != std::string::npos,
-        "command and acknowledgement labels must be visible");
-    require(output.find("FIDUCIAL LANDING") == std::string::npos &&
-                output.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=
+void shortcuts_reflect_the_actual_input_mode() {
+    mission::AppSnapshot app;
+    app.motion_commands_allowed = true;
+    app.aerial_tracking_available = true;
+    const auto passive = ui::render_console(app, "fake://transport");
+    require(passive.find("[2]") == std::string::npos &&
+                passive.find("[R]") == std::string::npos &&
+                passive.find("[Q]") == std::string::npos &&
+                passive.find("Ctrl+C exit") != std::string::npos,
+        "a noninteractive console must not advertise inactive keyboard "
+        "shortcuts");
+    const ui::ConsoleViewOptions interactive{.interactive_input = true};
+    const auto active =
+        ui::render_console(app, "fake://transport", interactive);
+    require(active.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=
                     std::string::npos &&
-                output.find("[R] ABORT MISSION + RTL") != std::string::npos &&
-                output.find("[Q] QUIT") != std::string::npos,
-        "interactive command hints must be visible");
-    require(output.find("AUTONOMY: ACTIVE") != std::string::npos &&
-                output.find("STARTUP: COMPLETE") != std::string::npos &&
-                output.find("TARGET SEARCHING") != std::string::npos,
-        "production startup and runtime state must be visible");
-
-    const auto tracking_only =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            false);
-    require(tracking_only.find("FIDUCIAL LANDING") == std::string::npos &&
-                tracking_only.find("TRACK AIRBORNE TARGET") !=
-                    std::string::npos,
-        "the console must advertise only configured missions");
-
-    snapshot.elapsed = std::chrono::milliseconds(1320);
-    const auto dim_pulse =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            false);
-    require(dim_pulse.find("--[ COMMAND_LONG: SET_MODE ]") != std::string::npos,
-        "a fresh frame must alternate to the dim blink phase");
-
-    snapshot.elapsed = std::chrono::milliseconds(1800);
-    const auto stale =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            false);
-    require(stale.find("COMMAND_LONG") == std::string::npos &&
-                stale.find("COMMAND_ACK") == std::string::npos,
-        "expired traffic must disappear instead of looking current");
+                active.find("[R] ABORT MISSION + RTL") != std::string::npos &&
+                active.find("[Q] QUIT") != std::string::npos,
+        "existing interactive shortcuts must remain discoverable");
+    app.motion_commands_allowed = false;
+    const auto observation =
+        ui::render_console(app, "fake://transport", interactive);
+    require(observation.find("[Q] QUIT") != std::string::npos &&
+                observation.find("[2]") == std::string::npos &&
+                observation.find("[R]") == std::string::npos,
+        "observation mode must expose Quit without advertising motion "
+        "controls");
 }
 
-void colors_group_related_elements() {
-    const onboard_autonomy::mission::AppSnapshot snapshot;
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "udp://127.0.0.1:14550",
-            true);
-
-    require(output.find("\x1b[96m|   RASPBERRY PI 5   |\x1b[0m") !=
-                std::string::npos,
-        "Raspberry Pi must use the companion color");
-    require(output.find("\x1b[93m| FLIGHT CONTROLLER  |\x1b[0m") !=
-                std::string::npos,
-        "Pixhawk must use the controller color");
-    require(output.find("\x1b[94m+===") != std::string::npos,
-        "screen chrome must have its own color");
-}
-
-void long_mavlink_message_names_are_safely_clipped() {
-    onboard_autonomy::mission::AppSnapshot snapshot;
-    snapshot.elapsed = std::chrono::milliseconds(1200);
-    snapshot.tx_activity = onboard_autonomy::mission::LinkActivity{
-        .sequence = 1,
-        .observed_at = std::chrono::milliseconds(1200),
+void all_warnings_and_long_protocol_text_remain_readable() {
+    mission::AppSnapshot app;
+    app.vehicle.warnings = {"Battery below arming threshold",
+        "GPS not ready",
+        std::string(170, 'w')};
+    app.tx_activity = mission::LinkActivity{
         .message_name = "OPEN_DRONE_ID_MESSAGE_PACK_REGISTRATION",
-        .detail = "TRANSMITTED",
+        .detail = std::string(180, 'd'),
     };
-    snapshot.rx_activity = onboard_autonomy::mission::LinkActivity{
-        .sequence = 2,
-        .observed_at = std::chrono::milliseconds(1200),
-        .message_name = "OPEN_DRONE_ID_MESSAGE_PACK_REGISTRATION",
-        .detail = "RECEIVED",
-    };
-
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "serial:///dev/ttyACM0?baud=115200",
-            false);
-
-    require(output.find("OPEN_DRONE_ID_MESSAGE_PACK_REG...") !=
+    const auto output = ui::render_console(app, std::string(140, 'e'));
+    require(output.find("Battery below arming threshold") !=
+                    std::string::npos &&
+                output.find("GPS not ready") != std::string::npos,
+        "every active warning must be displayed");
+    require(output.find("OPEN_DRONE_ID_MESSAGE_PACK_REGISTRATION") !=
                 std::string::npos,
-        "long real MAVLink names must be clipped without overflowing "
-        "the fixed-width wire");
+        "real MAVLink names must not be hidden by a decorative wire");
+    std::istringstream lines{output};
+    std::string line;
+    while (std::getline(lines, line)) {
+        require(line.size() == 80,
+            "wrapped text must stay inside an 80-column screen");
+    }
+    app.vehicle.warnings = {"Bad\x1b[2J\nmessage\ttext"};
+    const auto untrusted = ui::render_console(app, "fake://transport");
+    require(untrusted.find('\x1b') == std::string::npos &&
+                untrusted.find('\t') == std::string::npos,
+        "protocol text must not inject terminal control sequences");
 }
 
-void camera_pipeline_metrics_are_visible() {
-    onboard_autonomy::mission::AppSnapshot snapshot;
-    snapshot.camera = onboard_autonomy::mission::CameraSnapshot{
-        .phase = onboard_autonomy::mission::ports::CameraSourcePhase::streaming,
-        .source = "rpicam-vid camera 0",
-        .error = "",
+void camera_and_vision_metrics_remain_visible() {
+    mission::AppSnapshot app;
+    app.camera = mission::CameraSnapshot{
+        .phase = mission::ports::CameraSourcePhase::streaming,
         .width = 640,
         .height = 480,
         .received_frames = 120,
         .camera_restarts = 2,
-        .frames_with_capture_timestamp = 120,
         .measured_fps = 30.01,
         .latest_latency_ms = 42.1,
         .average_latency_ms = 39.5,
-        .maximum_latency_ms = 51.2,
-        .latest_frame_age_ms = std::nullopt,
     };
-
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "serial:///dev/ttyACM0?baud=115200",
-            false);
-    require(output.find("CAMERA STREAMING") != std::string::npos &&
-                output.find("640x480 YUV420") != std::string::npos &&
-                output.find("30.0 FPS") != std::string::npos &&
-                output.find("2 RESTARTS") != std::string::npos,
-        "console must show the live camera stream");
-    require(output.find("CAMERA LATENCY 42.1 MS LATEST") != std::string::npos &&
-                output.find("39.5 MS AVG") != std::string::npos &&
-                output.find("DROP 0") != std::string::npos,
-        "console must show camera latency and dropped frames");
-}
-
-void vision_pipeline_and_target_are_visible() {
-    onboard_autonomy::mission::AppSnapshot snapshot;
-    snapshot.vision = onboard_autonomy::mission::VisionSnapshot{
+    app.vision = mission::VisionSnapshot{
         .detector = "synthetic detector",
         .processed_frames = 42,
-        .frames_with_targets = 3,
-        .total_targets = 3,
-        .latest_processing_ms = 5.2,
         .average_processing_ms = 4.8,
-        .maximum_processing_ms = 6.1,
-        .last_detection_age_ms = 0.0,
-        .latest_targets =
-            {
-                {
-                    .id = 0,
-                    .family = "object",
-                    .center = {.x_px = 319.5, .y_px = 239.5},
-                    .corners = {},
-
-                    .confidence_percent = 88.4,
-                },
-            },
+        .latest_targets = {{
+            .family = "object",
+            .center = {.x_px = 319.5, .y_px = 239.5},
+            .confidence_percent = 88.4,
+        }},
     };
-
-    const auto output =
-        onboard_autonomy::operator_interface::ui::render_console(snapshot,
-            "serial:///dev/ttyACM0?baud=115200",
-            false);
-    require(output.find("VISION synthetic detector") != std::string::npos &&
-                output.find("4.8 MS AVG") != std::string::npos,
-        "console must show the active vision detector");
-    require(output.find("object   |   CENTER 319.5/239.5 PX") !=
-                    std::string::npos &&
-                output.find("CONFIDENCE 88.4%") != std::string::npos,
-        "console must show the detected object in image coordinates");
+    const auto output = ui::render_console(app, "fake://transport");
+    for (const auto* expected : {"CAMERA STREAMING",
+             "640x480 YUV420",
+             "30.0 FPS",
+             "2 RESTARTS",
+             "CAMERA LATENCY 42.1 MS LATEST",
+             "39.5 MS AVG",
+             "DROP 0",
+             "VISION synthetic detector",
+             "4.8 MS AVG",
+             "CENTER 319.5/239.5 PX",
+             "CONFIDENCE 88.4%"}) {
+        require(output.find(expected) != std::string::npos,
+            std::string("missing camera diagnostic: ") + expected);
+    }
     require(output.find("TAG") == std::string::npos &&
                 output.find("X RIGHT") == std::string::npos,
-        "console must not show removed marker pose or tracking");
+        "the removed marker model must not return in the console");
+}
+
+void plain_sink_never_emits_terminal_controls() {
+    std::ostringstream output;
+    {
+        ui::ConsoleSnapshotSink sink{output,
+            "fake://transport",
+            nullptr,
+            {.use_color = true}};
+        sink.consume({}, {});
+        sink.consume({}, {});
+    }
+    require(output.str().find('\x1b') == std::string::npos,
+        "redirected snapshots must contain neither cursor controls nor colors, "
+        "even on destruction");
+    require(output.str().find("\n\n+") != std::string::npos,
+        "plain snapshots must remain separate complete records");
+}
+
+void terminal_sink_clears_a_shorter_frame_and_restores_cursor() {
+    std::ostringstream output;
+    mission::AppSnapshot app;
+    app.camera = mission::CameraSnapshot{};
+    {
+        ui::ConsoleSnapshotSink sink{output,
+            "fake://transport",
+            nullptr,
+            {},
+            ui::ConsoleOutputMode::terminal};
+        sink.consume(app, {});
+        const auto first_frame = output.str().size();
+        app.camera.reset();
+        sink.consume(app, {});
+        const auto second_frame = output.str().substr(first_frame);
+        require(second_frame.starts_with("\x1b[H") &&
+                    second_frame.ends_with("\x1b[J"),
+            "redraw must erase old rows after a camera section disappears");
+        require(second_frame.find("CAMERA / VISION") == std::string::npos,
+            "the shorter frame must not retain the removed camera section");
+    }
+    require(output.str().find("\x1b[?25l") != std::string::npos &&
+                output.str().ends_with("\x1b[?25h\x1b[0m\n"),
+        "terminal lifetime must restore the hidden cursor");
 }
 
 } // namespace
@@ -310,9 +257,10 @@ void vision_pipeline_and_target_are_visible() {
 void run_console_view_tests() {
     healthy_snapshot_is_human_readable();
     disconnected_snapshot_is_waiting();
-    command_bus_shows_both_directions();
-    colors_group_related_elements();
-    long_mavlink_message_names_are_safely_clipped();
-    camera_pipeline_metrics_are_visible();
-    vision_pipeline_and_target_are_visible();
+    link_activity_keeps_the_last_frame_and_its_age();
+    shortcuts_reflect_the_actual_input_mode();
+    all_warnings_and_long_protocol_text_remain_readable();
+    camera_and_vision_metrics_remain_visible();
+    plain_sink_never_emits_terminal_controls();
+    terminal_sink_clears_a_shorter_frame_and_restores_cursor();
 }

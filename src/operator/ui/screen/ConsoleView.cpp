@@ -14,12 +14,10 @@
 namespace onboard_autonomy::operator_interface::ui {
 namespace {
 
-constexpr std::size_t kConsoleWidth = 88;
+constexpr std::size_t kConsoleWidth = 80;
 constexpr std::size_t kInnerWidth = kConsoleWidth - 2;
-constexpr std::size_t kDeviceWidth = 22;
-constexpr std::size_t kLinkWidth = 40;
-constexpr auto kActivityVisibleFor = std::chrono::milliseconds(550);
-constexpr auto kBlinkHalfPeriod = std::chrono::milliseconds(120);
+constexpr std::size_t kContentWidth = kInnerWidth - 2;
+constexpr unsigned char kDeleteCharacter = 127;
 constexpr std::uint8_t kGpsUnavailable = 0;
 constexpr std::uint8_t kGpsNoFix = 1;
 constexpr std::uint8_t kGps2dFix = 2;
@@ -49,7 +47,6 @@ enum class Tone {
     waiting,
     bad,
     accent,
-    controller,
     chrome,
     dim,
 };
@@ -66,8 +63,6 @@ std::string_view ansi_code(const Tone tone) {
         return "\x1b[91m";
     case Tone::accent:
         return "\x1b[96m";
-    case Tone::controller:
-        return "\x1b[93m";
     case Tone::chrome:
         return "\x1b[94m";
     case Tone::dim:
@@ -83,33 +78,31 @@ std::string paint(std::string value, const Tone tone, const bool use_color) {
     return std::string(ansi_code(tone)) + value + "\x1b[0m";
 }
 
-std::string clipped(const std::string_view value, const std::size_t width) {
-    if (value.size() <= width) {
-        return std::string(value);
+// Protocol text is untrusted terminal content. Keep printable bytes only.
+std::string printable(const std::string_view value) {
+    std::string result;
+    result.reserve(value.size());
+    for (const unsigned char character : value) {
+        result += character >= ' ' && character != kDeleteCharacter
+                      ? static_cast<char>(character)
+                      : ' ';
     }
-    if (width <= 3) {
-        return std::string(value.substr(0, width));
-    }
-    return std::string(value.substr(0, width - 3)) + "...";
+    return result;
 }
 
 std::string fitted(const std::string_view value, const std::size_t width) {
-    std::string result = clipped(value, width);
+    std::string result{value.substr(0, width)};
     result.append(width - result.size(), ' ');
     return result;
 }
 
-std::string centered(const std::string_view value, const std::size_t width) {
-    const std::string content = clipped(value, width);
-    const auto left = (width - content.size()) / 2;
-    const auto right = width - content.size() - left;
-    return std::string(left, ' ') + content + std::string(right, ' ');
-}
-
 void write_border(std::ostringstream& output,
-    const char fill,
+    const std::string_view title,
     const bool use_color) {
-    output << paint("+" + std::string(kInnerWidth, fill) + "+",
+    const auto label =
+        title.empty() ? std::string{} : "-- " + std::string(title) + " ";
+    output << paint("+" + label + std::string(kInnerWidth - label.size(), '-') +
+                        "+",
                   Tone::chrome,
                   use_color)
            << '\n';
@@ -119,60 +112,26 @@ void write_line(std::ostringstream& output,
     const std::string_view value,
     const Tone tone,
     const bool use_color) {
-    output << paint("|", Tone::chrome, use_color)
-           << paint(fitted(value, kInnerWidth), tone, use_color)
-           << paint("|", Tone::chrome, use_color) << '\n';
-}
-
-void write_centered_line(std::ostringstream& output,
-    const std::string_view value,
-    const Tone tone,
-    const bool use_color) {
-    output << paint("|", Tone::chrome, use_color)
-           << paint(centered(value, kInnerWidth), tone, use_color)
-           << paint("|", Tone::chrome, use_color) << '\n';
-}
-
-std::string device_line(const std::string_view value) {
-    return "|" + centered(value, kDeviceWidth - 2) + "|";
-}
-
-void write_topology_line(std::ostringstream& output,
-    const std::string_view companion,
-    const Tone companion_tone,
-    const std::string_view link,
-    const Tone link_tone,
-    const std::string_view controller,
-    const Tone controller_tone,
-    const bool use_color) {
-    output << paint("| ", Tone::chrome, use_color)
-           << paint(fitted(companion, kDeviceWidth), companion_tone, use_color)
-           << paint(fitted(link, kLinkWidth), link_tone, use_color)
-           << paint(fitted(controller, kDeviceWidth),
-                  controller_tone,
-                  use_color)
-           << paint(" |", Tone::chrome, use_color) << '\n';
-}
-
-void write_header(std::ostringstream& output,
-    const std::string_view link_status,
-    const std::string_view transport_description,
-    const bool connected,
-    const bool use_color) {
-    constexpr std::string_view title{" ONBOARD AUTONOMY   "};
-    constexpr std::string_view link_label{"LINK: "};
-    const std::string transport = "   " + std::string(transport_description);
-    const auto remaining =
-        kInnerWidth - title.size() - link_label.size() - link_status.size();
-
-    output << paint("|", Tone::chrome, use_color)
-           << paint(std::string(title), Tone::accent, use_color)
-           << paint(std::string(link_label), Tone::normal, use_color)
-           << paint(std::string(link_status),
-                  connected ? Tone::good : Tone::dim,
-                  use_color)
-           << paint(fitted(transport, remaining), Tone::dim, use_color)
-           << paint("|", Tone::chrome, use_color) << '\n';
+    const auto text = printable(value);
+    std::string_view remaining{text};
+    while (!remaining.empty()) {
+        auto count = std::min(remaining.size(), kContentWidth);
+        if (remaining.size() > kContentWidth) {
+            const auto space = remaining.rfind(' ', kContentWidth);
+            if (space != std::string_view::npos && space > 0) {
+                count = space;
+            }
+        }
+        output << paint("| ", Tone::chrome, use_color)
+               << paint(fitted(remaining.substr(0, count), kContentWidth),
+                      tone,
+                      use_color)
+               << paint(" |", Tone::chrome, use_color) << '\n';
+        remaining.remove_prefix(count);
+        while (!remaining.empty() && remaining.front() == ' ') {
+            remaining.remove_prefix(1);
+        }
+    }
 }
 
 std::string gps_fix_name(const std::optional<std::uint8_t> fix_type) {
@@ -290,15 +249,6 @@ std::string board_type_name(const std::uint32_t board_version,
         return match->preferred_name;
     }
     return "BOARD TYPE " + std::to_string(board_type_id(board_version));
-}
-
-std::string controller_hardware_name(const mission::VehicleSnapshot& vehicle,
-    const BoardTypeResolver* resolver) {
-    if (!vehicle.connected || !vehicle.autopilot_metadata.has_value() ||
-        vehicle.autopilot_metadata->board_version == 0U) {
-        return "FLIGHT CONTROLLER";
-    }
-    return board_type_name(vehicle.autopilot_metadata->board_version, resolver);
 }
 
 std::string board_detail(const mission::VehicleSnapshot& vehicle,
@@ -594,59 +544,26 @@ Tone autonomy_tone(const mission::AutonomyRuntimePhase phase) {
     return Tone::normal;
 }
 
-bool activity_is_fresh(const std::optional<mission::LinkActivity>& activity,
+std::string activity_detail(const std::string_view direction,
+    const std::optional<mission::LinkActivity>& activity,
     const std::chrono::milliseconds elapsed) {
-    return activity.has_value() && elapsed >= activity->observed_at &&
-           elapsed - activity->observed_at <= kActivityVisibleFor;
-}
-
-bool blink_is_bright(const std::chrono::milliseconds elapsed) {
-    return (elapsed.count() / kBlinkHalfPeriod.count()) % 2 == 0;
-}
-
-Tone activity_tone(const std::optional<mission::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed,
-    const Tone group_tone) {
-    if (!activity_is_fresh(activity, elapsed) || !blink_is_bright(elapsed)) {
-        return Tone::dim;
+    if (!activity.has_value()) {
+        return std::string(direction) + "  WAITING FOR FIRST FRAME";
     }
-    return group_tone;
-}
-
-std::string activity_label(const mission::LinkActivity& activity) {
-    return activity.detail.empty()
-               ? activity.message_name
-               : activity.message_name + ": " + activity.detail;
-}
-
-std::string outbound_wire(const std::optional<mission::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed) {
-    if (!activity.has_value() || !activity_is_fresh(activity, elapsed)) {
-        return std::string(kLinkWidth - 1, '-') + ">";
+    std::ostringstream detail;
+    detail << direction << "  " << activity->message_name;
+    if (!activity->detail.empty()) {
+        detail << ": " << activity->detail;
     }
-
-    constexpr std::size_t decoration_width = 7;
-    const std::string label = clipped(activity_label(activity.value()),
-        kLinkWidth - decoration_width);
-    const std::string packet = "[ " + label + " ]";
-    const char pulse = blink_is_bright(elapsed) ? '=' : '-';
-    return std::string(2, pulse) + packet +
-           std::string(kLinkWidth - packet.size() - 3, pulse) + ">";
-}
-
-std::string inbound_wire(const std::optional<mission::LinkActivity>& activity,
-    const std::chrono::milliseconds elapsed) {
-    if (!activity.has_value() || !activity_is_fresh(activity, elapsed)) {
-        return "<" + std::string(kLinkWidth - 1, '-');
+    if (elapsed >= activity->observed_at) {
+        const auto age =
+            std::chrono::duration<double>(elapsed - activity->observed_at);
+        detail << "  / " << std::fixed << std::setprecision(1) << age.count()
+               << " S AGO";
+    } else {
+        detail << "  / AGE UNKNOWN";
     }
-
-    constexpr std::size_t decoration_width = 7;
-    const std::string label = clipped(activity_label(activity.value()),
-        kLinkWidth - decoration_width);
-    const std::string packet = "[ " + label + " ]";
-    const char pulse = blink_is_bright(elapsed) ? '=' : '-';
-    return "<" + std::string(kLinkWidth - packet.size() - 3, pulse) + packet +
-           std::string(2, pulse);
+    return detail.str();
 }
 
 std::string overall_status(const mission::AppSnapshot& snapshot) {
@@ -693,200 +610,177 @@ Tone overall_tone(const mission::AppSnapshot& snapshot) {
     return Tone::waiting;
 }
 
-void write_topology(std::ostringstream& output,
-    const mission::AppSnapshot& snapshot,
+void write_vehicle(std::ostringstream& output,
+    const mission::VehicleSnapshot& vehicle,
     const BoardTypeResolver* resolver,
     const bool use_color) {
-    const auto& vehicle = snapshot.vehicle;
-    const std::string heartbeat =
-        snapshot.companion_heartbeat_active ? "HEARTBEAT ON" : "HEARTBEAT WAIT";
-    const std::string controller_mode =
-        vehicle.connected ? flight_mode_name(vehicle.flight_mode) +
-                                (vehicle.armed ? " / ARMED" : " / DISARMED")
-                          : "WAITING FOR LINK";
+    write_border(output, "VEHICLE", use_color);
+    const auto tone = vehicle.connected ? Tone::normal : Tone::dim;
+    write_line(output,
+        "MODE " + flight_mode_name(vehicle.flight_mode) + " / " +
+            (vehicle.connected ? (vehicle.armed ? "ARMED" : "DISARMED")
+                               : "ARM STATE UNKNOWN") +
+            "   |   ALT " + altitude_detail(vehicle),
+        tone,
+        use_color);
+    write_line(output,
+        "GPS " + gps_detail(vehicle) + "   |   BAT " + battery_detail(vehicle),
+        tone,
+        use_color);
+    write_line(output,
+        "FC " + autopilot_name(vehicle.autopilot_type) + "   |   " +
+            firmware_detail(vehicle),
+        tone,
+        use_color);
+    write_line(output, board_detail(vehicle, resolver), tone, use_color);
+}
 
-    write_line(output, "", Tone::normal, use_color);
-    write_topology_line(output,
-        "+--o--------------o--+",
-        Tone::accent,
-        centered("MAVLINK", kLinkWidth),
-        Tone::dim,
-        "/--o--------------o--\\",
-        Tone::controller,
+void write_health(std::ostringstream& output,
+    const mission::AppSnapshot& snapshot,
+    const bool use_color) {
+    write_border(output, "HEALTH", use_color);
+    write_line(output,
+        telemetry_detail(snapshot.telemetry) + "   |   COMPANION HEARTBEAT " +
+            (snapshot.companion_heartbeat_active ? "ON" : "WAITING"),
+        metadata_tone(snapshot),
         use_color);
-    write_topology_line(output,
-        device_line("RASPBERRY PI 5"),
-        Tone::accent,
-        outbound_wire(snapshot.tx_activity, snapshot.elapsed),
-        activity_tone(snapshot.tx_activity, snapshot.elapsed, Tone::accent),
-        device_line(controller_hardware_name(vehicle, resolver)),
-        Tone::controller,
+    write_line(output,
+        companion_link_failsafe_detail(snapshot.companion_link_failsafe),
+        companion_link_failsafe_tone(snapshot.companion_link_failsafe),
         use_color);
-    write_topology_line(output,
-        device_line("COMPANION COMPUTER"),
-        Tone::accent,
-        inbound_wire(snapshot.rx_activity, snapshot.elapsed),
-        activity_tone(snapshot.rx_activity, snapshot.elapsed, Tone::controller),
-        device_line("FLIGHT CONTROLLER"),
-        Tone::controller,
-        use_color);
-    write_topology_line(output,
-        device_line(heartbeat),
-        vehicle.connected ? Tone::accent : Tone::dim,
-        "",
-        Tone::dim,
-        device_line(controller_mode),
-        vehicle.connected ? Tone::controller : Tone::dim,
-        use_color);
-    write_topology_line(output,
-        device_line("ONBOARD AUTONOMY"),
-        Tone::accent,
-        "",
-        Tone::dim,
-        device_line(autopilot_name(vehicle.autopilot_type)),
-        Tone::controller,
-        use_color);
-    write_topology_line(output,
-        "+--o--------------o--+",
-        Tone::accent,
-        "",
-        Tone::dim,
-        "\\--o--------------o--/",
-        Tone::controller,
-        use_color);
-    write_line(output, "", Tone::normal, use_color);
+    if (snapshot.vehicle.warnings.empty()) {
+        write_line(output,
+            snapshot.vehicle.connected ? "NO ACTIVE WARNINGS"
+                                       : "WARNINGS AVAILABLE AFTER CONNECTION",
+            snapshot.vehicle.connected ? Tone::good : Tone::dim,
+            use_color);
+    }
+    for (const auto& warning : snapshot.vehicle.warnings) {
+        write_line(output, "! " + warning, Tone::bad, use_color);
+    }
 }
 
 void write_camera_and_vision(std::ostringstream& output,
     const mission::AppSnapshot& snapshot,
     const bool use_color) {
+    if (!snapshot.camera.has_value() && !snapshot.vision.has_value()) {
+        return;
+    }
+    write_border(output, "CAMERA / VISION", use_color);
     if (snapshot.camera.has_value()) {
         const auto tone = camera_tone(*snapshot.camera);
-        write_centered_line(output,
+        write_line(output,
             camera_stream_detail(*snapshot.camera),
             tone,
             use_color);
-        write_centered_line(output,
+        write_line(output,
             camera_latency_detail(*snapshot.camera),
             tone,
             use_color);
     }
-    if (!snapshot.vision.has_value()) {
-        return;
+    if (snapshot.vision.has_value()) {
+        write_line(output,
+            vision_pipeline_detail(*snapshot.vision),
+            Tone::accent,
+            use_color);
+        write_line(output,
+            vision_target_detail(*snapshot.vision),
+            vision_target_tone(*snapshot.vision),
+            use_color);
     }
-
-    const auto target_tone = vision_target_tone(*snapshot.vision);
-    write_centered_line(output,
-        vision_pipeline_detail(*snapshot.vision),
-        Tone::accent,
-        use_color);
-    write_centered_line(output,
-        vision_target_detail(*snapshot.vision),
-        target_tone,
-        use_color);
 }
 
-void write_vehicle_status(std::ostringstream& output,
-    const mission::AppSnapshot& snapshot,
-    const BoardTypeResolver* resolver,
-    const bool use_color) {
-    const auto& vehicle = snapshot.vehicle;
-    write_centered_line(output,
-        "[ " + overall_status(snapshot) + " ]",
-        overall_tone(snapshot),
-        use_color);
-    write_centered_line(output,
-        telemetry_detail(snapshot.telemetry) + "   |   " +
-            firmware_detail(vehicle),
-        metadata_tone(snapshot),
-        use_color);
-    write_centered_line(output,
-        board_detail(vehicle, resolver),
-        metadata_tone(snapshot),
-        use_color);
-    write_centered_line(output,
-        companion_link_failsafe_detail(snapshot.companion_link_failsafe),
-        companion_link_failsafe_tone(snapshot.companion_link_failsafe),
-        use_color);
-    write_camera_and_vision(output, snapshot, use_color);
-    write_centered_line(output,
-        "MODE " + flight_mode_name(vehicle.flight_mode) + "   |   ALT " +
-            altitude_detail(vehicle) + "   |   GPS " + gps_detail(vehicle) +
-            "   |   BAT " + battery_detail(vehicle),
-        vehicle.connected ? Tone::normal : Tone::dim,
-        use_color);
-    const bool healthy = vehicle.warnings.empty();
-    const std::string warning =
-        healthy ? (vehicle.connected ? "NO ACTIVE WARNINGS"
-                                     : "WARNINGS AVAILABLE AFTER CONNECTION")
-                : "! " + vehicle.warnings.front();
-    const Tone warning_tone =
-        healthy ? (vehicle.connected ? Tone::good : Tone::dim) : Tone::bad;
-    write_centered_line(output, warning, warning_tone, use_color);
-}
-
-void write_runtime_footer(std::ostringstream& output,
+void write_session(std::ostringstream& output,
     const mission::AppSnapshot& snapshot,
     const bool use_color) {
     const auto& startup = snapshot.flight_startup;
     const auto& autonomy = snapshot.autonomy;
+    if (startup.phase == mission::FlightStartupPhase::disabled &&
+        autonomy.phase == mission::AutonomyRuntimePhase::disabled) {
+        return;
+    }
     const bool startup_finished =
         startup.phase == mission::FlightStartupPhase::completed ||
         startup.phase == mission::FlightStartupPhase::idle ||
         startup.phase == mission::FlightStartupPhase::disabled;
+    write_border(output, "SESSION", use_color);
+    write_line(output,
+        "AUTONOMY: " + autonomy_phase_name(autonomy.phase) +
+            "   |   STARTUP: " + startup_phase_name(startup.phase),
+        autonomy_tone(autonomy.phase),
+        use_color);
+    write_line(output,
+        startup_finished ? autonomy.detail : startup.detail,
+        autonomy_tone(autonomy.phase),
+        use_color);
+}
 
-    write_border(output, '-', use_color);
-    write_line(output,
-        " AUTONOMY: " + autonomy_phase_name(autonomy.phase) +
-            " | STARTUP: " + startup_phase_name(startup.phase),
-        autonomy_tone(autonomy.phase),
-        use_color);
-    write_line(output,
-        " " + (startup_finished ? autonomy.detail : startup.detail),
-        autonomy_tone(autonomy.phase),
-        use_color);
-    std::string mission_commands;
-    if (snapshot.aerial_tracking_available) {
-        if (!mission_commands.empty()) {
-            mission_commands += "     ";
-        }
-        mission_commands += "[2] TRACK AIRBORNE TARGET (HOLD + YAW)";
+void write_controls(std::ostringstream& output,
+    const mission::AppSnapshot& snapshot,
+    const ConsoleViewOptions& options) {
+    write_border(output, "CONTROLS", options.use_color);
+    if (!options.interactive_input) {
+        write_line(output,
+            "LIVE VIEW   |   Ctrl+C exit",
+            Tone::dim,
+            options.use_color);
+        return;
     }
-    if (!snapshot.motion_commands_allowed) {
-        mission_commands = "LIVE VIEW     MOTION KEYS DISABLED     CTRL+C EXIT";
-    } else if (mission_commands.empty()) {
-        mission_commands = "NO AUTONOMY MISSION CONFIGURED";
-    }
-    write_centered_line(output,
-        mission_commands,
-        snapshot.motion_commands_allowed ? Tone::normal : Tone::dim,
-        use_color);
     if (snapshot.motion_commands_allowed) {
-        write_centered_line(output,
-            "[R] ABORT MISSION + RTL     [Q] QUIT",
+        if (snapshot.aerial_tracking_available) {
+            write_line(output,
+                "[2] TRACK AIRBORNE TARGET (HOLD + YAW)",
+                Tone::normal,
+                options.use_color);
+        }
+        write_line(output,
+            "[R] ABORT MISSION + RTL   |   [Q] QUIT",
             Tone::normal,
-            use_color);
+            options.use_color);
+    } else {
+        write_line(output,
+            "[Q] QUIT   |   OBSERVATION ONLY",
+            Tone::dim,
+            options.use_color);
     }
-    write_border(output, '=', use_color);
 }
 
 } // namespace
 
 std::string render_console(const mission::AppSnapshot& snapshot,
     const std::string_view transport_description,
-    const bool use_color,
+    const ConsoleViewOptions options,
     const BoardTypeResolver* board_type_resolver) {
     std::ostringstream output;
-    write_border(output, '=', use_color);
-    write_header(output,
-        snapshot.vehicle.connected ? "ONLINE" : "WAITING",
-        transport_description,
-        snapshot.vehicle.connected,
-        use_color);
-    write_border(output, '-', use_color);
-    write_topology(output, snapshot, board_type_resolver, use_color);
-    write_vehicle_status(output, snapshot, board_type_resolver, use_color);
-    write_runtime_footer(output, snapshot, use_color);
+    write_border(output, {}, options.use_color);
+    write_line(output,
+        "ONBOARD AUTONOMY   [ " + overall_status(snapshot) + " ]",
+        overall_tone(snapshot),
+        options.use_color);
+    write_line(output,
+        std::string("LINK ") +
+            (snapshot.vehicle.connected ? "ONLINE" : "WAITING") + "   " +
+            std::string(transport_description),
+        snapshot.vehicle.connected ? Tone::accent : Tone::dim,
+        options.use_color);
+    write_vehicle(output,
+        snapshot.vehicle,
+        board_type_resolver,
+        options.use_color);
+    write_health(output, snapshot, options.use_color);
+    write_camera_and_vision(output, snapshot, options.use_color);
+    write_border(output, "MAVLINK / LAST FRAME", options.use_color);
+    write_line(output,
+        activity_detail("TX", snapshot.tx_activity, snapshot.elapsed),
+        Tone::accent,
+        options.use_color);
+    write_line(output,
+        activity_detail("RX", snapshot.rx_activity, snapshot.elapsed),
+        Tone::normal,
+        options.use_color);
+    write_session(output, snapshot, options.use_color);
+    write_controls(output, snapshot, options);
+    write_border(output, {}, options.use_color);
     return output.str();
 }
 
