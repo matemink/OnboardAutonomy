@@ -28,7 +28,12 @@ def check_environment() -> list[str]:
     for socket_type, port, label in ENDPOINTS:
         with socket.socket(socket.AF_INET, socket_type) as probe:
             try:
+                if socket_type == socket.SOCK_STREAM:
+                    # Match the services: TIME_WAIT is not an active listener.
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 probe.bind(("0.0.0.0", port))
+                if socket_type == socket.SOCK_STREAM:
+                    probe.listen(1)
             except OSError:
                 conflicts.append(f"{label}: port {port} is unavailable")
     return conflicts

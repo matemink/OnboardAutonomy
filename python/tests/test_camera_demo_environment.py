@@ -3,6 +3,7 @@
 import importlib.util
 import socket
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -82,3 +83,54 @@ class CameraDemoEnvironmentTests(unittest.TestCase):
         self.assertIn(
             'ONBOARD_AUTONOMY_BUILD_DIR="%ONBOARD_AUTONOMY_BUILD_DIR%"', launcher
         )
+
+    def test_active_tcp_listener_is_not_reused(self) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            with (
+                patch.object(
+                    MODULE, "ENDPOINTS", ((socket.SOCK_STREAM, port, "test preview"),)
+                ),
+                patch.object(
+                    MODULE.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 1),
+                ),
+            ):
+                self.assertEqual(
+                    MODULE.check_environment(),
+                    [f"test preview: port {port} is unavailable"],
+                )
+            self.assertEqual(listener.getsockname()[1], port)
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux TCP reuse behavior")
+    def test_recently_closed_tcp_connection_does_not_block_restart(self) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as client:
+                connection, _ = listener.accept()
+                connection.close()
+                self.assertEqual(client.recv(1), b"")
+        # Prove this fixture has the condition that fooled the previous probe.
+        with (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as plain_probe,
+            self.assertRaises(OSError),
+        ):
+            plain_probe.bind(("0.0.0.0", port))
+        with (
+            patch.object(
+                MODULE, "ENDPOINTS", ((socket.SOCK_STREAM, port, "test preview"),)
+            ),
+            patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 1),
+            ),
+        ):
+            self.assertEqual(MODULE.check_environment(), [])
