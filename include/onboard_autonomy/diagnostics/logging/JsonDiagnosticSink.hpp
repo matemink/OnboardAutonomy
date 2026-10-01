@@ -1,6 +1,6 @@
 #pragma once
 
-#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/SnapshotSink.hpp"
 
 #include <filesystem>
 #include <iosfwd>
@@ -9,7 +9,7 @@
 namespace onboard_autonomy::diagnostics::logging {
 
 // Writes backward-compatible snapshots plus transition events as JSON Lines.
-class JsonDiagnosticSink final : public bootstrap::RuntimeSnapshotSink {
+class JsonDiagnosticSink final : public mission::ports::RuntimeSnapshotSink {
   public:
     explicit JsonDiagnosticSink(std::ostream& output);
     explicit JsonDiagnosticSink(const std::filesystem::path& output_file);

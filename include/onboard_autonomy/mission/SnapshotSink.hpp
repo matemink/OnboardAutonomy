@@ -6,7 +6,7 @@ namespace onboard_autonomy::mission {
 struct AppSnapshot;
 }
 
-namespace onboard_autonomy::bootstrap {
+namespace onboard_autonomy::mission::ports {
 
 // Receives immutable runtime observations without becoming a mission
 // dependency.
@@ -18,4 +18,4 @@ class RuntimeSnapshotSink {
         std::chrono::system_clock::time_point recorded_at) = 0;
 };
 
-} // namespace onboard_autonomy::bootstrap
+} // namespace onboard_autonomy::mission::ports

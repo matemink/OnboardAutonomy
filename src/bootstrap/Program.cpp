@@ -4,7 +4,7 @@
 #include "onboard_autonomy/diagnostics/preview/HttpCameraPreviewServer.hpp"
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
-#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/SnapshotSink.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 #include "onboard_autonomy/mission/cv/detection/OpenCvDnnTargetDetector.hpp"
@@ -38,7 +38,7 @@ constexpr float kMinimumAirplaneConfidence = 0.51F;
 
 using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
 using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
-using RuntimeSnapshotSink = bootstrap::RuntimeSnapshotSink;
+using RuntimeSnapshotSink = mission::ports::RuntimeSnapshotSink;
 
 std::vector<std::string_view> command_line_arguments(const int argc,
     char** argv) {

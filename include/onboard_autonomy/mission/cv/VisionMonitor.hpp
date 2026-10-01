@@ -1,7 +1,9 @@
 #pragma once
 
+#include "onboard_autonomy/mission/cv/VisionSnapshot.hpp"
+
 #include "onboard_autonomy/mission/cv/detection/TargetDetector.hpp"
-#include "onboard_autonomy/mission/flight/VehicleState.hpp"
+#include "onboard_autonomy/mission/Clock.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -10,18 +12,6 @@
 #include <vector>
 
 namespace onboard_autonomy::mission {
-
-struct VisionSnapshot {
-    std::string detector;
-    std::uint64_t processed_frames{0};
-    std::uint64_t frames_with_targets{0};
-    std::uint64_t total_targets{0};
-    std::optional<double> latest_processing_ms;
-    std::optional<double> average_processing_ms;
-    std::optional<double> maximum_processing_ms;
-    std::optional<double> last_detection_age_ms;
-    std::vector<mission::TargetObservation> latest_targets;
-};
 
 class VisionMonitor {
   public:

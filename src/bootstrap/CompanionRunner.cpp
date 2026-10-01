@@ -5,7 +5,7 @@
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 #include "onboard_autonomy/mission/cv/CameraSource.hpp"
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
-#include "onboard_autonomy/bootstrap/RuntimeSnapshotSink.hpp"
+#include "onboard_autonomy/mission/SnapshotSink.hpp"
 
 #include <chrono>
 #include <csignal>
@@ -34,7 +34,7 @@ CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
     mission::CompanionApplication& application,
     mission::AsyncCameraMonitor* forward_camera_monitor,
     RuntimeCommandSource* command_source,
-    std::vector<bootstrap::RuntimeSnapshotSink*> snapshot_sinks,
+    std::vector<mission::ports::RuntimeSnapshotSink*> snapshot_sinks,
     std::vector<diagnostics::preview::CameraPreviewSink*> preview_sinks)
     : options_(options), application_(application),
       forward_camera_monitor_(forward_camera_monitor),

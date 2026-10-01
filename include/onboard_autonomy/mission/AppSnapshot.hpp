@@ -1,11 +1,12 @@
 #pragma once
 
-#include "onboard_autonomy/mission/autonomy/AutonomyRuntime.hpp"
-#include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
-#include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
+#include "onboard_autonomy/mission/autonomy/AutonomySnapshot.hpp"
+#include "onboard_autonomy/mission/cv/CameraSnapshot.hpp"
+#include "onboard_autonomy/mission/cv/VisionSnapshot.hpp"
+#include "onboard_autonomy/mission/safety/CompanionLinkFailsafeSnapshot.hpp"
 #include "onboard_autonomy/mission/EnvironmentProfile.hpp"
-#include "onboard_autonomy/mission/flight/FlightStartupController.hpp"
-#include "onboard_autonomy/mission/flight/VehicleState.hpp"
+#include "onboard_autonomy/mission/flight/FlightStartupSnapshot.hpp"
+#include "onboard_autonomy/mission/flight/VehicleSnapshot.hpp"
 
 #include <chrono>
 #include <cstddef>

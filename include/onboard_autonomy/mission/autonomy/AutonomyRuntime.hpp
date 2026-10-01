@@ -1,12 +1,15 @@
 #pragma once
 
+#include "onboard_autonomy/mission/autonomy/AutonomySnapshot.hpp"
+
 #include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
 #include "onboard_autonomy/mission/autonomy/AerialYawController.hpp"
 #include "onboard_autonomy/mission/cv/tracking/AerialTargetTracker.hpp"
 #include "onboard_autonomy/mission/flight/FlightCommand.hpp"
 #include "onboard_autonomy/mission/flight/FlightStartupController.hpp"
 #include "onboard_autonomy/mission/safety/MotionSafetyStatus.hpp"
-#include "onboard_autonomy/mission/flight/VehicleState.hpp"
+#include "onboard_autonomy/mission/flight/VehicleSnapshot.hpp"
+#include "onboard_autonomy/mission/Clock.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -15,17 +18,6 @@
 #include <vector>
 
 namespace onboard_autonomy::mission {
-
-enum class AutonomyRuntimePhase {
-    disabled,
-    idle,
-    waiting_for_startup,
-    active,
-    suspended,
-    returning_to_launch,
-    completed,
-    failed,
-};
 
 enum class AutonomyRuntimeMode {
     aerial_observation,
@@ -55,17 +47,6 @@ struct AutonomyRuntimeConfig {
         kDefaultAerialLinkLossGrace};
     std::chrono::milliseconds aerial_link_recovery_hold{
         kDefaultAerialLinkRecoveryHold};
-};
-
-struct AutonomyRuntimeSnapshot {
-    AutonomyRuntimePhase phase{AutonomyRuntimePhase::disabled};
-    std::string detail{"Autonomy runtime disabled"};
-    MotionSafetyStatus motion_safety_status{MotionSafetyStatus::no_intent};
-    std::optional<std::uint8_t> failure_result;
-    std::optional<double> aerial_horizontal_error;
-    std::optional<double> aerial_proportional_rate_degrees_per_second;
-    std::optional<double> aerial_feed_forward_rate_degrees_per_second;
-    std::optional<double> aerial_commanded_yaw_rate_degrees_per_second;
 };
 
 class AutonomyRuntime {
