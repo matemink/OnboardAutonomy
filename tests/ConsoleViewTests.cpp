@@ -120,6 +120,12 @@ void shortcuts_reflect_the_actual_input_mode() {
         "a noninteractive console must not advertise inactive keyboard "
         "shortcuts");
     const ui::ConsoleViewOptions interactive{.interactive_input = true};
+    const auto camera_only =
+        ui::render_console(app, "fake://transport", interactive);
+    require(camera_only.find("[2]") == std::string::npos,
+        "a configured camera without an enabled mission must not advertise a "
+        "start action");
+    app.autonomy.phase = mission::AutonomyRuntimePhase::idle;
     const auto active =
         ui::render_console(app, "fake://transport", interactive);
     require(active.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=

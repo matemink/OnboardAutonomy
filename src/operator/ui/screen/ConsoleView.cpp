@@ -727,7 +727,9 @@ void write_controls(std::ostringstream& output,
         return;
     }
     if (snapshot.motion_commands_allowed) {
-        if (snapshot.aerial_tracking_available) {
+        if (snapshot.aerial_tracking_available &&
+            snapshot.autonomy.phase !=
+                mission::AutonomyRuntimePhase::disabled) {
             write_line(output,
                 "[2] TRACK AIRBORNE TARGET (HOLD + YAW)",
                 Tone::normal,
