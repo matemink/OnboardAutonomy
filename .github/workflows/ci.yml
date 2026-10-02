@@ -31,7 +31,7 @@ jobs:
         if: steps.scope.outputs.mode != 'skip'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy-18 libopencv-dev ninja-build
+          sudo apt-get install -y clang-tidy-18 ninja-build
       - name: Analyze project sources
         if: steps.scope.outputs.mode != 'skip'
         env:
@@ -50,7 +50,7 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopencv-dev ninja-build
+          sudo apt-get install -y ninja-build
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -100,7 +100,7 @@ jobs:
       - name: Install ARM64 dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopencv-dev ninja-build
+          sudo apt-get install -y ninja-build
       - name: Configure ARM64
         run: >-
           cmake -S . -B build-arm64 -G Ninja

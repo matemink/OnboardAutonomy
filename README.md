@@ -53,7 +53,9 @@ ruff check python scripts
 
 CMake fetches pinned dependencies. Generic OpenCV DNN / YOLOX utilities and
 calibration tools remain available for independent image experiments; they
-are not connected to flight control or enabled by the camera demo.
+are not connected to flight control or enabled by the camera demo. OpenCV DNN
+is opt-in with `-DONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=ON`; it builds a standalone
+library and is never linked into the companion executable.
 
 ## Explore
 

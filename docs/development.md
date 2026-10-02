@@ -37,6 +37,11 @@ CMake downloads pinned generated MAVLink C headers and the other source
 dependencies into the build directory. MAVLink framing is not
 reimplemented by this project.
 
+Standard builds do not require OpenCV. To build the standalone DNN image
+utilities, install `libopencv-dev` and configure with
+`-DONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=ON`. This option does not enable a runtime
+detector or change the executable's observation behavior.
+
 ## Static analysis
 
 Install the developer-only quality tools on Ubuntu 24.04 or WSL2:

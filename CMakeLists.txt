@@ -11,8 +11,8 @@ find_package(Threads REQUIRED)
 
 option(
     ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
-    "Enable OpenCV DNN object detection"
-    ON
+    "Build standalone OpenCV DNN image utilities"
+    OFF
 )
 if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
     find_package(OpenCV 4.6 REQUIRED COMPONENTS core dnn imgproc)
@@ -331,7 +331,6 @@ target_link_libraries(
         onboard_autonomy_operator_ui
         onboard_autonomy_diagnostics_logging
         onboard_autonomy_mission_runtime
-        onboard_autonomy_mission_cv_detection
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
 
