@@ -242,14 +242,9 @@ onboard_autonomy_enable_warnings(onboard_autonomy_operator_screen)
 
 add_library(
     onboard_autonomy_mission
-    src/mission/autonomy/AerialYawController.cpp
-    src/mission/autonomy/AutonomyRuntime.cpp
     src/mission/cv/AsyncCameraMonitor.cpp
     src/mission/cv/CameraMonitor.cpp
     src/mission/safety/CompanionLinkFailsafe.cpp
-    src/mission/flight/FlightStartupController.cpp
-    src/mission/safety/MotionSafetyPolicy.cpp
-    src/mission/cv/tracking/AerialTargetTracker.cpp
     src/mission/cv/VisionMonitor.cpp
     src/mission/CompanionApplication.cpp
 )
@@ -392,10 +387,6 @@ if(BUILD_TESTING)
         onboard_autonomy_tests
         tests/CompanionApplicationTests.cpp
         tests/JsonDiagnosticSinkTests.cpp
-        tests/AutonomyRuntimeTests.cpp
-        tests/AerialTargetTrackerTests.cpp
-        tests/AerialYawControllerTests.cpp
-        tests/FlightStartupControllerTests.cpp
         tests/BoardTypeCatalogTests.cpp
         tests/CameraMonitorTests.cpp
         tests/CommandLineTests.cpp
@@ -405,7 +396,6 @@ if(BUILD_TESTING)
         tests/ConsoleViewTests.cpp
         tests/MavlinkDecoderTests.cpp
         tests/MavlinkEncoderTests.cpp
-        tests/MotionSafetyPolicyTests.cpp
         tests/TelemetryStreamConfiguratorTests.cpp
         tests/TransportTests.cpp
         tests/VehicleStateTests.cpp

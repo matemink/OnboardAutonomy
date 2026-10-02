@@ -41,7 +41,6 @@ struct CameraPreviewOptions {
 
 struct ForwardCameraOptions {
     std::uint16_t udp_port{defaults::kForwardCameraUdpPort};
-    std::string detector_model_file;
     std::uint32_t frame_width{defaults::kCameraFrameWidth};
     std::uint32_t frame_height{defaults::kCameraFrameHeight};
 };
@@ -50,15 +49,6 @@ struct CameraOptions {
     CameraSourceOptions source{RpicamOptions{}};
     std::uint32_t frame_width{defaults::kCameraFrameWidth};
     std::uint32_t frame_height{defaults::kCameraFrameHeight};
-};
-
-enum class AutonomyMode {
-    aerial_observation,
-};
-
-struct AutonomyOptions {
-    bool enabled{};
-    AutonomyMode mode{AutonomyMode::aerial_observation};
 };
 
 struct OperatorInterfaceOptions {
@@ -77,7 +67,6 @@ struct DiagnosticsOptions {
 struct HardwareLaunchOptions {
     MavlinkConnectionOptions connection{UdpConnectionOptions{}};
     std::optional<CameraOptions> camera;
-    AutonomyOptions autonomy;
     OperatorInterfaceOptions operator_interface;
     DiagnosticsOptions diagnostics;
 };
@@ -86,7 +75,6 @@ struct SimulationLaunchOptions {
     UdpConnectionOptions connection;
     std::optional<CameraOptions> camera;
     std::optional<mission::SimulatedWindProfile> wind;
-    AutonomyOptions autonomy;
     OperatorInterfaceOptions operator_interface;
     DiagnosticsOptions diagnostics;
 };

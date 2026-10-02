@@ -7,7 +7,6 @@
 #include "onboard_autonomy/mission/SnapshotSink.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
-#include "onboard_autonomy/mission/cv/detection/OpenCvDnnTargetDetector.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 #include "onboard_autonomy/bootstrap/MissionRuntime.hpp"
 #include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
@@ -36,8 +35,6 @@ namespace onboard_autonomy::bootstrap {
 namespace {
 
 constexpr std::uint32_t kMaximumConsoleRefreshIntervalMs = 100;
-constexpr std::int32_t kCocoAirplaneClassId = 4;
-constexpr float kMinimumAirplaneConfidence = 0.51F;
 
 using BoardTypeCatalog = operator_interface::ui::BoardTypeCatalog;
 using CameraPreviewSink = diagnostics::preview::CameraPreviewSink;
@@ -132,13 +129,6 @@ MissionRuntimeConfig make_mission_runtime_config(
         .connection = make_mission_connection(options.connection),
         .camera = make_mission_camera(options.camera),
         .simulated_wind = std::nullopt,
-        .environment = MissionEnvironment::hardware,
-        .autonomous = options.autonomy.enabled,
-        .start_automatically = !options.operator_interface.interactive,
-        .aerial_tracking_allowed = false,
-        .autonomy_mode = mission::AutonomyRuntimeMode::aerial_observation,
-        .motion_commands_requested =
-            options.autonomy.enabled || options.operator_interface.interactive,
     };
 }
 
@@ -152,14 +142,6 @@ MissionRuntimeConfig make_mission_runtime_config(
             },
         .camera = make_mission_camera(options.camera),
         .simulated_wind = options.wind,
-        .environment = MissionEnvironment::simulation,
-        .autonomous = options.autonomy.enabled,
-        .start_automatically = !options.operator_interface.interactive,
-        .aerial_tracking_allowed =
-            options.diagnostics.forward_camera.has_value(),
-        .autonomy_mode = mission::AutonomyRuntimeMode::aerial_observation,
-        .motion_commands_requested =
-            options.autonomy.enabled || options.operator_interface.interactive,
     };
 }
 
@@ -253,27 +235,12 @@ std::unique_ptr<mission::ports::CameraSource> make_forward_preview_camera(
     });
 }
 
-std::unique_ptr<mission::ports::TargetDetector> make_forward_target_detector(
-    const operator_interface::cli::CommandLineOptions& options) {
-    const auto& forward_camera = diagnostics_options(options).forward_camera;
-    if (!forward_camera.has_value() ||
-        forward_camera->detector_model_file.empty()) {
-        return nullptr;
-    }
-    return mission::cv::make_opencv_dnn_target_detector({
-        .model_file = forward_camera->detector_model_file,
-        .accepted_class_ids = {kCocoAirplaneClassId},
-        .confidence_threshold = kMinimumAirplaneConfidence,
-    });
-}
-
 std::unique_ptr<mission::AsyncCameraMonitor> make_forward_camera_monitor(
-    mission::ports::CameraSource* source,
-    mission::ports::TargetDetector* detector) {
+    mission::ports::CameraSource* source) {
     if (source == nullptr) {
         return nullptr;
     }
-    return std::make_unique<mission::AsyncCameraMonitor>(*source, detector);
+    return std::make_unique<mission::AsyncCameraMonitor>(*source);
 }
 
 struct ConsoleTerminalSettings {
@@ -368,12 +335,6 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
 
     [[nodiscard]] std::optional<RuntimeCommand> poll() override {
         while (const auto key = input_.poll()) {
-            if (*key == '2') {
-                return RuntimeCommand::start_aerial_tracking;
-            }
-            if (*key == 'r' || *key == 'R') {
-                return RuntimeCommand::return_to_launch;
-            }
             if (*key == 'q' || *key == 'Q') {
                 return RuntimeCommand::shutdown;
             }
@@ -404,10 +365,8 @@ int run_program(const int argc, char** argv) {
         console_terminal);
     auto camera_preview = make_camera_preview(options, executable);
     auto forward_preview_camera = make_forward_preview_camera(options);
-    auto forward_target_detector = make_forward_target_detector(options);
     auto forward_camera_monitor =
-        make_forward_camera_monitor(forward_preview_camera.get(),
-            forward_target_detector.get());
+        make_forward_camera_monitor(forward_preview_camera.get());
     ConsoleCommandSource operator_commands{operator_interface.interactive};
 
     std::cerr << "OnboardAutonomy listening on "

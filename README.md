@@ -6,8 +6,8 @@
 
 OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs.
 It brings together MAVLink telemetry, camera capture, operator diagnostics,
-and fault recovery. The physical Raspberry Pi 5 / Pixhawk 6C bench runs in
-observation mode. Automated motion is restricted to explicitly configured SITL.
+and fault recovery. Both the physical Raspberry Pi 5 / Pixhawk 6C bench and SITL run in
+observation mode. The runtime has no flight-command or pursuit controller.
 
 ## Runtime
 
@@ -16,15 +16,15 @@ observation mode. Automated motion is restricted to explicitly configured SITL.
 - Forward-only Gazebo preview by default, with an optional downward feed.
 - Independent camera streams through GStreamer or `rpicam-vid`, with automatic
   recovery after producer failure or stalled frames.
-- Forward-camera OpenCV DNN / YOLOX processing and temporal observation tracking
-  in simulation.
 - A compact console with telemetry, health warnings, optional camera diagnostics,
   and the last MAVLink frames with their age; JSONL and a browser camera preview.
 - ArduPilot-owned companion-link failsafe validation and explicit separation
   between simulation and physical endpoints.
 
 ArduPilot owns stabilization, navigation, and flight control. The companion
-runtime observes its telemetry and runs the configured simulation workflow.
+runtime observes its telemetry and camera frames. Its outbound protocol is
+limited to companion heartbeat, telemetry setup, and read-only information
+requests. Interactive input provides `Q` to quit.
 
 ```mermaid
 flowchart LR
@@ -51,8 +51,9 @@ PYTHONPATH=python python3 -m unittest discover -s python/tests -v
 ruff check python scripts
 ```
 
-CMake fetches pinned dependencies. ONNX model weights are downloaded separately
-with `scripts/download_yolox_model.sh` and are not committed to the repository.
+CMake fetches pinned dependencies. Generic OpenCV DNN / YOLOX utilities and
+calibration tools remain available for independent image experiments; they
+are not connected to flight control or enabled by the camera demo.
 
 ## Explore
 

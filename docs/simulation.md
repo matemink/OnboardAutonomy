@@ -50,16 +50,6 @@ The model is `iris_with_cameras`. Camera streams are independent and report
 failure separately. The optional downward stream is an observation feed. The world
 contains no marker landing pad.
 
-The optional forward OpenCV DNN detector reads a separately downloaded model:
-
-```bash
-bash scripts/download_yolox_model.sh
-```
-
-The downloader checks the pinned model hash. Weights remain in `.local/models`;
-without them, capture and preview remain available. The generic model's labels
-are an integration baseline and do not establish aircraft-specific accuracy.
-
 ## Weather and rendering
 
 ```bash
@@ -74,30 +64,23 @@ measurements. Gazebo's server and GUI are separate so capture does not depend
 on the GUI lifecycle. WSL launchers check the configured GPU renderer before
 starting the scene.
 
-## Existing interactive simulation workflow
+## Console
 
-The aerial-observation launcher uses `--aerial-observation` with an explicit
-`--sitl` assertion and a forward camera. Interactive mode waits for operator
-input; the console presents the configured action and `R` for return to launch.
-`Q` exits the application. Requests remain subject to the existing telemetry,
-startup, and failsafe state machines.
-
-The former marker options, marker assets, and landing acceptance script have
-been removed. `config/onboard_autonomy-gazebo.parm` disables precision landing.
-Ordinary ArduPilot landing and return-to-launch remain available.
+The companion observes telemetry and camera frames. `Q` exits an interactive
+session; `Ctrl+C` exits a passive session. It has no flight-start, tracking,
+return-to-launch, or automatic takeoff actions. The former two-aircraft scenario
+and its models, flight controllers, and launchers have been removed.
 
 ## Recovery checks
 
 ```bash
 python python/run_integration_check.py --companion "$HOME/build/onboard_autonomy/onboard_autonomy"
 python python/camera_recovery_acceptance.py --companion "$HOME/build/onboard_autonomy/onboard_autonomy"
-python python/link_failsafe_sitl_acceptance.py --companion "$HOME/build/onboard_autonomy/onboard_autonomy"
 ```
 
 The first check uses generated UDP telemetry. Camera recovery stops and
 restarts the producer and requires new frames in the same companion process.
-The link-failsafe harness cuts the telemetry relay and verifies the flight
-controller's independent fallback from protocol evidence. These integration
+These integration
 checks require their respective local runtime, simulator, and Python dependencies;
 unit tests do not establish that a new Gazebo flight has been executed.
 

@@ -31,48 +31,4 @@ std::vector<std::uint8_t> encode_autopilot_version_request(
     std::uint8_t vehicle_system_id,
     std::uint8_t component_id = kCompanionComponentId);
 
-std::vector<std::uint8_t> encode_set_guided_mode(std::uint8_t vehicle_system_id,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_arm(std::uint8_t vehicle_system_id,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_takeoff(std::uint8_t vehicle_system_id,
-    double altitude_m,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_land(std::uint8_t vehicle_system_id,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_return_to_launch(
-    std::uint8_t vehicle_system_id,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_condition_yaw(std::uint8_t vehicle_system_id,
-    double relative_yaw_degrees,
-    double yaw_speed_degrees_per_second,
-    std::uint8_t confirmation = 0,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_yaw_rate_target(std::uint8_t vehicle_system_id,
-    double yaw_rate_degrees_per_second,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_yaw_target(std::uint8_t vehicle_system_id,
-    double yaw_target_radians,
-    std::uint8_t component_id = kCompanionComponentId);
-
-std::vector<std::uint8_t> encode_local_position_target(
-    std::uint8_t vehicle_system_id,
-    double north_m,
-    double east_m,
-    double down_m,
-    std::uint8_t component_id = kCompanionComponentId);
-
-
 } // namespace onboard_autonomy::hardware::mavlink

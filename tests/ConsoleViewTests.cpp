@@ -109,38 +109,16 @@ void link_activity_keeps_the_last_frame_and_its_age() {
 }
 
 void shortcuts_reflect_the_actual_input_mode() {
-    mission::AppSnapshot app;
-    app.motion_commands_allowed = true;
-    app.aerial_tracking_available = true;
-    const auto passive = ui::render_console(app, "fake://transport");
-    require(passive.find("[2]") == std::string::npos &&
-                passive.find("[R]") == std::string::npos &&
-                passive.find("[Q]") == std::string::npos &&
+    const auto passive = ui::render_console({}, "fake://transport");
+    require(passive.find("[Q]") == std::string::npos &&
                 passive.find("Ctrl+C exit") != std::string::npos,
-        "a noninteractive console must not advertise inactive keyboard "
-        "shortcuts");
-    const ui::ConsoleViewOptions interactive{.interactive_input = true};
-    const auto camera_only =
-        ui::render_console(app, "fake://transport", interactive);
-    require(camera_only.find("[2]") == std::string::npos,
-        "a configured camera without an enabled mission must not advertise a "
-        "start action");
-    app.autonomy.phase = mission::AutonomyRuntimePhase::idle;
-    const auto active =
-        ui::render_console(app, "fake://transport", interactive);
-    require(active.find("[2] TRACK AIRBORNE TARGET (HOLD + YAW)") !=
-                    std::string::npos &&
-                active.find("[R] ABORT MISSION + RTL") != std::string::npos &&
-                active.find("[Q] QUIT") != std::string::npos,
-        "existing interactive shortcuts must remain discoverable");
-    app.motion_commands_allowed = false;
-    const auto observation =
-        ui::render_console(app, "fake://transport", interactive);
-    require(observation.find("[Q] QUIT") != std::string::npos &&
-                observation.find("[2]") == std::string::npos &&
-                observation.find("[R]") == std::string::npos,
-        "observation mode must expose Quit without advertising motion "
-        "controls");
+        "a passive console must explain how to exit");
+    const auto interactive = ui::render_console({}, "fake://transport",
+        {.interactive_input = true});
+    require(interactive.find("[Q] QUIT") != std::string::npos &&
+                interactive.find("[2]") == std::string::npos &&
+                interactive.find("[R]") == std::string::npos,
+        "interactive observation must only expose Quit");
 }
 
 void all_warnings_and_long_protocol_text_remain_readable() {

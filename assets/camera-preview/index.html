@@ -272,7 +272,7 @@
         </div>
         <footer class="card-footer">
           <div class="frame">NO FRAME</div>
-          <div class="analysis">DETECTOR NOT LOADED</div>
+          <div class="analysis">OBSERVATION ONLY</div>
         </footer>
       </article>
 
@@ -301,59 +301,6 @@
   </main>
 
   <script>
-    function drawTargets(
-      context,
-      canvas,
-      targets,
-      color
-    ) {
-      context.lineWidth = Math.max(2, canvas.width / 240);
-      context.font = `${Math.max(14, canvas.width / 36)}px Lucida Console`;
-
-      for (const target of targets) {
-        if (target.corners.length !== 4) {
-          continue;
-        }
-        const corners = target.corners;
-        context.strokeStyle = color;
-        context.fillStyle = color;
-        context.beginPath();
-        context.moveTo(corners[0][0], corners[0][1]);
-        for (let index = 1; index < corners.length; index += 1) {
-          context.lineTo(corners[index][0], corners[index][1]);
-        }
-        context.closePath();
-        context.stroke();
-
-        const [centerX, centerY] = target.center;
-        context.beginPath();
-        context.arc(centerX, centerY, 5, 0, Math.PI * 2);
-        context.fill();
-
-        const label = `${target.family.toUpperCase()} ` +
-          `${target.confidence_percent.toFixed(0)}%`;
-        const labelY = Math.max(22, corners[0][1] - 10);
-        context.fillStyle = "rgb(5 12 12 / 82%)";
-        context.fillRect(
-          corners[0][0],
-          labelY - 20,
-          context.measureText(label).width + 14,
-          25
-        );
-        context.fillStyle = color;
-        context.fillText(label, corners[0][0] + 7, labelY);
-      }
-    }
-
-    function aerialObjectSummary(targets) {
-      if (targets.length === 0) {
-        return "SEARCHING FOR AERIAL OBJECT";
-      }
-      return targets
-        .map((target) => `${(target.family || "object").toUpperCase()} ` +
-          `${target.confidence_percent.toFixed(0)}%`)
-        .join("   ");
-    }
 
     function createStream(card) {
       const stream = card.dataset.stream;
@@ -391,9 +338,6 @@
           const width = Number(response.headers.get("X-Frame-Width"));
           const height = Number(response.headers.get("X-Frame-Height"));
           const sequence = response.headers.get("X-Frame-Sequence");
-          const targets = JSON.parse(
-            response.headers.get("X-OnboardAutonomy-Targets") || "[]"
-          );
           const yuv420 = new Uint8Array(await response.arrayBuffer());
           const lumaSize = width * height;
           const chromaWidth = width / 2;
@@ -443,23 +387,7 @@
             }
           }
           context.putImageData(imageData, 0, 0);
-          if (stream === "downward") {
-            drawTargets(
-              context,
-              canvas,
-              targets,
-              "#49d9ff"
-            );
-            analysisText.textContent = "OBSERVATION ONLY";
-          } else {
-            drawTargets(
-              context,
-              canvas,
-              targets,
-              "#ffbd5c"
-            );
-            analysisText.textContent = aerialObjectSummary(targets);
-          }
+          analysisText.textContent = "OBSERVATION ONLY";
 
           badge.classList.add("live");
           statusText.textContent = "LIVE";

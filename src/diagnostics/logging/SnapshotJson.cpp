@@ -56,55 +56,6 @@ std::string_view telemetry_state_name(
     return "failed";
 }
 
-std::string_view startup_phase_name(const mission::FlightStartupPhase phase) {
-    using mission::FlightStartupPhase;
-    switch (phase) {
-    case FlightStartupPhase::disabled:
-        return "disabled";
-    case FlightStartupPhase::idle:
-        return "idle";
-    case FlightStartupPhase::waiting_for_vehicle:
-        return "waiting_for_vehicle";
-    case FlightStartupPhase::waiting_for_readiness:
-        return "waiting_for_readiness";
-    case FlightStartupPhase::setting_guided:
-        return "setting_guided";
-    case FlightStartupPhase::arming:
-        return "arming";
-    case FlightStartupPhase::taking_off:
-        return "taking_off";
-    case FlightStartupPhase::completed:
-        return "completed";
-    case FlightStartupPhase::failed:
-        return "failed";
-    }
-    return "failed";
-}
-
-std::string_view autonomy_phase_name(
-    const mission::AutonomyRuntimePhase phase) {
-    using mission::AutonomyRuntimePhase;
-    switch (phase) {
-    case AutonomyRuntimePhase::disabled:
-        return "disabled";
-    case AutonomyRuntimePhase::idle:
-        return "idle";
-    case AutonomyRuntimePhase::waiting_for_startup:
-        return "waiting_for_startup";
-    case AutonomyRuntimePhase::active:
-        return "active";
-    case AutonomyRuntimePhase::suspended:
-        return "suspended";
-    case AutonomyRuntimePhase::returning_to_launch:
-        return "returning_to_launch";
-    case AutonomyRuntimePhase::completed:
-        return "completed";
-    case AutonomyRuntimePhase::failed:
-        return "failed";
-    }
-    return "failed";
-}
-
 std::string_view link_direction_name(
     const mission::LinkEventDirection direction) {
     return direction == mission::LinkEventDirection::outbound ? "outbound"
@@ -313,33 +264,6 @@ Json snapshot_json(const mission::AppSnapshot& snapshot,
     };
     result["camera"] = camera_json(snapshot.camera);
     result["vision"] = vision_json(snapshot.vision);
-    result["flight_startup"] = {
-        {"phase", startup_phase_name(snapshot.flight_startup.phase)},
-        {"detail", snapshot.flight_startup.detail},
-        {"target_altitude_m", snapshot.flight_startup.target_altitude_m},
-        {"attempt", snapshot.flight_startup.attempt},
-    };
-    result["autonomy"] = {
-        {"phase", autonomy_phase_name(snapshot.autonomy.phase)},
-        {"detail", snapshot.autonomy.detail},
-        {"aerial_yaw",
-            {{"horizontal_error",
-                 optional_number(snapshot.autonomy.aerial_horizontal_error)},
-                {"proportional_rate_degrees_per_second",
-                    optional_number(
-                        snapshot.autonomy
-                            .aerial_proportional_rate_degrees_per_second)},
-                {"feed_forward_rate_degrees_per_second",
-                    optional_number(
-                        snapshot.autonomy
-                            .aerial_feed_forward_rate_degrees_per_second)},
-                {"commanded_rate_degrees_per_second",
-                    optional_number(
-                        snapshot.autonomy
-                            .aerial_commanded_yaw_rate_degrees_per_second)}}},
-    };
-    result["motion_commands_allowed"] = snapshot.motion_commands_allowed;
-    result["aerial_tracking_available"] = snapshot.aerial_tracking_available;
     result["link_events"] = Json::array();
     for (const auto& event : snapshot.link_events) {
         result["link_events"].push_back(link_event_json(event));

@@ -199,20 +199,6 @@ std::vector<std::uint8_t> accepted_interval_ack() {
     return serialize(message);
 }
 
-std::vector<std::uint8_t> accepted_rtl_ack() {
-    mavlink_message_t message{};
-    mavlink_msg_command_ack_pack(1,
-        MAV_COMP_ID_AUTOPILOT1,
-        &message,
-        MAV_CMD_NAV_RETURN_TO_LAUNCH,
-        MAV_RESULT_ACCEPTED,
-        100,
-        0,
-        1,
-        onboard_autonomy::hardware::mavlink::kCompanionComponentId);
-    return serialize(message);
-}
-
 void application_orchestrates_the_complete_telemetry_setup() {
     FakeTransport transport;
     onboard_autonomy::mission::CompanionApplication application{transport};
@@ -290,6 +276,19 @@ void application_orchestrates_the_complete_telemetry_setup() {
                 snapshot.tx_activity->message_name == "PARAM_REQUEST_READ" &&
                 snapshot.tx_activity->detail == "BATT_ARM_VOLT",
         "live activity must follow the newest real RX and TX frames");
+
+    for (const auto& frame : transport.outgoing()) {
+        const auto id = message_id(frame);
+        require(id == MAVLINK_MSG_ID_HEARTBEAT ||
+                    id == MAVLINK_MSG_ID_PARAM_REQUEST_READ ||
+                    id == MAVLINK_MSG_ID_COMMAND_LONG,
+            "observation runtime must not emit flight-control messages");
+        if (const auto command = command_long_command(frame)) {
+            require(*command == MAV_CMD_SET_MESSAGE_INTERVAL ||
+                        *command == MAV_CMD_REQUEST_MESSAGE,
+                "COMMAND_LONG must only configure or request telemetry");
+        }
+    }
 }
 
 void quiet_transport_does_not_stall_runtime_scheduling() {
@@ -310,188 +309,9 @@ void quiet_transport_does_not_stall_runtime_scheduling() {
         "quiet transport must not stop scheduled companion heartbeat");
 }
 
-void interactive_autonomy_restart_is_guarded() {
-    const onboard_autonomy::mission::TimePoint start{};
-    using onboard_autonomy::mission::AutonomyRuntimeMode;
-
-    FakeTransport blocked_transport;
-    onboard_autonomy::mission::CompanionApplication blocked_application{
-        blocked_transport};
-    require(!blocked_application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start),
-        "autonomy start must be blocked without motion permission");
-    require(blocked_application.snapshot(start).link_events.back().detail ==
-                "BLOCKED BY MOTION SAFETY POLICY",
-        "blocked command must explain the safety policy");
-
-    FakeTransport transport;
-    FakeCameraSource camera;
-    FakeTargetDetector detector;
-    onboard_autonomy::mission::CompanionApplication application{transport,
-        {
-            .flight_startup =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                    .takeoff_altitude_m = 8.0,
-                },
-            .autonomy_runtime =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                },
-            .motion_commands_allowed = true,
-            .aerial_tracking_allowed = true,
-            .camera_source = &camera,
-            .target_detector = &detector,
-            .simulated_wind = std::nullopt,
-        }};
-    auto snapshot = application.snapshot(start);
-    require(snapshot.flight_startup.phase ==
-                    onboard_autonomy::mission::FlightStartupPhase::idle &&
-                snapshot.autonomy.phase ==
-                    onboard_autonomy::mission::AutonomyRuntimePhase::idle,
-        "interactive autonomy must remain idle until the operator starts it");
-    require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start),
-        "autonomy start must be blocked before heartbeat");
-
-    transport.enqueue(autopilot_heartbeat());
-    application.poll(start);
-    require(application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start + std::chrono::milliseconds(1)),
-        "connected idle runtime must accept an operator-selected mission");
-    require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start + std::chrono::milliseconds(2)),
-        "an active autonomy run must not be restarted");
-
-    require(application.request_return_to_launch(
-                start + std::chrono::milliseconds(3)),
-        "RTL must cancel an active scenario despite a stale disarmed state");
-    application.poll(start + std::chrono::milliseconds(4));
-    transport.enqueue(accepted_rtl_ack());
-    application.poll(start + std::chrono::milliseconds(5));
-    require(application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start + std::chrono::milliseconds(6)),
-        "an acknowledged disarmed RTL must permit another mission");
-
-    snapshot = application.snapshot(start + std::chrono::milliseconds(6));
-    require(snapshot.flight_startup.phase ==
-                    onboard_autonomy::mission::FlightStartupPhase::
-                        waiting_for_vehicle &&
-                snapshot.autonomy.phase ==
-                    onboard_autonomy::mission::AutonomyRuntimePhase::
-                        waiting_for_startup &&
-                snapshot.link_events.back().label == "START" &&
-                snapshot.link_events.back().status ==
-                    onboard_autonomy::mission::LinkEventStatus::pending,
-        "restart must reset both state machines and remain observable");
-}
-
-void operator_rtl_aborts_the_active_mission() {
-    using onboard_autonomy::mission::AutonomyRuntimeMode;
-    using onboard_autonomy::mission::AutonomyRuntimePhase;
-    using onboard_autonomy::mission::FlightStartupPhase;
-
-    FakeTransport transport;
-    FakeCameraSource camera;
-    FakeTargetDetector detector;
-    onboard_autonomy::mission::CompanionApplication application{transport,
-        {
-            .flight_startup =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                    .takeoff_altitude_m = 8.0,
-                },
-            .autonomy_runtime =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                },
-            .motion_commands_allowed = true,
-            .aerial_tracking_allowed = true,
-            .camera_source = &camera,
-            .target_detector = &detector,
-            .simulated_wind = std::nullopt,
-        }};
-    const onboard_autonomy::mission::TimePoint start{};
-
-    transport.enqueue(autopilot_heartbeat(true));
-    application.poll(start);
-    require(application.request_return_to_launch(
-                start + std::chrono::milliseconds(1)),
-        "armed vehicle must accept the operator RTL request");
-    application.poll(start + std::chrono::milliseconds(2));
-
-    const auto rtl = std::find_if(transport.outgoing().begin(),
-        transport.outgoing().end(),
-        [](const auto& frame) {
-            return command_long_command(frame) == MAV_CMD_NAV_RETURN_TO_LAUNCH;
-        });
-    require(rtl != transport.outgoing().end(),
-        "operator abort must transmit MAV_CMD_NAV_RETURN_TO_LAUNCH");
-    const auto snapshot =
-        application.snapshot(start + std::chrono::milliseconds(1));
-    require(snapshot.flight_startup.phase == FlightStartupPhase::idle &&
-                snapshot.autonomy.phase ==
-                    AutonomyRuntimePhase::returning_to_launch,
-        "RTL must cancel startup and remain visible as an active state");
-
-    require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start + std::chrono::milliseconds(2)),
-        "a new mission must not start while RTL is active");
-}
-
-void hardware_runtime_rejects_sitl_only_aerial_tracking() {
-    using onboard_autonomy::mission::AutonomyRuntimeMode;
-
-    FakeTransport transport;
-    FakeCameraSource camera;
-    FakeTargetDetector detector;
-    onboard_autonomy::mission::CompanionApplication application{transport,
-        {
-            .flight_startup =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                    .takeoff_altitude_m = 8.0,
-                },
-            .autonomy_runtime =
-                {
-                    .enabled = true,
-                    .start_automatically = false,
-                },
-            .motion_commands_allowed = true,
-            .aerial_tracking_allowed = false,
-            .camera_source = &camera,
-            .target_detector = &detector,
-            .simulated_wind = std::nullopt,
-        }};
-    const onboard_autonomy::mission::TimePoint start{};
-    transport.enqueue(autopilot_heartbeat());
-    application.poll(start);
-
-    require(!application.request_autonomy_start(
-                AutonomyRuntimeMode::aerial_observation,
-                start + std::chrono::milliseconds(1)) &&
-                application.snapshot(start).link_events.back().detail ==
-                    "SHAHED-136 TRACKING IS AVAILABLE IN SITL ONLY",
-        "hardware runtime must not bypass the SITL-only aerial guard");
-}
-
 } // namespace
 
 void run_companion_application_tests() {
     application_orchestrates_the_complete_telemetry_setup();
     quiet_transport_does_not_stall_runtime_scheduling();
-    interactive_autonomy_restart_is_guarded();
-    operator_rtl_aborts_the_active_mission();
-    hardware_runtime_rejects_sitl_only_aerial_tracking();
 }
