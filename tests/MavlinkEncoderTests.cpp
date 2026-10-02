@@ -5,7 +5,6 @@
 #include <ardupilotmega/mavlink.h>
 
 #include <cstdint>
-#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -32,14 +31,14 @@ mavlink_command_long_t decode_command_long(
                 &parsed_message,
                 &parsed_status) == MAVLINK_FRAMING_OK) {
             require(parsed_message.msgid == MAVLINK_MSG_ID_COMMAND_LONG,
-                "flight command must use COMMAND_LONG");
+                "telemetry request must use COMMAND_LONG");
             mavlink_command_long_t command{};
             mavlink_msg_command_long_decode(&parsed_message, &command);
             return command;
         }
     }
 
-    throw std::runtime_error("flight command must be a valid MAVLink frame");
+    throw std::runtime_error("telemetry request must be a valid MAVLink frame");
 }
 
 mavlink_message_t decode_message(const std::vector<std::uint8_t>& bytes) {
@@ -205,83 +204,6 @@ void autopilot_version_uses_one_shot_message_request() {
         "version response must be addressed back to the requester");
 }
 
-void flight_commands_use_documented_arducopter_parameters() {
-    constexpr std::uint8_t system_id{1};
-
-    const auto guided = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_set_guided_mode(system_id));
-    require(guided.command == MAV_CMD_DO_SET_MODE &&
-                guided.param1 ==
-                    static_cast<float>(MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) &&
-                guided.param2 == 4.0F,
-        "GUIDED must use MAV_CMD_DO_SET_MODE and Copter mode 4");
-
-    const auto arm = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_arm(system_id));
-    require(arm.command == MAV_CMD_COMPONENT_ARM_DISARM && arm.param1 == 1.0F &&
-                arm.param2 == 0.0F,
-        "arm must preserve ArduPilot safety checks");
-
-    const auto takeoff = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_takeoff(system_id, 5.0));
-    require(takeoff.command == MAV_CMD_NAV_TAKEOFF && takeoff.param7 == 5.0F,
-        "takeoff altitude must be encoded in param7");
-
-    const auto land = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_land(system_id));
-    require(land.command == MAV_CMD_NAV_LAND,
-        "landing must use MAV_CMD_NAV_LAND");
-
-    const auto rtl = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_return_to_launch(
-            system_id));
-    require(rtl.command == MAV_CMD_NAV_RETURN_TO_LAUNCH,
-        "RTL must use MAV_CMD_NAV_RETURN_TO_LAUNCH");
-
-    const auto yaw = decode_command_long(
-        onboard_autonomy::hardware::mavlink::encode_condition_yaw(system_id,
-            -8.0,
-            15.0));
-    require(yaw.command == MAV_CMD_CONDITION_YAW && yaw.param1 == 8.0F &&
-                yaw.param2 == 15.0F && yaw.param3 == -1.0F &&
-                yaw.param4 == 1.0F,
-        "yaw guidance must encode a bounded relative counter-clockwise turn");
-}
-
-void movement_messages_use_documented_frames() {
-    constexpr std::uint8_t system_id{1};
-    const auto move_message = decode_message(
-        onboard_autonomy::hardware::mavlink::encode_local_position_target(
-            system_id,
-            10.0,
-            -4.0,
-            0.0));
-    require(move_message.msgid == MAVLINK_MSG_ID_SET_POSITION_TARGET_LOCAL_NED,
-        "route step must use SET_POSITION_TARGET_LOCAL_NED");
-    mavlink_set_position_target_local_ned_t move{};
-    mavlink_msg_set_position_target_local_ned_decode(&move_message, &move);
-    require(move.coordinate_frame == MAV_FRAME_LOCAL_OFFSET_NED &&
-                move.type_mask == 3576 && move.x == 10.0F && move.y == -4.0F &&
-                move.z == 0.0F,
-        "route target must be a documented local NED position offset");
-
-    const auto yaw_rate_message = decode_message(
-        onboard_autonomy::hardware::mavlink::encode_yaw_rate_target(system_id,
-            -45.0));
-    require(yaw_rate_message.msgid ==
-                MAVLINK_MSG_ID_SET_POSITION_TARGET_LOCAL_NED,
-        "yaw rate must use SET_POSITION_TARGET_LOCAL_NED");
-    mavlink_set_position_target_local_ned_t yaw_rate{};
-    mavlink_msg_set_position_target_local_ned_decode(&yaw_rate_message,
-        &yaw_rate);
-    require(yaw_rate.coordinate_frame == MAV_FRAME_LOCAL_NED &&
-                yaw_rate.type_mask == 1479 && yaw_rate.vx == 0.0F &&
-                yaw_rate.vy == 0.0F && yaw_rate.vz == 0.0F &&
-                std::abs(yaw_rate.yaw_rate + 0.7853982F) < 0.0001F,
-        "yaw rate must hold position and preserve its signed angular velocity");
-
-}
-
 } // namespace
 
 void run_mavlink_encoder_tests() {
@@ -290,6 +212,4 @@ void run_mavlink_encoder_tests() {
     battery_threshold_request_uses_parameter_protocol();
     named_parameter_request_uses_parameter_protocol();
     autopilot_version_uses_one_shot_message_request();
-    flight_commands_use_documented_arducopter_parameters();
-    movement_messages_use_documented_frames();
 }

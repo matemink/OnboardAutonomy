@@ -48,7 +48,10 @@ The result demonstrates bidirectional MAVLink over the physical TELEM2/GPIO
 UART path: receiving a heartbeat alone cannot complete six acknowledged
 message-rate commands.
 
-## Safety finding
+## Historical safety finding
+
+This section describes the tested older binary. The current runtime has no
+autonomous startup or motion-command path.
 
 The runtime independently read the GCS failsafe parameters and rejected
 autonomous startup because `FS_GCS_ENABLE` was not the required value `5`

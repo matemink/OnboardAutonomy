@@ -3,19 +3,15 @@
 #include "onboard_autonomy/hardware/mavlink/MavlinkDecoder.hpp"
 #include "onboard_autonomy/hardware/mavlink/MavlinkEncoder.hpp"
 #include "onboard_autonomy/hardware/mavlink/TelemetryStreamConfigurator.hpp"
-#include "onboard_autonomy/mission/cv/tracking/AerialTargetTracker.hpp"
+#include "onboard_autonomy/mission/safety/CompanionLinkFailsafe.hpp"
 
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <iomanip>
 #include <optional>
-#include <numbers>
 #include <span>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -32,7 +28,6 @@ constexpr std::uint32_t kReturnToLaunchMode = 6;
 constexpr std::uint32_t kLandMode = 9;
 constexpr std::uint32_t kPositionHoldMode = 16;
 constexpr std::size_t kTransportReceiveBufferSize = 4096;
-constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
 
 TelemetrySetupState map_telemetry_state(
     const hardware::mavlink::TelemetrySetupPhase phase) {
@@ -47,35 +42,6 @@ TelemetrySetupState map_telemetry_state(
         return TelemetrySetupState::failed;
     }
     return TelemetrySetupState::failed;
-}
-
-std::optional<FlightAction> map_flight_action(const std::uint16_t command) {
-    switch (command) {
-    case MAV_CMD_DO_SET_MODE:
-        return FlightAction::set_guided_mode;
-    case MAV_CMD_COMPONENT_ARM_DISARM:
-        return FlightAction::arm;
-    case MAV_CMD_NAV_TAKEOFF:
-        return FlightAction::takeoff;
-    case MAV_CMD_NAV_LAND:
-        return FlightAction::land;
-    case MAV_CMD_NAV_RETURN_TO_LAUNCH:
-        return FlightAction::return_to_launch;
-    case MAV_CMD_CONDITION_YAW:
-        return FlightAction::condition_yaw;
-    default:
-        return std::nullopt;
-    }
-}
-
-FlightCommandAckOutcome map_ack_outcome(const std::uint8_t result) {
-    if (result == MAV_RESULT_ACCEPTED) {
-        return FlightCommandAckOutcome::accepted;
-    }
-    if (result == MAV_RESULT_IN_PROGRESS) {
-        return FlightCommandAckOutcome::in_progress;
-    }
-    return FlightCommandAckOutcome::rejected;
 }
 
 LinkEventStatus map_event_status(const std::uint8_t result) {
@@ -144,109 +110,6 @@ std::string command_ack_activity_detail(const std::uint16_t command,
     return command_name + " " + ack_result_name(result);
 }
 
-std::string flight_action_name(const FlightAction action) {
-    switch (action) {
-    case FlightAction::invalid:
-        return "INVALID";
-    case FlightAction::set_guided_mode:
-        return "SET_MODE";
-    case FlightAction::arm:
-        return "ARM";
-    case FlightAction::takeoff:
-        return "TAKEOFF";
-    case FlightAction::return_to_launch:
-        return "RTL";
-    case FlightAction::land:
-        return "LAND";
-    case FlightAction::condition_yaw:
-        return "YAW";
-    case FlightAction::yaw_rate:
-        return "YAW_RATE";
-    case FlightAction::yaw_target:
-        return "YAW_TARGET";
-    }
-    return "ACTION";
-}
-
-std::string flight_action_message_name(const FlightAction action) {
-    switch (action) {
-    case FlightAction::invalid:
-        return "INVALID";
-    case FlightAction::yaw_rate:
-    case FlightAction::yaw_target:
-        return "SET_POSITION_TARGET_LOCAL_NED";
-    case FlightAction::set_guided_mode:
-    case FlightAction::arm:
-    case FlightAction::takeoff:
-    case FlightAction::return_to_launch:
-    case FlightAction::land:
-    case FlightAction::condition_yaw:
-        return "COMMAND_LONG";
-    }
-    return "MAVLINK";
-}
-
-bool action_expects_ack(const FlightAction action) {
-    return action != FlightAction::invalid &&
-           action != FlightAction::yaw_rate &&
-           action != FlightAction::yaw_target;
-}
-
-std::string flight_action_detail(const FlightActionRequest& request) {
-    std::string detail;
-    switch (request.action) {
-    case FlightAction::invalid:
-        return "INVALID ACTION";
-    case FlightAction::set_guided_mode:
-        detail = "GUIDED";
-        break;
-    case FlightAction::arm:
-        detail = "SAFETY CHECKS ON";
-        break;
-    case FlightAction::takeoff: {
-        std::ostringstream altitude;
-        altitude << std::fixed << std::setprecision(1) << request.altitude_m
-                 << " M";
-        detail = altitude.str();
-        break;
-    }
-    case FlightAction::return_to_launch:
-        detail = "RETURN TO HOME";
-        break;
-    case FlightAction::land:
-        detail = "LAND MODE";
-        break;
-    case FlightAction::condition_yaw: {
-        std::ostringstream yaw;
-        yaw << std::fixed << std::setprecision(1)
-            << (request.yaw_degrees >= 0.0 ? "RIGHT " : "LEFT ")
-            << std::abs(request.yaw_degrees) << " DEG";
-        detail = yaw.str();
-        break;
-    }
-    case FlightAction::yaw_rate: {
-        std::ostringstream yaw;
-        yaw << std::fixed << std::setprecision(1)
-            << (request.yaw_rate_degrees_per_second >= 0.0 ? "RIGHT " : "LEFT ")
-            << std::abs(request.yaw_rate_degrees_per_second) << " DEG/S";
-        return yaw.str();
-    }
-    case FlightAction::yaw_target: {
-        std::ostringstream yaw;
-        yaw << std::fixed << std::setprecision(1)
-            << request.yaw_target_radians * kRadiansToDegrees << " DEG ABS";
-        return yaw.str();
-    }
-    }
-
-    if (action_expects_ack(request.action)) {
-        detail +=
-            " | ATTEMPT " +
-            std::to_string(static_cast<unsigned int>(request.confirmation) + 1);
-    }
-    return detail;
-}
-
 std::string flight_mode_name(const std::uint32_t mode) {
     switch (mode) {
     case kStabilizeMode:
@@ -268,46 +131,6 @@ std::string flight_mode_name(const std::uint32_t mode) {
     }
 }
 
-std::vector<std::uint8_t> encode_flight_action(
-    const FlightActionRequest& request) {
-    switch (request.action) {
-    case FlightAction::invalid:
-        return {};
-    case FlightAction::set_guided_mode:
-        return hardware::mavlink::encode_set_guided_mode(
-            request.vehicle_system_id,
-            request.confirmation);
-    case FlightAction::arm:
-        return hardware::mavlink::encode_arm(request.vehicle_system_id,
-            request.confirmation);
-    case FlightAction::takeoff:
-        return hardware::mavlink::encode_takeoff(request.vehicle_system_id,
-            request.altitude_m,
-            request.confirmation);
-    case FlightAction::return_to_launch:
-        return hardware::mavlink::encode_return_to_launch(
-            request.vehicle_system_id,
-            request.confirmation);
-    case FlightAction::land:
-        return hardware::mavlink::encode_land(request.vehicle_system_id,
-            request.confirmation);
-    case FlightAction::condition_yaw:
-        return hardware::mavlink::encode_condition_yaw(
-            request.vehicle_system_id,
-            request.yaw_degrees,
-            request.yaw_speed_degrees_per_second,
-            request.confirmation);
-    case FlightAction::yaw_rate:
-        return hardware::mavlink::encode_yaw_rate_target(
-            request.vehicle_system_id,
-            request.yaw_rate_degrees_per_second);
-    case FlightAction::yaw_target:
-        return hardware::mavlink::encode_yaw_target(request.vehicle_system_id,
-            request.yaw_target_radians);
-    }
-    return {};
-}
-
 } // namespace
 
 class CompanionApplication::Impl {
@@ -315,13 +138,7 @@ class CompanionApplication::Impl {
     explicit Impl(ports::Transport& transport,
         CompanionApplicationOptions options)
         : transport_(transport),
-          motion_commands_allowed_(options.motion_commands_allowed),
-          aerial_tracking_allowed_(options.aerial_tracking_allowed),
-          autonomy_scenario_configured_(options.flight_startup.enabled &&
-                                        options.autonomy_runtime.enabled),
           simulated_wind_(options.simulated_wind),
-          flight_startup_(options.flight_startup),
-          autonomy_runtime_(options.autonomy_runtime),
           decoder_{
               vehicle_state_,
               [this](const hardware::mavlink::CommandAck& acknowledgement,
@@ -358,27 +175,6 @@ class CompanionApplication::Impl {
                   }
 
                   telemetry_configurator_.on_command_ack(acknowledgement, now);
-
-                  const auto flight_action =
-                      map_flight_action(acknowledgement.command);
-                  if (!flight_action.has_value() ||
-                      (acknowledgement.target_component != 0 &&
-                          acknowledgement.target_component !=
-                              hardware::mavlink::kCompanionComponentId)) {
-                      return;
-                  }
-
-                  const auto outcome = map_ack_outcome(acknowledgement.result);
-                  flight_startup_.on_command_ack(*flight_action,
-                      outcome,
-                      acknowledgement.result,
-                      acknowledgement.source_system,
-                      now);
-                  autonomy_runtime_.on_command_ack(*flight_action,
-                      outcome,
-                      acknowledgement.result,
-                      acknowledgement.source_system,
-                      now);
               },
               [this](const hardware::mavlink::MessageObservation& message,
                   const mission::TimePoint now) {
@@ -407,21 +203,6 @@ class CompanionApplication::Impl {
                   }
               },
           } {
-        const auto startup = flight_startup_.snapshot();
-        const auto runtime = autonomy_runtime_.snapshot();
-        const bool startup_enabled =
-            startup.phase != FlightStartupPhase::disabled;
-        const bool runtime_enabled =
-            runtime.phase != AutonomyRuntimePhase::disabled;
-        if (startup_enabled != runtime_enabled) {
-            throw std::invalid_argument(
-                "flight startup and autonomy runtime must be enabled "
-                "together");
-        }
-        if (!motion_commands_allowed_ && startup_enabled) {
-            throw std::invalid_argument(
-                "automated flight requires explicit motion permission");
-        }
         if (options.camera_source != nullptr) {
             camera_monitor_.emplace(*options.camera_source,
                 options.target_detector);
@@ -581,45 +362,6 @@ class CompanionApplication::Impl {
             now);
     }
 
-    void send_flight_action(const FlightActionRequest& action,
-        const mission::TimePoint now,
-        const bool startup_action) {
-        const bool sent = write_frame(encode_flight_action(action),
-            now,
-            flight_action_message_name(action.action),
-            flight_action_name(action.action));
-        if (startup_action) {
-            flight_startup_.on_action_sent(action, sent, now);
-        } else {
-            autonomy_runtime_.on_action_sent(action, sent, now);
-        }
-        record_event(LinkEventDirection::outbound,
-            sent ? LinkEventStatus::pending : LinkEventStatus::failure,
-            flight_action_name(action.action),
-            flight_action_detail(action) + (sent ? "" : " | WRITE FAILED"),
-            now);
-    }
-
-    void update_flight_automation(const mission::VehicleSnapshot& vehicle,
-        const bool telemetry_ready,
-        const mission::TimePoint now) {
-        const auto startup_actions = flight_startup_.update(vehicle,
-            telemetry_ready,
-            companion_link_failsafe_.snapshot(),
-            now);
-        for (const auto& action : startup_actions) {
-            send_flight_action(action, now, true);
-        }
-        const auto autonomy_actions = autonomy_runtime_.update(vehicle,
-            flight_startup_.snapshot(),
-            companion_link_failsafe_.snapshot(),
-            now,
-            aerial_target_tracker_.snapshot(now));
-        for (const auto& action : autonomy_actions) {
-            send_flight_action(action, now, false);
-        }
-    }
-
     void poll(const std::optional<mission::TimePoint> fixed_now) {
         const auto now = poll_inputs(fixed_now);
         const auto vehicle = vehicle_state_.snapshot(now);
@@ -628,142 +370,9 @@ class CompanionApplication::Impl {
         const bool telemetry_ready = update_telemetry_setup(vehicle, now);
         request_failsafe_parameter(vehicle, telemetry_ready, now);
         request_vehicle_metadata(vehicle, telemetry_ready, now);
-        update_flight_automation(vehicle, telemetry_ready, now);
     }
 
   public:
-    bool request_autonomy_start(const AutonomyRuntimeMode mode,
-        const mission::TimePoint now) {
-        if (!motion_commands_allowed_) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "BLOCKED BY MOTION SAFETY POLICY",
-                now);
-            return false;
-        }
-
-        if (!autonomy_scenario_configured_) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "AUTONOMOUS SCENARIO NOT CONFIGURED",
-                now);
-            return false;
-        }
-
-        if (mode == AutonomyRuntimeMode::aerial_observation &&
-            !aerial_tracking_allowed_) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "SHAHED-136 TRACKING IS AVAILABLE IN SITL ONLY",
-                now);
-            return false;
-        }
-
-        const auto vehicle = vehicle_state_.snapshot(now);
-        if (!vehicle.connected || !vehicle.system_id.has_value()) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "BLOCKED | NO FLIGHT CONTROLLER",
-                now);
-            return false;
-        }
-
-        if (vehicle.armed) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "START",
-                "BLOCKED | VEHICLE IS ARMED",
-                now);
-            return false;
-        }
-
-        const auto startup = flight_startup_.snapshot();
-        const auto autonomy = autonomy_runtime_.snapshot();
-        const bool startup_finished =
-            startup.phase == FlightStartupPhase::idle ||
-            startup.phase == FlightStartupPhase::completed ||
-            startup.phase == FlightStartupPhase::failed;
-        const bool autonomy_finished =
-            autonomy.phase == AutonomyRuntimePhase::idle ||
-            autonomy.phase == AutonomyRuntimePhase::completed ||
-            autonomy.phase == AutonomyRuntimePhase::failed;
-        if (!startup_finished || !autonomy_finished) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::warning,
-                "START",
-                "SCENARIO ALREADY RUNNING",
-                now);
-            return false;
-        }
-
-        flight_startup_.restart();
-        autonomy_runtime_.restart(mode);
-        record_event(LinkEventDirection::outbound,
-            LinkEventStatus::pending,
-            "START",
-            "AERIAL OBSERVATION REQUESTED",
-            now);
-        return true;
-    }
-
-    bool request_return_to_launch(const mission::TimePoint now) {
-        if (!motion_commands_allowed_) {
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "RTL",
-                "BLOCKED BY MOTION SAFETY POLICY",
-                now);
-            return false;
-        }
-
-        const auto startup = flight_startup_.snapshot();
-        const auto autonomy = autonomy_runtime_.snapshot();
-        const bool mission_active =
-            startup.phase != FlightStartupPhase::disabled &&
-            startup.phase != FlightStartupPhase::idle &&
-            startup.phase != FlightStartupPhase::completed &&
-            startup.phase != FlightStartupPhase::failed;
-        const bool autonomy_active =
-            autonomy.phase != AutonomyRuntimePhase::disabled &&
-            autonomy.phase != AutonomyRuntimePhase::idle &&
-            autonomy.phase != AutonomyRuntimePhase::completed &&
-            autonomy.phase != AutonomyRuntimePhase::failed;
-        flight_startup_.cancel("Startup cancelled by operator");
-        const auto vehicle = vehicle_state_.snapshot(now);
-        if (!vehicle.connected || !vehicle.system_id.has_value()) {
-            autonomy_runtime_.cancel(
-                "Mission cancelled; RTL unavailable without controller link");
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::failure,
-                "RTL",
-                "MISSION CANCELLED | RTL NOT SENT | NO FLIGHT CONTROLLER",
-                now);
-            return false;
-        }
-
-        if (!vehicle.armed && !mission_active && !autonomy_active) {
-            autonomy_runtime_.cancel("Mission idle; vehicle already disarmed");
-            record_event(LinkEventDirection::outbound,
-                LinkEventStatus::success,
-                "RTL",
-                "NO ACTION | VEHICLE DISARMED",
-                now);
-            return true;
-        }
-
-        autonomy_runtime_.begin_return_to_launch(*vehicle.system_id, now);
-        record_event(LinkEventDirection::outbound,
-            LinkEventStatus::pending,
-            "RTL",
-            "MISSION CANCELLED | RTL REQUESTED",
-            now);
-        return true;
-    }
-
     AppSnapshot snapshot(const mission::TimePoint now) {
         const auto telemetry = telemetry_configurator_.snapshot();
         return {
@@ -786,10 +395,6 @@ class CompanionApplication::Impl {
             .vision = camera_monitor_.has_value()
                           ? camera_monitor_->vision_snapshot(now)
                           : std::nullopt,
-            .flight_startup = flight_startup_.snapshot(),
-            .autonomy = autonomy_runtime_.snapshot(),
-            .motion_commands_allowed = motion_commands_allowed_,
-            .aerial_tracking_available = aerial_tracking_allowed_,
             .link_events =
                 {
                     link_events_.begin(),
@@ -807,19 +412,6 @@ class CompanionApplication::Impl {
             return std::nullopt;
         }
         return camera_monitor_->take_latest_processed_frame();
-    }
-
-    void update_forward_target_observations(
-        const std::span<const mission::TargetObservation> observations,
-        const std::uint32_t frame_width,
-        const std::uint32_t frame_height,
-        const std::uint64_t frame_sequence,
-        const mission::TimePoint now) {
-        aerial_target_tracker_.update(observations,
-            frame_width,
-            frame_height,
-            frame_sequence,
-            now);
     }
 
   private:
@@ -971,16 +563,10 @@ class CompanionApplication::Impl {
     static constexpr std::size_t kMaximumLinkEvents = 8;
 
     ports::Transport& transport_;
-    bool motion_commands_allowed_{false};
-    bool aerial_tracking_allowed_{false};
-    bool autonomy_scenario_configured_{false};
     std::optional<SimulatedWindProfile> simulated_wind_;
     mission::VehicleState vehicle_state_;
     CompanionLinkFailsafe companion_link_failsafe_;
     hardware::mavlink::TelemetryStreamConfigurator telemetry_configurator_;
-    FlightStartupController flight_startup_;
-    AutonomyRuntime autonomy_runtime_;
-    AerialTargetTracker aerial_target_tracker_;
     std::optional<CameraMonitor> camera_monitor_;
     hardware::mavlink::MavlinkDecoder decoder_;
     std::array<std::uint8_t, kTransportReceiveBufferSize> receive_buffer_{};
@@ -1014,17 +600,6 @@ void CompanionApplication::poll(const mission::TimePoint now) {
 
 void CompanionApplication::poll() { impl_->poll(); }
 
-bool CompanionApplication::request_autonomy_start(
-    const AutonomyRuntimeMode mode,
-    const mission::TimePoint now) {
-    return impl_->request_autonomy_start(mode, now);
-}
-
-bool CompanionApplication::request_return_to_launch(
-    const mission::TimePoint now) {
-    return impl_->request_return_to_launch(now);
-}
-
 AppSnapshot CompanionApplication::snapshot(const mission::TimePoint now) {
     return impl_->snapshot(now);
 }
@@ -1032,19 +607,6 @@ AppSnapshot CompanionApplication::snapshot(const mission::TimePoint now) {
 std::optional<ProcessedCameraFrame>
 CompanionApplication::take_latest_processed_camera_frame() {
     return impl_->take_latest_processed_camera_frame();
-}
-
-void CompanionApplication::update_forward_target_observations(
-    const std::span<const mission::TargetObservation> observations,
-    const std::uint32_t frame_width,
-    const std::uint32_t frame_height,
-    const std::uint64_t frame_sequence,
-    const mission::TimePoint now) {
-    impl_->update_forward_target_observations(observations,
-        frame_width,
-        frame_height,
-        frame_sequence,
-        now);
 }
 
 } // namespace onboard_autonomy::mission

@@ -4,7 +4,6 @@ set -euo pipefail
 
 ONBOARD_AUTONOMY_BUILD_DIR="${ONBOARD_AUTONOMY_BUILD_DIR:-${HOME}/build/onboard_autonomy}"
 COMPANION="${ONBOARD_AUTONOMY_BUILD_DIR}/onboard_autonomy"
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! -x "${COMPANION}" ]]; then
     printf 'OnboardAutonomy is not built: %s\n' "${COMPANION}" >&2
@@ -64,16 +63,6 @@ if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
             "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT}"
         )
     fi
-    if [[ -n "${ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL:-}" ]]; then
-        arguments+=(
-            --forward-detector-model
-            "${ONBOARD_AUTONOMY_FORWARD_DETECTOR_MODEL}"
-        )
-    fi
-fi
-
-if [[ "${ONBOARD_AUTONOMY_AERIAL_OBSERVATION:-0}" == "1" ]]; then
-    arguments+=(--aerial-observation)
 fi
 
 if [[ "${ONBOARD_AUTONOMY_JSON:-0}" == "1" ]]; then

@@ -11,7 +11,6 @@
 
 namespace {
 
-using onboard_autonomy::operator_interface::cli::AutonomyMode;
 using onboard_autonomy::operator_interface::cli::CommandLineOptions;
 using onboard_autonomy::operator_interface::cli::GStreamerCameraOptions;
 using onboard_autonomy::operator_interface::cli::HardwareLaunchOptions;
@@ -52,8 +51,7 @@ void defaults_are_documented_udp_observation_mode() {
                                                 &hardware->connection);
     require(udp != nullptr && udp->bind_address == "0.0.0.0" &&
                 udp->port == 14550 &&
-                hardware->operator_interface.snapshot_interval_ms == 1000 &&
-                !hardware->autonomy.enabled,
+                hardware->operator_interface.snapshot_interval_ms == 1000,
         "empty CLI must preserve documented observation-only defaults");
 }
 
@@ -86,7 +84,7 @@ void transport_groups_are_explicit_and_exclusive() {
         "--sitl cannot be combined with --transport serial");
 }
 
-void camera_and_autonomy_dependencies_are_validated() {
+void camera_dependencies_are_validated() {
     const auto gazebo = parse({
         "--transport",
         "udp",
@@ -103,20 +101,14 @@ void camera_and_autonomy_dependencies_are_validated() {
         "--camera-preview",
         "--forward-camera-udp-port",
         "5602",
-        "--forward-detector-model",
-        "model.onnx",
-        "--aerial-observation",
     });
     const auto* simulation = std::get_if<SimulationLaunchOptions>(&gazebo);
     require(simulation != nullptr && simulation->camera.has_value() &&
                 std::holds_alternative<GStreamerCameraOptions>(
                     simulation->camera->source) &&
                 simulation->diagnostics.forward_camera.has_value() &&
-                simulation->diagnostics.forward_camera->udp_port == 5602 &&
-                simulation->diagnostics.forward_camera->detector_model_file ==
-                    "model.onnx" &&
-                simulation->autonomy.enabled,
-        "valid Gazebo autonomy group must parse");
+                simulation->diagnostics.forward_camera->udp_port == 5602,
+        "valid Gazebo camera group must parse");
 
     require_rejected({"--camera-source", "gstreamer"}, "require --camera");
     require_rejected(
@@ -132,7 +124,7 @@ void camera_and_autonomy_dependencies_are_validated() {
                          "--camera-preview",
                          "--forward-detector-model",
                          "model.onnx"},
-        "requires --forward-camera-udp-port");
+        "Unknown argument");
     require_rejected({"--camera",
                          "--camera-source",
                          "gstreamer",
@@ -151,8 +143,7 @@ void forward_preview_does_not_require_a_downward_camera() {
     require(hardware != nullptr && !hardware->camera.has_value() &&
                 hardware->diagnostics.forward_camera.has_value() &&
                 hardware->diagnostics.forward_camera->frame_width == 320 &&
-                hardware->diagnostics.forward_camera->frame_height == 240 &&
-                !hardware->autonomy.enabled,
+                hardware->diagnostics.forward_camera->frame_height == 240,
         "forward-only preview must have its own dimensions and no downward "
         "camera or mission");
     require_rejected({"--camera-preview"}, "require --camera or");
@@ -166,38 +157,6 @@ void forward_preview_does_not_require_a_downward_camera() {
         "require --camera");
     require_rejected({"--camera-preview-port", "8081"},
         "requires --camera-preview");
-}
-
-void aerial_observation_is_a_typed_sitl_only_mode() {
-    const auto options = parse({
-        "--sitl",
-        "--camera",
-        "--camera-preview",
-        "--forward-camera-udp-port",
-        "5602",
-        "--aerial-observation",
-    });
-    const auto* simulation = std::get_if<SimulationLaunchOptions>(&options);
-    require(simulation != nullptr && simulation->autonomy.enabled &&
-                simulation->autonomy.mode == AutonomyMode::aerial_observation,
-        "aerial observation must map to a distinct non-terminal mission");
-
-    require_rejected({"--camera",
-                         "--camera-preview",
-                         "--forward-camera-udp-port",
-                         "5602",
-                         "--aerial-observation"},
-        "requires --sitl");
-    require_rejected({"--sitl", "--camera", "--aerial-observation"},
-        "requires --forward-camera-udp-port");
-    require_rejected({"--sitl",
-                         "--camera",
-                         "--camera-preview",
-                         "--forward-camera-udp-port",
-                         "5602",
-                         "--autonomous",
-                         "--aerial-observation"},
-        "Unknown argument");
 }
 
 void simulated_wind_is_typed_and_sitl_only() {
@@ -238,12 +197,12 @@ void diagnostic_log_is_independent_from_console_output() {
 void removed_options_provide_migration_guidance() {
     for (const auto option : {"--apriltag", "--apriltag-size-mm",
              "--camera-calibration", "--camera-extrinsics", "--autonomous",
-             "--exit-after-autonomy"}) {
+             "--exit-after-autonomy", "--aerial-observation", "--forward-detector-model"}) {
         require_rejected({option}, "Unknown argument");
     }
     require_rejected({"--serial", "/dev/ttyACM0"},
         "--transport serial --serial-device DEVICE");
-    require_rejected({"--scenario", "5"}, "was removed; use --aerial-observation");
+    require_rejected({"--scenario", "5"}, "was removed; use telemetry and camera observation");
 }
 
 } // namespace
@@ -251,9 +210,8 @@ void removed_options_provide_migration_guidance() {
 void run_command_line_tests() {
     defaults_are_documented_udp_observation_mode();
     transport_groups_are_explicit_and_exclusive();
-    camera_and_autonomy_dependencies_are_validated();
+    camera_dependencies_are_validated();
     forward_preview_does_not_require_a_downward_camera();
-    aerial_observation_is_a_typed_sitl_only_mode();
     simulated_wind_is_typed_and_sitl_only();
     diagnostic_log_is_independent_from_console_output();
     removed_options_provide_migration_guidance();

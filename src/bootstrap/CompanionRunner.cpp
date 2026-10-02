@@ -81,17 +81,7 @@ void CompanionRunner::handle_runtime_commands() {
         return;
     }
     while (const auto command = command_source_->poll()) {
-        const auto command_time = std::chrono::steady_clock::now();
-        if (*command == RuntimeCommand::start_aerial_tracking) {
-            static_cast<void>(application_.request_autonomy_start(
-                mission::AutonomyRuntimeMode::aerial_observation,
-                command_time));
-            next_snapshot_ = command_time;
-        } else if (*command == RuntimeCommand::return_to_launch) {
-            static_cast<void>(
-                application_.request_return_to_launch(command_time));
-            next_snapshot_ = command_time;
-        } else if (*command == RuntimeCommand::shutdown) {
+        if (*command == RuntimeCommand::shutdown) {
             keep_running = 0;
         }
     }
@@ -127,11 +117,6 @@ void CompanionRunner::publish_forward_camera_frame() {
     if (!processed.has_value()) {
         return;
     }
-    application_.update_forward_target_observations(processed->targets,
-        processed->frame.width,
-        processed->frame.height,
-        processed->frame.sequence,
-        processed->observed_at);
     for (auto* sink : preview_sinks_) {
         if (sink != nullptr) {
             sink->publish(diagnostics::preview::CameraPreviewStream::forward,

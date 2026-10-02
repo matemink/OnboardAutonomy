@@ -45,14 +45,6 @@ Json serialize_snapshot(const AppSnapshot& snapshot) {
 
 void snapshot_keeps_runtime_state_without_camera_data() {
     AppSnapshot snapshot;
-    snapshot.flight_startup.phase =
-        onboard_autonomy::mission::FlightStartupPhase::waiting_for_vehicle;
-    snapshot.flight_startup.detail = "Waiting for controller";
-    snapshot.autonomy.phase =
-        onboard_autonomy::mission::AutonomyRuntimePhase::active;
-    snapshot.autonomy.detail = "Autonomy active";
-    snapshot.motion_commands_allowed = true;
-    snapshot.aerial_tracking_available = true;
     snapshot.vehicle.gps_ready = false;
     snapshot.vehicle.navigation_ready = true;
     snapshot.simulated_wind = onboard_autonomy::mission::SimulatedWindProfile{
@@ -79,17 +71,16 @@ void snapshot_keeps_runtime_state_without_camera_data() {
         "diagnostic snapshots must carry record type and wall-clock time");
     require(json.at("camera").is_null() && json.at("vision").is_null(),
         "missing camera and vision data must remain explicit nulls");
-    require(json.at("flight_startup").at("phase") == "waiting_for_vehicle" &&
-                json.at("autonomy").at("phase") == "active",
-        "snapshot diagnostics must preserve mission runtime state");
-    require(json.at("motion_commands_allowed") == true &&
-                json.at("aerial_tracking_available") == true &&
-                json.at("navigation_ready") == true &&
+    require(json.at("navigation_ready") == true &&
                 json.at("gps_ready") == false &&
                 json.at("simulated_wind").at("speed_m_s") == 3.0 &&
                 json.at("companion_link_failsafe").at("action") == "land" &&
                 json.at("telemetry_setup").at("completed_requests") == 6,
         "snapshot diagnostics must preserve safety and setup state");
+    require(!json.contains("flight_startup") && !json.contains("autonomy") &&
+                !json.contains("motion_commands_allowed") &&
+                !json.contains("aerial_tracking_available"),
+        "observation diagnostics must not retain the removed control schema");
 }
 
 void snapshot_serializes_camera_and_object_detections() {
@@ -152,10 +143,6 @@ void transition_events_reconstruct_runtime_failures() {
 
     AppSnapshot waiting;
     waiting.elapsed = 10ms;
-    waiting.flight_startup.phase =
-        onboard_autonomy::mission::FlightStartupPhase::waiting_for_vehicle;
-    waiting.autonomy.phase =
-        onboard_autonomy::mission::AutonomyRuntimePhase::waiting_for_startup;
     waiting.camera = onboard_autonomy::mission::CameraSnapshot{
         .phase =
             onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting,
@@ -182,22 +169,15 @@ void transition_events_reconstruct_runtime_failures() {
     active.camera->phase =
         onboard_autonomy::mission::ports::CameraSourcePhase::streaming;
     active.camera->error.clear();
-    active.flight_startup.phase =
-        onboard_autonomy::mission::FlightStartupPhase::setting_guided;
-    active.flight_startup.detail = "GUIDED command accepted";
-    active.autonomy.phase =
-        onboard_autonomy::mission::AutonomyRuntimePhase::active;
-    active.autonomy.detail = "aerial observation active";
     active.companion_link_failsafe.phase =
         onboard_autonomy::mission::CompanionLinkFailsafePhase::accepted;
     active.companion_link_failsafe.detail = "failsafe parameters accepted";
-    active.motion_commands_allowed = true;
     active.link_events.push_back({
         .sequence = 1,
         .elapsed = 100ms,
         .direction = onboard_autonomy::mission::LinkEventDirection::outbound,
         .status = onboard_autonomy::mission::LinkEventStatus::success,
-        .label = "GUIDED",
+        .label = "TELEMETRY",
         .detail = "COMMAND_ACK ACCEPTED",
     });
     sink.consume(active, std::chrono::system_clock::time_point{2s});
@@ -208,22 +188,15 @@ void transition_events_reconstruct_runtime_failures() {
     failed.camera->phase =
         onboard_autonomy::mission::ports::CameraSourcePhase::reconnecting;
     failed.camera->error = "frame stalled";
-    failed.flight_startup.phase =
-        onboard_autonomy::mission::FlightStartupPhase::failed;
-    failed.flight_startup.detail = "arm command rejected";
-    failed.autonomy.phase =
-        onboard_autonomy::mission::AutonomyRuntimePhase::failed;
-    failed.autonomy.detail = "controller heartbeat was lost";
     failed.companion_link_failsafe.phase =
         onboard_autonomy::mission::CompanionLinkFailsafePhase::rejected;
     failed.companion_link_failsafe.detail = "failsafe activation failed";
-    failed.motion_commands_allowed = false;
     failed.link_events.push_back({
         .sequence = 2,
         .elapsed = 280ms,
         .direction = onboard_autonomy::mission::LinkEventDirection::inbound,
         .status = onboard_autonomy::mission::LinkEventStatus::failure,
-        .label = "ARM",
+        .label = "TELEMETRY",
         .detail = "COMMAND_ACK DENIED",
     });
     sink.consume(failed, std::chrono::system_clock::time_point{3s});
@@ -245,12 +218,9 @@ void transition_events_reconstruct_runtime_failures() {
                 has_event("camera_stream_recovered") &&
                 has_event("camera_stream_stalled"),
         "diagnostics must record hardware transitions");
-    require(has_event("flight_startup_phase_changed") &&
-                has_event("autonomy_phase_changed") &&
-                has_event("companion_link_failsafe_phase_changed") &&
-                has_event("motion_safety_changed") &&
+    require(has_event("companion_link_failsafe_phase_changed") &&
                 has_event("mavlink_command_event"),
-        "diagnostics must record mission, safety, and command transitions");
+        "diagnostics must record failsafe and protocol transitions");
 }
 
 } // namespace

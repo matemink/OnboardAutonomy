@@ -18,10 +18,8 @@ namespace onboard_autonomy::diagnostics::logging {
 namespace {
 
 using Json = nlohmann::json;
-using detail::autonomy_phase_name;
 using detail::link_event_json;
 using detail::snapshot_json;
-using detail::startup_phase_name;
 
 std::int64_t unix_milliseconds(
     const std::chrono::system_clock::time_point value) {
@@ -117,22 +115,6 @@ class JsonDiagnosticSink::Impl {
     void write_phase_events(const mission::AppSnapshot& previous,
         const mission::AppSnapshot& snapshot,
         const std::int64_t recorded_at_ms) {
-        if (previous.flight_startup.phase != snapshot.flight_startup.phase) {
-            event("flight_startup_phase_changed",
-                recorded_at_ms,
-                snapshot,
-                snapshot.flight_startup.detail,
-                {{"from", startup_phase_name(previous.flight_startup.phase)},
-                    {"to", startup_phase_name(snapshot.flight_startup.phase)}});
-        }
-        if (previous.autonomy.phase != snapshot.autonomy.phase) {
-            event("autonomy_phase_changed",
-                recorded_at_ms,
-                snapshot,
-                snapshot.autonomy.detail,
-                {{"from", autonomy_phase_name(previous.autonomy.phase)},
-                    {"to", autonomy_phase_name(snapshot.autonomy.phase)}});
-        }
         if (previous.companion_link_failsafe.phase !=
             snapshot.companion_link_failsafe.phase) {
             event("companion_link_failsafe_phase_changed",
@@ -146,14 +128,7 @@ class JsonDiagnosticSink::Impl {
                         mission::companion_link_failsafe_phase_name(
                             snapshot.companion_link_failsafe.phase)}});
         }
-        if (previous.motion_commands_allowed !=
-            snapshot.motion_commands_allowed) {
-            event("motion_safety_changed",
-                recorded_at_ms,
-                snapshot,
-                snapshot.motion_commands_allowed ? "motion commands allowed"
-                                                 : "motion commands blocked");
-        }
+
     }
 
     void write_link_events(const mission::AppSnapshot& snapshot,

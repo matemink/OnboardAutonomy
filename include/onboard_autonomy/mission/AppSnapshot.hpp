@@ -1,11 +1,9 @@
 #pragma once
 
-#include "onboard_autonomy/mission/autonomy/AutonomySnapshot.hpp"
 #include "onboard_autonomy/mission/cv/CameraSnapshot.hpp"
 #include "onboard_autonomy/mission/cv/VisionSnapshot.hpp"
 #include "onboard_autonomy/mission/safety/CompanionLinkFailsafeSnapshot.hpp"
 #include "onboard_autonomy/mission/EnvironmentProfile.hpp"
-#include "onboard_autonomy/mission/flight/FlightStartupSnapshot.hpp"
 #include "onboard_autonomy/mission/flight/VehicleSnapshot.hpp"
 
 #include <chrono>
@@ -70,10 +68,6 @@ struct AppSnapshot {
     std::optional<SimulatedWindProfile> simulated_wind;
     std::optional<CameraSnapshot> camera;
     std::optional<VisionSnapshot> vision;
-    FlightStartupSnapshot flight_startup;
-    AutonomyRuntimeSnapshot autonomy;
-    bool motion_commands_allowed{false};
-    bool aerial_tracking_available{false};
     std::vector<LinkEvent> link_events;
     std::chrono::milliseconds elapsed{};
     std::optional<LinkActivity> tx_activity;
