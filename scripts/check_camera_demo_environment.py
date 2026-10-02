@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Refuse a second camera demo without stopping unrelated processes."""
 
+import os
 import socket
 import subprocess
 import sys
@@ -11,12 +12,11 @@ ENDPOINTS = (
     (socket.SOCK_STREAM, 8080, "camera preview"),
     (socket.SOCK_DGRAM, 9002, "Gazebo flight dynamics"),
     (socket.SOCK_DGRAM, 14550, "companion telemetry"),
-    (socket.SOCK_DGRAM, 5601, "downward camera"),
     (socket.SOCK_DGRAM, 5602, "forward camera"),
 )
 
 
-def check_environment() -> list[str]:
+def check_environment(*, downward_enabled: bool = False) -> list[str]:
     conflicts = []
     result = subprocess.run(
         ["pgrep", "-f", "^gz sim "], capture_output=True, check=False
@@ -25,7 +25,10 @@ def check_environment() -> list[str]:
         conflicts.append("a Gazebo simulation is already running")
     elif result.returncode != 1:
         conflicts.append("could not check running Gazebo simulations")
-    for socket_type, port, label in ENDPOINTS:
+    endpoints = ENDPOINTS
+    if downward_enabled:
+        endpoints += ((socket.SOCK_DGRAM, 5601, "downward camera"),)
+    for socket_type, port, label in endpoints:
         with socket.socket(socket.AF_INET, socket_type) as probe:
             try:
                 if socket_type == socket.SOCK_STREAM:
@@ -40,7 +43,9 @@ def check_environment() -> list[str]:
 
 
 def main() -> int:
-    conflicts = check_environment()
+    conflicts = check_environment(
+        downward_enabled=os.environ.get("ONBOARD_AUTONOMY_DOWNWARD_CAMERA") == "1"
+    )
     for conflict in conflicts:
         print(f"Camera demo cannot start: {conflict}", file=sys.stderr)
     return int(bool(conflicts))

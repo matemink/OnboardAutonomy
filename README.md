@@ -13,6 +13,7 @@ observation mode. Automated motion is restricted to explicitly configured SITL.
 
 - MAVLink 2 over UDP or Linux USB/UART, with controller identity filtering,
   telemetry freshness, command acknowledgements, and bounded retries.
+- Forward-only Gazebo preview by default, with an optional downward feed.
 - Independent camera streams through GStreamer or `rpicam-vid`, with automatic
   recovery after producer failure or stalled frames.
 - Forward-camera OpenCV DNN / YOLOX processing and temporal observation tracking

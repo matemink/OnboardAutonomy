@@ -121,7 +121,8 @@ class HttpCameraPreviewServer final
         : config_(std::move(config)), page_(read_page(config_.page_file)),
           minimum_frame_interval_(
               checked_frame_interval(config_.maximum_frames_per_second)) {
-        if (config_.bind_address.empty() || config_.port == 0U) {
+        if (config_.bind_address.empty() || config_.port == 0U ||
+            (!config_.downward_camera && !config_.forward_camera)) {
             throw std::invalid_argument(
                 "invalid HTTP camera preview configuration");
         }
@@ -131,11 +132,22 @@ class HttpCameraPreviewServer final
                 response.set_header("Cache-Control", "no-store");
                 response.set_content(page_, "text/html; charset=utf-8");
             });
-        register_frame_route("/api/frame", CameraPreviewStream::downward);
-        register_frame_route("/api/frame/downward",
-            CameraPreviewStream::downward);
-        register_frame_route("/api/frame/forward",
-            CameraPreviewStream::forward);
+        server_.Get("/api/streams",
+            [this](const httplib::Request&, httplib::Response& response) {
+                response.set_header("Cache-Control", "no-store");
+                response.set_content(enabled_streams_json(), "application/json");
+            });
+        register_frame_route("/api/frame", config_.downward_camera
+                                              ? CameraPreviewStream::downward
+                                              : CameraPreviewStream::forward);
+        if (config_.downward_camera) {
+            register_frame_route("/api/frame/downward",
+                CameraPreviewStream::downward);
+        }
+        if (config_.forward_camera) {
+            register_frame_route("/api/frame/forward",
+                CameraPreviewStream::forward);
+        }
 
         worker_ = std::jthread([this] {
             const bool listened = server_.listen(config_.bind_address,
@@ -204,6 +216,16 @@ class HttpCameraPreviewServer final
     }
 
   private:
+    [[nodiscard]] std::string enabled_streams_json() const {
+        if (config_.downward_camera && config_.forward_camera) {
+            return "[\"forward\",\"downward\"]";
+        }
+        if (config_.downward_camera) {
+            return "[\"downward\"]";
+        }
+        return "[\"forward\"]";
+    }
+
     void register_frame_route(const std::string& path,
         const CameraPreviewStream stream) {
         server_.Get(path,

@@ -45,15 +45,19 @@ fi
 
 if [[ "${ONBOARD_AUTONOMY_GAZEBO_VISION:-0}" == "1" ]]; then
     arguments+=(
-        --camera
-        --camera-source gstreamer
-        --camera-udp-port "${ONBOARD_AUTONOMY_CAMERA_UDP_PORT:-5601}"
         --camera-width 640
         --camera-height 480
         --camera-preview
         --camera-preview-port
         "${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
     )
+    if [[ "${ONBOARD_AUTONOMY_DOWNWARD_CAMERA:-0}" == "1" ]]; then
+        arguments+=(
+            --camera
+            --camera-source gstreamer
+            --camera-udp-port "${ONBOARD_AUTONOMY_CAMERA_UDP_PORT:-5601}"
+        )
+    fi
     if [[ -n "${ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT:-}" ]]; then
         arguments+=(
             --forward-camera-udp-port

@@ -134,3 +134,20 @@ class CameraDemoEnvironmentTests(unittest.TestCase):
             ),
         ):
             self.assertEqual(MODULE.check_environment(), [])
+
+
+    def test_disabled_downward_port_does_not_block_forward_demo(self) -> None:
+        with (
+            patch.object(MODULE, "ENDPOINTS", ()),
+            patch.object(MODULE.socket, "socket") as socket_factory,
+            patch.object(MODULE.subprocess, "run",
+                         return_value=subprocess.CompletedProcess([], 1)),
+        ):
+            probe = socket_factory.return_value.__enter__.return_value
+            probe.bind.side_effect = OSError("occupied")
+            self.assertEqual(MODULE.check_environment(), [])
+            socket_factory.assert_not_called()
+            self.assertEqual(
+                MODULE.check_environment(downward_enabled=True),
+                ["downward camera: port 5601 is unavailable"],
+            )

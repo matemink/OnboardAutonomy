@@ -143,6 +143,31 @@ void camera_and_autonomy_dependencies_are_validated() {
     require_rejected({"--interactive", "--json"}, "cannot be combined");
 }
 
+void forward_preview_does_not_require_a_downward_camera() {
+    const auto options = parse({"--camera-preview",
+        "--forward-camera-udp-port", "5602", "--camera-width", "320",
+        "--camera-height", "240"});
+    const auto* hardware = std::get_if<HardwareLaunchOptions>(&options);
+    require(hardware != nullptr && !hardware->camera.has_value() &&
+                hardware->diagnostics.forward_camera.has_value() &&
+                hardware->diagnostics.forward_camera->frame_width == 320 &&
+                hardware->diagnostics.forward_camera->frame_height == 240 &&
+                !hardware->autonomy.enabled,
+        "forward-only preview must have its own dimensions and no downward "
+        "camera or mission");
+    require_rejected({"--camera-preview"}, "require --camera or");
+    require_rejected({"--forward-camera-udp-port", "5602"},
+        "requires --camera-preview");
+    require_rejected({"--camera-preview", "--forward-camera-udp-port", "5602",
+                         "--camera-height", "241"},
+        "positive even values");
+    require_rejected({"--camera-preview", "--forward-camera-udp-port", "5602",
+                         "--camera-source", "gstreamer"},
+        "require --camera");
+    require_rejected({"--camera-preview-port", "8081"},
+        "requires --camera-preview");
+}
+
 void aerial_observation_is_a_typed_sitl_only_mode() {
     const auto options = parse({
         "--sitl",
@@ -227,6 +252,7 @@ void run_command_line_tests() {
     defaults_are_documented_udp_observation_mode();
     transport_groups_are_explicit_and_exclusive();
     camera_and_autonomy_dependencies_are_validated();
+    forward_preview_does_not_require_a_downward_camera();
     aerial_observation_is_a_typed_sitl_only_mode();
     simulated_wind_is_typed_and_sitl_only();
     diagnostic_log_is_independent_from_console_output();

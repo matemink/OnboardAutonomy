@@ -73,16 +73,6 @@ const operator_interface::cli::DiagnosticsOptions& diagnostics_options(
         options);
 }
 
-const std::optional<operator_interface::cli::CameraOptions>& camera_options(
-    const operator_interface::cli::CommandLineOptions& options) {
-    return std::visit(
-        [](const auto& launch)
-            -> const std::optional<operator_interface::cli::CameraOptions>& {
-            return launch.camera;
-        },
-        options);
-}
-
 MissionConnection make_mission_connection(
     const operator_interface::cli::MavlinkConnectionOptions& connection) {
     return std::visit(
@@ -230,8 +220,9 @@ std::filesystem::path find_camera_preview_page(
 }
 
 std::unique_ptr<CameraPreviewSink> make_camera_preview(
-    const operator_interface::cli::DiagnosticsOptions& options,
+    const operator_interface::cli::CommandLineOptions& launch,
     const std::filesystem::path& executable) {
+    const auto& options = diagnostics_options(launch);
     if (!options.camera_preview.has_value()) {
         return nullptr;
     }
@@ -241,6 +232,10 @@ std::unique_ptr<CameraPreviewSink> make_camera_preview(
         .maximum_frames_per_second = diagnostics::preview::
             HttpCameraPreviewConfig::kDefaultMaximumFramesPerSecond,
         .page_file = find_camera_preview_page(executable),
+        .downward_camera = std::visit(
+            [](const auto& configured) { return configured.camera.has_value(); },
+            launch),
+        .forward_camera = options.forward_camera.has_value(),
     });
 }
 
@@ -251,14 +246,9 @@ std::unique_ptr<mission::ports::CameraSource> make_forward_preview_camera(
         return nullptr;
     }
 
-    const auto& camera = camera_options(options);
-    if (!camera.has_value()) {
-        throw std::logic_error(
-            "forward camera preview requires primary camera dimensions");
-    }
     return hardware::camera::make_gstreamer_camera_source({
-        .width = camera->frame_width,
-        .height = camera->frame_height,
+        .width = diagnostics.forward_camera->frame_width,
+        .height = diagnostics.forward_camera->frame_height,
         .udp_port = diagnostics.forward_camera->udp_port,
     });
 }
@@ -412,7 +402,7 @@ int run_program(const int argc, char** argv) {
         mission.transport(),
         board_types.get(),
         console_terminal);
-    auto camera_preview = make_camera_preview(diagnostics, executable);
+    auto camera_preview = make_camera_preview(options, executable);
     auto forward_preview_camera = make_forward_preview_camera(options);
     auto forward_target_detector = make_forward_target_detector(options);
     auto forward_camera_monitor =
