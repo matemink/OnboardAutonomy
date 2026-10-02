@@ -17,6 +17,8 @@ struct HttpCameraPreviewConfig {
     std::uint16_t port{kDefaultPort};
     std::uint32_t maximum_frames_per_second{kDefaultMaximumFramesPerSecond};
     std::filesystem::path page_file;
+    bool downward_camera{true};
+    bool forward_camera{true};
 };
 
 [[nodiscard]] std::unique_ptr<diagnostics::preview::CameraPreviewSink>

@@ -42,6 +42,8 @@ struct CameraPreviewOptions {
 struct ForwardCameraOptions {
     std::uint16_t udp_port{defaults::kForwardCameraUdpPort};
     std::string detector_model_file;
+    std::uint32_t frame_width{defaults::kCameraFrameWidth};
+    std::uint32_t frame_height{defaults::kCameraFrameHeight};
 };
 
 struct CameraOptions {

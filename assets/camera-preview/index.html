@@ -82,6 +82,14 @@
       gap: 16px;
     }
 
+    .camera-grid.single-stream {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .camera-card[hidden] {
+      display: none;
+    }
+
     .camera-card {
       min-width: 0;
       overflow: hidden;
@@ -239,14 +247,14 @@
   <main>
     <header class="page-header">
       <div>
-        <p class="eyebrow">Raspberry Pi 5 / Dual Camera Rig</p>
+        <p class="eyebrow">Camera Preview</p>
         <h1>OnboardAutonomy Vision</h1>
       </div>
-      <p class="page-note">Independent streams / independent health</p>
+      <p class="page-note">Loading camera configuration</p>
     </header>
 
     <section class="camera-grid">
-      <article class="camera-card" data-stream="forward">
+      <article class="camera-card" data-stream="forward" hidden>
         <header class="card-header">
           <div>
             <h2>Front Camera</h2>
@@ -268,7 +276,7 @@
         </footer>
       </article>
 
-      <article class="camera-card" data-stream="downward">
+      <article class="camera-card" data-stream="downward" hidden>
         <header class="card-header">
           <div>
             <h2>Down Camera</h2>
@@ -470,7 +478,31 @@
       update();
     }
 
-    document.querySelectorAll(".camera-card").forEach(createStream);
+    async function loadStreams() {
+      const note = document.querySelector(".page-note");
+      try {
+        const response = await fetch("/api/streams", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const streams = await response.json();
+        const cards = Array.from(document.querySelectorAll(".camera-card"))
+          .filter((card) => streams.includes(card.dataset.stream));
+        document.querySelector(".camera-grid")
+          .classList.toggle("single-stream", cards.length === 1);
+        note.textContent = cards.length === 1
+          ? "One camera stream" : "Independent streams / independent health";
+        for (const card of cards) {
+          card.hidden = false;
+          createStream(card);
+        }
+      } catch (error) {
+        note.textContent = `Camera configuration unavailable: ${error.message}`;
+        window.setTimeout(loadStreams, 1000);
+      }
+    }
+
+    loadStreams();
   </script>
 </body>
 </html>

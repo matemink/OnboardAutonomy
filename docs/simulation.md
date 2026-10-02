@@ -24,7 +24,15 @@ ONBOARD_AUTONOMY_INTERACTIVE=1 bash scripts/run_onboard_autonomy_gazebo_vision.s
 On Windows, `StartOnboardAutonomyGazeboDemo.cmd` starts the weather camera
 profile, console, and browser preview. `StopOnboardAutonomyGazeboDemo.cmd`
 terminates the demo processes. The default demo supplies camera observations;
-no flight starts automatically.
+no flight starts automatically. Only the forward stream starts by default;
+the browser shows one camera panel. To also enable the downward observation feed:
+
+```bash
+ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1 bash scripts/run_onboard_autonomy_gazebo_vision.sh
+```
+
+On Windows, set `ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1` before running the demo
+launcher. Disabled cameras have no receiver or browser polling loop.
 
 ## Streams and scenes
 
@@ -33,13 +41,13 @@ no flight starts automatically.
 | `camera_observation.sdf` | Basic camera world |
 | `camera_showcase.sdf` | Camera showcase world |
 | `camera_showcase_storm.sdf` | Weather showcase world |
-| UDP 5601 | Downward camera frames |
+| UDP 5601 | Optional downward camera frames |
 | UDP 5602 | Forward camera frames |
 | HTTP 8080 | Runtime camera preview |
 | UDP 14550 | Companion MAVLink endpoint |
 
 The model is `iris_with_cameras`. Camera streams are independent and report
-failure separately. The downward stream is an observation feed. The world
+failure separately. The optional downward stream is an observation feed. The world
 contains no marker landing pad.
 
 The optional forward OpenCV DNN detector reads a separately downloaded model:

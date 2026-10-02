@@ -109,42 +109,47 @@ void validate_transport(const LaunchArgumentsDraft& options,
 
 void validate_camera(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
-    const bool camera_setting_used =
-        explicit_options.camera_source || explicit_options.camera_udp_port ||
-        explicit_options.camera_width || explicit_options.camera_height ||
-        explicit_options.camera_fps || explicit_options.camera_preview_port ||
-        options.forward_camera_udp_port.has_value() ||
-        !options.forward_detector_model_file.empty() ||
-        options.camera_preview_enabled;
-    if (camera_setting_used && !options.camera_enabled) {
+    const bool primary_setting_used = explicit_options.camera_source ||
+                                      explicit_options.camera_udp_port ||
+                                      explicit_options.camera_fps;
+    if (primary_setting_used && !options.camera_enabled) {
         throw std::invalid_argument(
-            "camera, vision, and preview options require --camera");
+            "camera source, UDP port, and FPS options require --camera");
     }
-    if (!options.camera_enabled) {
-        return;
+    const bool any_camera = options.camera_enabled ||
+                            options.forward_camera_udp_port.has_value();
+    if (!any_camera && (explicit_options.camera_width ||
+                          explicit_options.camera_height ||
+                          options.camera_preview_enabled)) {
+        throw std::invalid_argument(
+            "camera dimensions and preview require --camera or "
+            "--forward-camera-udp-port");
     }
-    if (options.camera_width == 0 || options.camera_height == 0 ||
-        options.camera_width % 2 != 0 || options.camera_height % 2 != 0) {
+    if (any_camera && (options.camera_width == 0 || options.camera_height == 0 ||
+                         options.camera_width % 2 != 0 ||
+                         options.camera_height % 2 != 0)) {
         throw std::invalid_argument(
             "camera width and height must be positive even values");
     }
-    if (options.camera_backend == CameraBackend::rpicam &&
-        explicit_options.camera_udp_port) {
-        throw std::invalid_argument(
-            "--camera-udp-port requires --camera-source gstreamer");
-    }
-    if (options.camera_backend == CameraBackend::gstreamer &&
-        explicit_options.camera_fps) {
-        throw std::invalid_argument(
-            "--camera-fps is available only for --camera-source rpicam");
-    }
-    if (options.camera_backend == CameraBackend::rpicam &&
-        options.camera_fps == 0) {
-        throw std::invalid_argument("--camera-fps must be positive");
-    }
-    if (options.camera_backend == CameraBackend::gstreamer &&
-        options.camera_udp_port == 0) {
-        throw std::invalid_argument("--camera-udp-port must be positive");
+    if (options.camera_enabled) {
+        if (options.camera_backend == CameraBackend::rpicam &&
+            explicit_options.camera_udp_port) {
+            throw std::invalid_argument(
+                "--camera-udp-port requires --camera-source gstreamer");
+        }
+        if (options.camera_backend == CameraBackend::gstreamer &&
+            explicit_options.camera_fps) {
+            throw std::invalid_argument(
+                "--camera-fps is available only for --camera-source rpicam");
+        }
+        if (options.camera_backend == CameraBackend::rpicam &&
+            options.camera_fps == 0) {
+            throw std::invalid_argument("--camera-fps must be positive");
+        }
+        if (options.camera_backend == CameraBackend::gstreamer &&
+            options.camera_udp_port == 0) {
+            throw std::invalid_argument("--camera-udp-port must be positive");
+        }
     }
     if (explicit_options.camera_preview_port &&
         !options.camera_preview_enabled) {
@@ -163,7 +168,8 @@ void validate_camera(const LaunchArgumentsDraft& options,
             throw std::invalid_argument(
                 "--forward-camera-udp-port must be positive");
         }
-        if (options.camera_backend == CameraBackend::gstreamer &&
+        if (options.camera_enabled &&
+            options.camera_backend == CameraBackend::gstreamer &&
             *options.forward_camera_udp_port == options.camera_udp_port) {
             throw std::invalid_argument(
                 "forward and downward camera UDP ports must differ");
@@ -284,6 +290,8 @@ CommandLineOptions make_command_line_options(
                 ? std::optional{ForwardCameraOptions{
                       .udp_port = *draft.forward_camera_udp_port,
                       .detector_model_file = draft.forward_detector_model_file,
+                      .frame_width = draft.camera_width,
+                      .frame_height = draft.camera_height,
                   }}
                 : std::nullopt,
         .log_file = draft.diagnostic_log_file,
