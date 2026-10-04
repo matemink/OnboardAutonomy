@@ -482,68 +482,6 @@ std::string battery_detail(const mission::VehicleSnapshot& vehicle) {
     return output.str();
 }
 
-std::string startup_phase_name(const mission::FlightStartupPhase phase) {
-    switch (phase) {
-    case mission::FlightStartupPhase::disabled:
-    case mission::FlightStartupPhase::idle:
-        return "IDLE";
-    case mission::FlightStartupPhase::waiting_for_vehicle:
-    case mission::FlightStartupPhase::waiting_for_readiness:
-        return "WAITING";
-    case mission::FlightStartupPhase::setting_guided:
-        return "GUIDED";
-    case mission::FlightStartupPhase::arming:
-        return "ARMING";
-    case mission::FlightStartupPhase::taking_off:
-        return "TAKEOFF";
-    case mission::FlightStartupPhase::completed:
-        return "COMPLETE";
-    case mission::FlightStartupPhase::failed:
-        return "FAILED";
-    }
-    return "UNKNOWN";
-}
-
-std::string autonomy_phase_name(const mission::AutonomyRuntimePhase phase) {
-    switch (phase) {
-    case mission::AutonomyRuntimePhase::disabled:
-    case mission::AutonomyRuntimePhase::idle:
-        return "IDLE";
-    case mission::AutonomyRuntimePhase::waiting_for_startup:
-        return "WAITING";
-    case mission::AutonomyRuntimePhase::active:
-        return "ACTIVE";
-    case mission::AutonomyRuntimePhase::suspended:
-        return "SUSPENDED";
-    case mission::AutonomyRuntimePhase::returning_to_launch:
-        return "RTL";
-    case mission::AutonomyRuntimePhase::completed:
-        return "COMPLETE";
-    case mission::AutonomyRuntimePhase::failed:
-        return "FAILED";
-    }
-    return "UNKNOWN";
-}
-
-Tone autonomy_tone(const mission::AutonomyRuntimePhase phase) {
-    switch (phase) {
-    case mission::AutonomyRuntimePhase::completed:
-        return Tone::good;
-    case mission::AutonomyRuntimePhase::failed:
-        return Tone::bad;
-    case mission::AutonomyRuntimePhase::active:
-    case mission::AutonomyRuntimePhase::returning_to_launch:
-        return Tone::accent;
-    case mission::AutonomyRuntimePhase::disabled:
-    case mission::AutonomyRuntimePhase::idle:
-        return Tone::dim;
-    case mission::AutonomyRuntimePhase::waiting_for_startup:
-    case mission::AutonomyRuntimePhase::suspended:
-        return Tone::waiting;
-    }
-    return Tone::normal;
-}
-
 std::string activity_detail(const std::string_view direction,
     const std::optional<mission::LinkActivity>& activity,
     const std::chrono::milliseconds elapsed) {
@@ -568,25 +506,10 @@ std::string activity_detail(const std::string_view direction,
 
 std::string overall_status(const mission::AppSnapshot& snapshot) {
     const auto& vehicle = snapshot.vehicle;
-    const auto phase = snapshot.autonomy.phase;
     const bool telemetry_complete = vehicle.gps_fix_type.has_value() &&
                                     vehicle.battery_voltage_v.has_value() &&
                                     vehicle.system_health_known;
 
-    if (phase == mission::AutonomyRuntimePhase::completed) {
-        return "FLIGHT COMPLETE";
-    }
-    if (phase == mission::AutonomyRuntimePhase::failed ||
-        snapshot.flight_startup.phase == mission::FlightStartupPhase::failed) {
-        return "FLIGHT FAILED";
-    }
-    if (phase == mission::AutonomyRuntimePhase::returning_to_launch) {
-        return "RETURNING TO LAUNCH";
-    }
-    if (phase != mission::AutonomyRuntimePhase::disabled &&
-        phase != mission::AutonomyRuntimePhase::idle) {
-        return "AUTONOMY RUNNING";
-    }
     if (!vehicle.connected) {
         return "WAITING FOR FLIGHT CONTROLLER";
     }
@@ -598,14 +521,11 @@ std::string overall_status(const mission::AppSnapshot& snapshot) {
 
 Tone overall_tone(const mission::AppSnapshot& snapshot) {
     const std::string status = overall_status(snapshot);
-    if (status == "READY" || status == "FLIGHT COMPLETE") {
+    if (status == "READY") {
         return Tone::good;
     }
-    if (status == "NOT READY" || status == "FLIGHT FAILED") {
+    if (status == "NOT READY") {
         return Tone::bad;
-    }
-    if (status == "AUTONOMY RUNNING" || status == "RETURNING TO LAUNCH") {
-        return Tone::accent;
     }
     return Tone::waiting;
 }
@@ -690,33 +610,7 @@ void write_camera_and_vision(std::ostringstream& output,
     }
 }
 
-void write_session(std::ostringstream& output,
-    const mission::AppSnapshot& snapshot,
-    const bool use_color) {
-    const auto& startup = snapshot.flight_startup;
-    const auto& autonomy = snapshot.autonomy;
-    if (startup.phase == mission::FlightStartupPhase::disabled &&
-        autonomy.phase == mission::AutonomyRuntimePhase::disabled) {
-        return;
-    }
-    const bool startup_finished =
-        startup.phase == mission::FlightStartupPhase::completed ||
-        startup.phase == mission::FlightStartupPhase::idle ||
-        startup.phase == mission::FlightStartupPhase::disabled;
-    write_border(output, "SESSION", use_color);
-    write_line(output,
-        "AUTONOMY: " + autonomy_phase_name(autonomy.phase) +
-            "   |   STARTUP: " + startup_phase_name(startup.phase),
-        autonomy_tone(autonomy.phase),
-        use_color);
-    write_line(output,
-        startup_finished ? autonomy.detail : startup.detail,
-        autonomy_tone(autonomy.phase),
-        use_color);
-}
-
 void write_controls(std::ostringstream& output,
-    const mission::AppSnapshot& snapshot,
     const ConsoleViewOptions& options) {
     write_border(output, "CONTROLS", options.use_color);
     if (!options.interactive_input) {
@@ -726,25 +620,11 @@ void write_controls(std::ostringstream& output,
             options.use_color);
         return;
     }
-    if (snapshot.motion_commands_allowed) {
-        if (snapshot.aerial_tracking_available &&
-            snapshot.autonomy.phase !=
-                mission::AutonomyRuntimePhase::disabled) {
-            write_line(output,
-                "[2] TRACK AIRBORNE TARGET (HOLD + YAW)",
-                Tone::normal,
-                options.use_color);
-        }
-        write_line(output,
-            "[R] ABORT MISSION + RTL   |   [Q] QUIT",
-            Tone::normal,
-            options.use_color);
-    } else {
-        write_line(output,
-            "[Q] QUIT   |   OBSERVATION ONLY",
-            Tone::dim,
-            options.use_color);
-    }
+
+    write_line(output,
+        "[Q] QUIT   |   OBSERVATION ONLY",
+        Tone::dim,
+        options.use_color);
 }
 
 } // namespace
@@ -780,8 +660,7 @@ std::string render_console(const mission::AppSnapshot& snapshot,
         activity_detail("RX", snapshot.rx_activity, snapshot.elapsed),
         Tone::normal,
         options.use_color);
-    write_session(output, snapshot, options.use_color);
-    write_controls(output, snapshot, options);
+    write_controls(output, options);
     write_border(output, {}, options.use_color);
     return output.str();
 }

@@ -11,8 +11,8 @@ find_package(Threads REQUIRED)
 
 option(
     ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
-    "Enable OpenCV DNN object detection"
-    ON
+    "Build standalone OpenCV DNN image utilities"
+    OFF
 )
 if(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN)
     find_package(OpenCV 4.6 REQUIRED COMPONENTS core dnn imgproc)
@@ -242,14 +242,9 @@ onboard_autonomy_enable_warnings(onboard_autonomy_operator_screen)
 
 add_library(
     onboard_autonomy_mission
-    src/mission/autonomy/AerialYawController.cpp
-    src/mission/autonomy/AutonomyRuntime.cpp
     src/mission/cv/AsyncCameraMonitor.cpp
     src/mission/cv/CameraMonitor.cpp
     src/mission/safety/CompanionLinkFailsafe.cpp
-    src/mission/flight/FlightStartupController.cpp
-    src/mission/safety/MotionSafetyPolicy.cpp
-    src/mission/cv/tracking/AerialTargetTracker.cpp
     src/mission/cv/VisionMonitor.cpp
     src/mission/CompanionApplication.cpp
 )
@@ -336,7 +331,6 @@ target_link_libraries(
         onboard_autonomy_operator_ui
         onboard_autonomy_diagnostics_logging
         onboard_autonomy_mission_runtime
-        onboard_autonomy_mission_cv_detection
 )
 onboard_autonomy_enable_warnings(onboard_autonomy)
 
@@ -392,10 +386,6 @@ if(BUILD_TESTING)
         onboard_autonomy_tests
         tests/CompanionApplicationTests.cpp
         tests/JsonDiagnosticSinkTests.cpp
-        tests/AutonomyRuntimeTests.cpp
-        tests/AerialTargetTrackerTests.cpp
-        tests/AerialYawControllerTests.cpp
-        tests/FlightStartupControllerTests.cpp
         tests/BoardTypeCatalogTests.cpp
         tests/CameraMonitorTests.cpp
         tests/CommandLineTests.cpp
@@ -405,7 +395,6 @@ if(BUILD_TESTING)
         tests/ConsoleViewTests.cpp
         tests/MavlinkDecoderTests.cpp
         tests/MavlinkEncoderTests.cpp
-        tests/MotionSafetyPolicyTests.cpp
         tests/TelemetryStreamConfiguratorTests.cpp
         tests/TransportTests.cpp
         tests/VehicleStateTests.cpp

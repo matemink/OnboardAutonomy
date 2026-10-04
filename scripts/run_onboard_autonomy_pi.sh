@@ -93,7 +93,7 @@ printf 'OnboardAutonomy hardware bench\n'
 printf '  Mode:   OBSERVE ONLY\n'
 printf '  Link:   %s at %s baud\n' "${device}" "${baud}"
 printf '  Logs:   %s/%s*.jsonl\n' "${log_dir}" "${log_stem}"
-printf '  Safety: autonomous motion is disabled on serial hardware\n\n'
+printf '  Mode: telemetry and camera observation\n\n'
 
 declare -a camera_arguments=()
 if [[ "${camera_enabled}" == "1" ]]; then

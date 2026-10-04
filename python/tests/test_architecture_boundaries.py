@@ -24,15 +24,12 @@ MODEL_AND_PORT_HEADERS = {
     "mission/Clock.hpp",
     "mission/EnvironmentProfile.hpp",
     "mission/SnapshotSink.hpp",
-    "mission/autonomy/AutonomySnapshot.hpp",
     "mission/cv/CameraSnapshot.hpp",
     "mission/cv/VisionSnapshot.hpp",
     "mission/cv/CameraSource.hpp",
     "mission/cv/detection/TargetObservation.hpp",
-    "mission/flight/FlightStartupSnapshot.hpp",
     "mission/flight/VehicleSnapshot.hpp",
     "mission/safety/CompanionLinkFailsafeSnapshot.hpp",
-    "mission/safety/MotionSafetyStatus.hpp",
 }
 
 
@@ -120,7 +117,7 @@ class BoundaryRegressionTests(unittest.TestCase):
         for delimiter in ('"', '<'):
             closing = '"' if delimiter == '"' else '>'
             for forbidden in (
-                "mission/safety/MotionSafetyPolicy.hpp",
+                "mission/CompanionApplication.hpp",
                 "mission/cv/detection/OpenCvDnnTargetDetector.hpp",
                 "mission/NewController.hpp",
             ):

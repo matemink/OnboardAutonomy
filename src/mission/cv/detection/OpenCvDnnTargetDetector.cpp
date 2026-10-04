@@ -12,11 +12,7 @@
 #include <utility>
 #include <vector>
 
-#ifndef ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
-#define ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN 0
-#endif
-
-#if ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
+#if defined(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN) && ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
@@ -24,7 +20,7 @@
 
 namespace onboard_autonomy::mission::cv {
 
-#if ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
+#if defined(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN) && ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
 namespace {
 
 constexpr std::int32_t kAirplaneClassId = 4;
@@ -290,7 +286,7 @@ class OpenCvDnnTargetDetector final : public mission::ports::TargetDetector {
 
 std::unique_ptr<mission::ports::TargetDetector> make_opencv_dnn_target_detector(
     const OpenCvDnnDetectorConfig& config) {
-#if ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
+#if defined(ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN) && ONBOARD_AUTONOMY_ENABLE_OPENCV_DNN
     return std::make_unique<OpenCvDnnTargetDetector>(config);
 #else
     static_cast<void>(config);

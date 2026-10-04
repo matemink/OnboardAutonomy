@@ -1,7 +1,6 @@
 #pragma once
 
 #include "onboard_autonomy/mission/EnvironmentProfile.hpp"
-#include "onboard_autonomy/mission/autonomy/AutonomyRuntime.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -18,11 +17,6 @@ class Transport;
 }
 
 namespace onboard_autonomy::bootstrap {
-
-enum class MissionEnvironment {
-    hardware,
-    simulation,
-};
 
 struct UdpMissionConnection {
     std::string bind_address;
@@ -58,13 +52,6 @@ struct MissionRuntimeConfig {
     MissionConnection connection;
     std::optional<MissionCameraConfig> camera;
     std::optional<mission::SimulatedWindProfile> simulated_wind;
-    MissionEnvironment environment{MissionEnvironment::hardware};
-    bool autonomous{};
-    bool start_automatically{true};
-    bool aerial_tracking_allowed{false};
-    mission::AutonomyRuntimeMode autonomy_mode{
-        mission::AutonomyRuntimeMode::aerial_observation};
-    bool motion_commands_requested{};
 };
 
 // Owns only the adapters and application state required to execute a mission.

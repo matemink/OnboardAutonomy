@@ -7,7 +7,6 @@ readonly wait_interval_seconds=0.1
 
 readonly -a exact_process_names=(
     arducopter
-    arduplane
     gz
 )
 
@@ -15,11 +14,7 @@ readonly -a command_patterns=(
     '^gz sim '
     '/onboard_autonomy --transport udp --sitl'
     'mavproxy.py --master=tcp:127.0.0.1:5760'
-    'mavproxy.py --master=tcp:127.0.0.1:5770'
-    'scripts/run_arduplane_shahed_136'
-    'scripts/run_arduplane_skywalker_x8'
     'scripts/run_arducopter_gazebo'
-    'scripts/run_gazebo_fixed_wing'
     'scripts/run_gazebo_camera'
     'scripts/run_gazebo_gui.sh'
     'scripts/run_gazebo_iris.sh'

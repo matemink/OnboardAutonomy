@@ -12,12 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from link_failsafe_sitl_acceptance import wait_for_snapshot
 from sitl_harness import (
     CAMERA_ENABLE_TOPIC,
     ProcessSupervisor,
     require_available_port,
     wait_for_gazebo_camera,
+    wait_for_snapshot,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -138,7 +138,7 @@ def run_acceptance(
     supervisor = ProcessSupervisor()
 
     try:
-        gazebo = _start_gazebo(
+        _start_gazebo(
             supervisor,
             "Gazebo initial",
             artifacts / "gazebo-initial.log",
@@ -174,10 +174,11 @@ def run_acceptance(
         ) as snapshot_log:
             initial = wait_for_snapshot(
                 runtime,
-                (("Gazebo initial", gazebo),),
+                supervisor,
                 snapshot_log,
-                lambda snapshot: camera_is_streaming(snapshot, 10),
                 timeout,
+                lambda snapshot: camera_is_streaming(snapshot, 10),
+                "Initial camera frames",
             )
             initial_camera = _camera(initial)
             if initial_camera is None:
@@ -187,31 +188,33 @@ def run_acceptance(
             supervisor.stop("Gazebo initial", timeout=5.0)
             outage = wait_for_snapshot(
                 runtime,
-                (),
+                supervisor,
                 snapshot_log,
-                camera_is_reconnecting,
                 timeout,
+                camera_is_reconnecting,
+                "Camera reconnection",
             )
             outage_camera = _camera(outage)
             if outage_camera is None:
                 raise RuntimeError("Outage camera snapshot disappeared")
             restart_count = int(outage_camera["camera_restarts"])
 
-            restarted_gazebo = _start_gazebo(
+            _start_gazebo(
                 supervisor,
                 "Gazebo restarted",
                 artifacts / "gazebo-restarted.log",
             )
             recovered = wait_for_snapshot(
                 runtime,
-                (("Gazebo restarted", restarted_gazebo),),
+                supervisor,
                 snapshot_log,
+                timeout,
                 lambda snapshot: camera_is_streaming(
                     snapshot,
                     initial_frames + 10,
                     restart_count,
                 ),
-                timeout,
+                "Recovered camera frames",
             )
     finally:
         supervisor.stop_all(timeout=5.0)

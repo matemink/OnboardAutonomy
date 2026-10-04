@@ -24,8 +24,6 @@ class CameraPreviewSink;
 namespace onboard_autonomy::bootstrap {
 
 enum class RuntimeCommand {
-    start_aerial_tracking,
-    return_to_launch,
     shutdown,
 };
 

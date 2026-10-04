@@ -26,7 +26,6 @@ struct LaunchArgumentsDraft {
     std::string serial_device;
     std::string board_types_file;
     std::string diagnostic_log_file;
-    std::string forward_detector_model_file;
     std::optional<mission::SimulatedWindProfile> simulated_wind;
     std::optional<std::uint16_t> forward_camera_udp_port;
     TransportBackend transport{TransportBackend::udp};
@@ -43,8 +42,6 @@ struct LaunchArgumentsDraft {
     bool camera_preview_enabled{};
     bool json_output{};
     bool sitl_mode{};
-    bool autonomous{};
-    bool aerial_observation{};
     bool interactive{};
 };
 
@@ -175,25 +172,12 @@ void validate_camera(const LaunchArgumentsDraft& options,
                 "forward and downward camera UDP ports must differ");
         }
     }
-    if (!options.forward_detector_model_file.empty() &&
-        !options.forward_camera_udp_port.has_value()) {
-        throw std::invalid_argument(
-            "--forward-detector-model requires --forward-camera-udp-port");
-    }
 }
 
 void validate_options(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
     if (options.snapshot_interval_ms == 0) {
         throw std::invalid_argument("--snapshot-ms must be positive");
-    }
-    if (options.aerial_observation && !options.sitl_mode) {
-        throw std::invalid_argument("--aerial-observation requires --sitl");
-    }
-    if (options.aerial_observation &&
-        !options.forward_camera_udp_port.has_value()) {
-        throw std::invalid_argument(
-            "--aerial-observation requires --forward-camera-udp-port");
     }
     if (options.interactive && options.json_output) {
         throw std::invalid_argument(
@@ -269,10 +253,6 @@ std::optional<CameraOptions> make_camera_options(
 CommandLineOptions make_command_line_options(
     const LaunchArgumentsDraft& draft) {
     auto camera = make_camera_options(draft);
-    const AutonomyOptions autonomy{
-        .enabled = draft.autonomous,
-        .mode = AutonomyMode::aerial_observation,
-    };
     const OperatorInterfaceOptions operator_interface{
         .interactive = draft.interactive,
         .json_output = draft.json_output,
@@ -289,7 +269,6 @@ CommandLineOptions make_command_line_options(
             draft.forward_camera_udp_port.has_value()
                 ? std::optional{ForwardCameraOptions{
                       .udp_port = *draft.forward_camera_udp_port,
-                      .detector_model_file = draft.forward_detector_model_file,
                       .frame_width = draft.camera_width,
                       .frame_height = draft.camera_height,
                   }}
@@ -306,7 +285,6 @@ CommandLineOptions make_command_line_options(
                 },
             .camera = camera,
             .wind = draft.simulated_wind,
-            .autonomy = autonomy,
             .operator_interface = operator_interface,
             .diagnostics = diagnostics,
         };
@@ -315,7 +293,6 @@ CommandLineOptions make_command_line_options(
     return HardwareLaunchOptions{
         .connection = make_connection_options(draft),
         .camera = camera,
-        .autonomy = autonomy,
         .operator_interface = operator_interface,
         .diagnostics = diagnostics,
     };
@@ -416,12 +393,6 @@ class ArgumentParser {
         } else if (argument == "--forward-camera-udp-port") {
             draft_.forward_camera_udp_port =
                 parse_number<std::uint16_t>(value_after(argument), argument);
-        } else if (argument == "--forward-detector-model") {
-            draft_.forward_detector_model_file = value_after(argument);
-            if (draft_.forward_detector_model_file.empty()) {
-                throw std::invalid_argument(
-                    "--forward-detector-model cannot be empty");
-            }
         } else {
             return false;
         }
@@ -450,9 +421,6 @@ class ArgumentParser {
                 .turbulence_m_s =
                     parse_number<double>(value_after(argument), argument),
             };
-        } else if (argument == "--aerial-observation") {
-            draft_.autonomous = true;
-            draft_.aerial_observation = true;
         } else if (argument == "--interactive") {
             draft_.interactive = true;
         } else {
@@ -469,7 +437,7 @@ class ArgumentParser {
         if (argument == "--scenario" || argument == "--demo-flight" ||
             argument == "--exit-after-scenario") {
             throw std::invalid_argument(
-                std::string(argument) + " was removed; use --aerial-observation");
+                std::string(argument) + " was removed; use telemetry and camera observation");
         }
         throw std::invalid_argument(
             "Unknown argument: " + std::string(argument));

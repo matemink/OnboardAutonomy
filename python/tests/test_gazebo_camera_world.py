@@ -61,39 +61,6 @@ GAZEBO_GUI_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_gui.sh"
 GAZEBO_SERVER_LAUNCHER = PROJECT_ROOT / "scripts" / "run_gazebo_iris.sh"
 GAZEBO_GPU_GUARD = PROJECT_ROOT / "scripts" / "require_gazebo_gpu.sh"
 GAZEBO_INSTALLER = PROJECT_ROOT / "scripts" / "install_gazebo_harmonic.sh"
-TARGET_MODEL = (
-    PROJECT_ROOT
-    / "simulation"
-    / "models"
-    / "scripted_fixed_wing_target"
-    / "model.sdf"
-)
-TARGET_MODEL_DIR = TARGET_MODEL.parent
-TARGET_SPAWNER = (
-    PROJECT_ROOT / "scripts" / "spawn_gazebo_aerial_target.sh"
-)
-TARGET_LAUNCHER = (
-    PROJECT_ROOT / "StartOnboardAutonomyAerialTracking.cmd"
-)
-FIXED_WING_WORLD = (
-    PROJECT_ROOT / "simulation" / "worlds" / "fixed_wing_follow.sdf"
-)
-FIXED_WING_LAUNCHER = (
-    PROJECT_ROOT / "StartOnboardAutonomyFixedWingFollow.cmd"
-)
-X8_PREPARER = PROJECT_ROOT / "scripts" / "prepare_skywalker_x8_sitl.sh"
-FIXED_WING_PREPARER = (
-    PROJECT_ROOT / "scripts" / "prepare_fixed_wing_follow_sitl.sh"
-)
-X8_GAZEBO_RUNNER = (
-    PROJECT_ROOT / "scripts" / "run_gazebo_fixed_wing_follow.sh"
-)
-X8_ARDUPLANE_RUNNER = (
-    PROJECT_ROOT / "scripts" / "run_arduplane_skywalker_x8.sh"
-)
-SHAHED_ARDUPLANE_RUNNER = (
-    PROJECT_ROOT / "scripts" / "run_arduplane_shahed_136.sh"
-)
 CAMERA_PREVIEW_PAGE = PROJECT_ROOT / "assets" / "camera-preview" / "index.html"
 
 
@@ -280,48 +247,6 @@ class GazeboCameraWorldTests(unittest.TestCase):
             showcase_launcher,
         )
 
-    def test_scripted_aerial_target_has_a_deterministic_route(self) -> None:
-        model = element_tree.parse(TARGET_MODEL).getroot().find("model")
-        self.assertIsNotNone(model)
-        self.assertEqual(model.attrib["name"], "scripted_fixed_wing_target")
-
-        pose = [float(value) for value in model.findtext("pose").split()]
-        self.assertEqual(pose[2], 12.0)
-        self.assertEqual(model.findtext("link/gravity"), "false")
-
-        mesh_uri = model.findtext("link/visual/geometry/mesh/uri")
-        self.assertEqual(mesh_uri, "meshes/shahed_136/scene.gltf")
-        self.assertTrue((TARGET_MODEL_DIR / mesh_uri).is_file())
-        self.assertTrue(
-            (TARGET_MODEL_DIR / "meshes" / "shahed_136" / "scene.bin").is_file()
-        )
-
-        visual_pose = [
-            float(value) for value in model.findtext("link/visual/pose").split()
-        ]
-        self.assertEqual(visual_pose[3:5], [0.0, 0.0])
-        self.assertAlmostEqual(visual_pose[5], math.pi / 2.0)
-
-        self.assertTrue((TARGET_MODEL_DIR / "NOTICE.md").is_file())
-        self.assertTrue(
-            (TARGET_MODEL_DIR / "LICENSE.shahed-136.txt").is_file()
-        )
-
-        plugin = model.find("plugin")
-        self.assertIsNotNone(plugin)
-        self.assertEqual(
-            plugin.attrib["filename"],
-            "gz-sim-velocity-control-system",
-        )
-        linear = [
-            float(value) for value in plugin.findtext("initial_linear").split()
-        ]
-        angular = [
-            float(value) for value in plugin.findtext("initial_angular").split()
-        ]
-        self.assertEqual(linear, [12.0, 0.0, 0.0])
-        self.assertEqual(angular[:2], [0.0, 0.0])
-        self.assertAlmostEqual(linear[0] / angular[2], 15.0)
 
     def test_gazebo_launchers_reject_software_rendering(self) -> None:
         guard = GAZEBO_GPU_GUARD.read_text(encoding="utf-8")
@@ -338,107 +263,8 @@ class GazeboCameraWorldTests(unittest.TestCase):
         self.assertIn('source "${script_dir}/require_gazebo_gpu.sh"', server_launcher)
         self.assertIn("mesa-utils", installer)
 
-    def test_aerial_target_is_opt_in_and_uses_gazebo_create(self) -> None:
-        world = element_tree.parse(WORLD).getroot()
-        base_uris = {
-            include.findtext("uri")
-            for include in world.findall(".//world/include")
-        }
-        self.assertNotIn("model://scripted_fixed_wing_target", base_uris)
 
-        spawner = TARGET_SPAWNER.read_text(encoding="utf-8")
-        launcher = TARGET_LAUNCHER.read_text(encoding="utf-8")
-        demo_launcher = (
-            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
-        ).read_text(encoding="utf-8")
-        self.assertIn("/world/${world_name}/create", spawner)
-        self.assertIn("gz.msgs.EntityFactory", spawner)
-        self.assertIn('readonly target_name="Shahed_136_Visual_Target"', spawner)
-        self.assertIn("StartOnboardAutonomyGazeboDemo.cmd", launcher)
-        self.assertIn("ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET=1", launcher)
-        self.assertIn("ONBOARD_AUTONOMY_AERIAL_OBSERVATION=1", launcher)
-        self.assertNotIn("spawn_gazebo_aerial_target.sh", launcher)
-        self.assertIn(
-            'if "%ONBOARD_AUTONOMY_GAZEBO_AERIAL_TARGET%"=="1"',
-            demo_launcher,
-        )
-        self.assertIn(
-            'if "%ONBOARD_AUTONOMY_AERIAL_OBSERVATION%"=="1"',
-            demo_launcher,
-        )
-        self.assertIn("env %AUTONOMY_ENV%", demo_launcher)
-        spawn_index = demo_launcher.index("spawn_gazebo_aerial_target.sh")
-        sitl_index = demo_launcher.index("run_arducopter_gazebo_weather.sh")
-        preview_index = demo_launcher.index("http://localhost:8080/api/frame")
-        self.assertLess(spawn_index, sitl_index)
-        self.assertLess(spawn_index, preview_index)
 
-    def test_fixed_wing_lab_replaces_the_copter_with_arduplane(self) -> None:
-        world = element_tree.parse(FIXED_WING_WORLD).getroot().find("world")
-        self.assertIsNotNone(world)
-        self.assertEqual(world.attrib["name"], "fixed_wing_follow")
-
-        includes = {
-            include.findtext("uri"): include for include in world.findall("include")
-        }
-        self.assertEqual(
-            set(includes),
-            {
-                "model://lightweight_grass_ground",
-                "model://skywalker_x8",
-                "model://shahed_136_arduplane",
-            },
-        )
-        self.assertNotIn("model://iris_with_cameras", includes)
-        self.assertEqual(
-            includes["model://skywalker_x8"].findtext("name"),
-            "Skywalker_X8_ArduPlane",
-        )
-        self.assertEqual(
-            includes["model://skywalker_x8"].findtext("pose"),
-            "0 0 0.246 0 0 0",
-        )
-        self.assertEqual(
-            includes["model://shahed_136_arduplane"].findtext("name"),
-            "Shahed_136_ArduPlane",
-        )
-        self.assertEqual(
-            includes["model://shahed_136_arduplane"].findtext("pose"),
-            "0 -20 0.3 0 0 0",
-        )
-
-    def test_fixed_wing_lab_uses_pinned_official_x8_assets(self) -> None:
-        preparer = X8_PREPARER.read_text(encoding="utf-8")
-        gazebo_runner = X8_GAZEBO_RUNNER.read_text(encoding="utf-8")
-        plane_runner = X8_ARDUPLANE_RUNNER.read_text(encoding="utf-8")
-        target_runner = SHAHED_ARDUPLANE_RUNNER.read_text(encoding="utf-8")
-        fixed_wing_preparer = FIXED_WING_PREPARER.read_text(encoding="utf-8")
-        launcher = FIXED_WING_LAUNCHER.read_text(encoding="utf-8")
-
-        self.assertIn(
-            "25bc38ed8c6c0345840159a8cbc0b02781d52f3c",
-            preparer,
-        )
-        self.assertIn("https://github.com/ArduPilot/SITL_Models.git", preparer)
-        self.assertIn("rev-parse --verify", preparer)
-        self.assertIn('checkout --detach "${sitl_models_commit}"', preparer)
-        self.assertIn("./waf plane", preparer)
-        self.assertIn(".local/vendor/SITL_Models/Gazebo", gazebo_runner)
-        self.assertIn("simulation/worlds/fixed_wing_follow.sdf", gazebo_runner)
-        self.assertIn('exec bash "${script_dir}/run_gazebo_iris.sh"', gazebo_runner)
-        self.assertIn("skywalker_x8.param", plane_runner)
-        self.assertIn("--master=tcp:127.0.0.1:5760", plane_runner)
-        self.assertIn("--sitl=127.0.0.1:5501", plane_runner)
-        self.assertIn("-I0", plane_runner)
-        self.assertIn("prepare_skywalker_x8_sitl.sh", fixed_wing_preparer)
-        self.assertIn("generate_shahed_136_physics_model.py", fixed_wing_preparer)
-        self.assertIn("--master=tcp:127.0.0.1:5770", target_runner)
-        self.assertIn("--sitl=127.0.0.1:5511", target_runner)
-        self.assertIn("-I1", target_runner)
-        self.assertIn("prepare_fixed_wing_follow_sitl.sh", launcher)
-        self.assertIn("run_gazebo_fixed_wing_follow_weather.sh", launcher)
-        self.assertIn("run_arduplane_skywalker_x8_weather.sh", launcher)
-        self.assertIn("run_arduplane_shahed_136_weather.sh", launcher)
 
     def test_dual_camera_preview_keeps_streams_independent(self) -> None:
         preview = CAMERA_PREVIEW_PAGE.read_text(encoding="utf-8")
@@ -452,11 +278,11 @@ class GazeboCameraWorldTests(unittest.TestCase):
         self.assertIn('data-stream="forward"', preview)
         self.assertIn('data-stream="downward"', preview)
         self.assertIn("/api/frame/${stream}", preview)
-        self.assertIn("DETECTOR NOT LOADED", preview)
+        self.assertIn("OBSERVATION ONLY", preview)
         self.assertIn("Raspberry_Pi_Camera_Module_3_Wide_Forward", gazebo_runner)
         self.assertIn("ONBOARD_AUTONOMY_FORWARD_CAMERA_UDP_PORT", gazebo_runner)
         self.assertIn("--forward-camera-udp-port", sitl_runner)
-        self.assertIn("--aerial-observation", sitl_runner)
+        self.assertNotIn("--aerial-observation", sitl_runner)
         self.assertNotIn("ONBOARD_AUTONOMY_FIDUCIAL_LANDING", sitl_runner)
         self.assertNotIn("ONBOARD_AUTONOMY_AUTONOMOUS", sitl_runner)
         self.assertNotIn(

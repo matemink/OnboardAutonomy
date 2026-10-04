@@ -1,8 +1,6 @@
 #pragma once
 
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
-#include "onboard_autonomy/mission/autonomy/AutonomyRuntime.hpp"
-#include "onboard_autonomy/mission/flight/FlightStartupController.hpp"
 #include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 
@@ -14,10 +12,6 @@
 namespace onboard_autonomy::mission {
 
 struct CompanionApplicationOptions {
-    FlightStartupConfig flight_startup;
-    AutonomyRuntimeConfig autonomy_runtime;
-    bool motion_commands_allowed{false};
-    bool aerial_tracking_allowed{false};
     ports::CameraSource* camera_source{nullptr};
     ports::TargetDetector* target_detector{nullptr};
     std::optional<SimulatedWindProfile> simulated_wind;
@@ -39,18 +33,9 @@ class CompanionApplication {
     // deterministic.
     void poll();
     void poll(mission::TimePoint now);
-    [[nodiscard]] bool request_autonomy_start(AutonomyRuntimeMode mode,
-        mission::TimePoint now);
-    [[nodiscard]] bool request_return_to_launch(mission::TimePoint now);
     [[nodiscard]] AppSnapshot snapshot(mission::TimePoint now);
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_camera_frame();
-    void update_forward_target_observations(
-        std::span<const mission::TargetObservation> observations,
-        std::uint32_t frame_width,
-        std::uint32_t frame_height,
-        std::uint64_t frame_sequence,
-        mission::TimePoint now);
 
   private:
     class Impl;

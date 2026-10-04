@@ -37,6 +37,11 @@ CMake downloads pinned generated MAVLink C headers and the other source
 dependencies into the build directory. MAVLink framing is not
 reimplemented by this project.
 
+Standard builds do not require OpenCV. To build the standalone DNN image
+utilities, install `libopencv-dev` and configure with
+`-DONBOARD_AUTONOMY_ENABLE_OPENCV_DNN=ON`. This option does not enable a runtime
+detector or change the executable's observation behavior.
+
 ## Static analysis
 
 Install the developer-only quality tools on Ubuntu 24.04 or WSL2:
@@ -175,18 +180,6 @@ The harness starts every process, waits on protocol evidence instead of
 fixed sleeps, writes logs under `artifacts/sitl-smoke/`, and terminates
 its process group when the check completes.
 
-Run the companion-link failsafe acceptance check:
-
-```bash
-.venv/bin/python python/link_failsafe_sitl_acceptance.py \
-    --companion "${HOME}/build/onboard_autonomy/onboard_autonomy"
-```
-
-The harness inserts a controllable UDP relay. It cuts both MAVLink
-directions only after verified takeoff, then requires OnboardAutonomy to record
-heartbeat loss and ArduPilot to enter LAND independently. The tlog must contain
-no LAND or RTL command from companion component `191`.
-
 Verify camera-process and stream recovery without restarting OnboardAutonomy:
 
 ```bash
@@ -233,9 +226,8 @@ Pass `--json` to emit JSON Lines instead of the operator console:
 
 Snapshot records preserve the existing top-level telemetry fields and add
 `record_type`, wall-clock time, link activity, and elapsed runtime. Event
-records capture controller and camera loss/recovery, target acquisition/loss,
-mission and failsafe phase changes, motion-safety changes, and MAVLink command
-results.
+records capture controller and camera loss/recovery, generic image detection changes,
+failsafe validation changes, and MAVLink telemetry-command results.
 
 Structured logging can also run alongside the normal console:
 
@@ -258,9 +250,8 @@ traffic stops. Long text wraps inside an 80-column layout, and every active
 warning is shown. The companion hardware model is not inferred from the target
 configuration.
 
-`--sitl --interactive` enables the existing keyboard commands; their hints
-appear only when input is enabled. A camera alone does not advertise a mission
-start command. `Q` exits an interactive session. Without interactive input, use
+`--interactive` enables `Q` to exit; its hint appears only when input is enabled.
+The console observes telemetry and cameras and has no flight actions. Without interactive input, use
 `Ctrl+C`. Redirected output contains separate plain-text
 snapshots without ANSI sequences. Set `NO_COLOR` to disable colors while keeping
 terminal redraws.
