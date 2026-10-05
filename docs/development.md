@@ -226,8 +226,10 @@ Pass `--json` to emit JSON Lines instead of the operator console:
 
 Snapshot records preserve the existing top-level telemetry fields and add
 `record_type`, wall-clock time, link activity, and elapsed runtime. Event
-records capture controller and camera loss/recovery, generic image detection changes,
-failsafe validation changes, and MAVLink telemetry-command results.
+records capture sampled controller and camera loss/recovery summaries.
+Failsafe phase transitions and MAVLink telemetry-command results are written
+at observation time, including multiple changes between periodic snapshots.
+The bounded console history does not limit delivery to the JSON log.
 
 Structured logging can also run alongside the normal console:
 

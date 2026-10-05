@@ -1,5 +1,7 @@
 #include <array>
 #include <csignal>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string_view>
@@ -16,6 +18,11 @@ int main(const int argc, char* argv[]) {
     std::signal(SIGTERM, SIG_IGN);
     for (int index = 1; index + 1 < argc; ++index) {
         if (std::string_view{argv[index]} == "--metadata") {
+            const auto* skip_once = std::getenv("ONBOARD_AUTONOMY_FIXTURE_SKIP_METADATA_ONCE");
+            if (skip_once != nullptr && !std::filesystem::exists(skip_once)) {
+                std::ofstream marker{skip_once};
+                continue;
+            }
             std::ofstream metadata{argv[index + 1]};
             metadata << "\"FrameWallClock\": 1785440325818936064\n";
         }

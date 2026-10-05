@@ -5,6 +5,7 @@
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/mission/SnapshotSink.hpp"
+#include "onboard_autonomy/mission/CompanionApplication.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"

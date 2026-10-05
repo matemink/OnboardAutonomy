@@ -5,6 +5,8 @@
 #include <cerrno>
 #include <chrono>
 #include <csignal>
+#include <cstdlib>
+#include <filesystem>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -12,6 +14,7 @@
 #include <thread>
 
 #include <sys/wait.h>
+#include <unistd.h>
 
 namespace {
 using namespace std::chrono_literals;
@@ -76,6 +79,24 @@ int main(const int argc, char* argv[]) {
             int status = 0;
             require(::waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD,
                 "startup termination must reap camera children");
+        }
+        {
+            const auto marker = std::filesystem::temp_directory_path() /
+                ("onboard-metadata-" + std::to_string(getpid()));
+            std::filesystem::remove(marker);
+            require(::setenv("ONBOARD_AUTONOMY_FIXTURE_SKIP_METADATA_ONCE", marker.c_str(), 1) == 0,
+                "failed to configure metadata fixture");
+            auto source = onboard_autonomy::hardware::camera::make_rpicam_camera_source({
+                .width = 8, .height = 2, .frame_timeout_ms = 100,
+                .restart_delay_ms = 25, .command = command});
+            wait_for([&source] { return source->status().produced_frames > 0; },
+                "source must recover from missing metadata");
+            const auto frame = source->take_latest_frame();
+            require(source->status().restart_count > 0 && frame.has_value() && frame->sequence == 1,
+                "discarded metadata-invalid frames must not consume a published sequence");
+            source.reset();
+            ::unsetenv("ONBOARD_AUTONOMY_FIXTURE_SKIP_METADATA_ONCE");
+            std::filesystem::remove(marker);
         }
         check_lifecycle([&command](const std::uint32_t timeout) {
             return onboard_autonomy::hardware::camera::make_gstreamer_camera_source({

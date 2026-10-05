@@ -86,7 +86,11 @@ implemented by console and JSON consumers.
 
 Console and logging targets link the model library rather than the mission
 runtime. JSON mapping lives in the private `SnapshotJson` implementation;
-`JsonDiagnosticSink` owns record writing and sampled transition detection.
+`JsonDiagnosticSink` owns record writing. Protocol events and failsafe phase
+transitions are delivered synchronously through the observation port when
+they occur; they do not depend on the eight-entry console history or snapshot
+interval. Bootstrap attaches the non-owning sinks before polling. Snapshot
+publication remains periodic, including sampled camera/connection summaries.
 Python owns process orchestration, failure injection,
 and independent protocol evidence; production runtime state remains in C++.
 

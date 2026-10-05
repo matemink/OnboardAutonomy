@@ -434,6 +434,9 @@ if(BUILD_TESTING)
             ONBOARD_AUTONOMY_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
     )
     onboard_autonomy_enable_warnings(onboard_autonomy_tests)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_options(onboard_autonomy_tests PRIVATE "-Wl,--wrap=sendto")
+    endif()
     add_test(NAME onboard_autonomy_tests COMMAND onboard_autonomy_tests)
     add_executable(
         onboard_autonomy_preview_lifecycle_tests

@@ -189,6 +189,12 @@ bin/profile_onboard_autonomy_pi.sh
 ```
 
 The default 60-second run measures the C++ runtime and all of its child
+processes. Acceptance requires the process group to remain alive until the
+requested deadline; an early exit does not pass merely because the final
+sample reaches 90% of that duration. The report records the sampling interval
+and the observed duration before the intentional shutdown.
+
+The profiler measures the C++ runtime and all of its child
 processes together, including `rpicam`, camera preview, and the Python JSONL
 sink. It records average/p95 CPU, aggregate peak RSS, process count, SoC
 temperature, and Raspberry Pi throttling bits under:
