@@ -21,8 +21,8 @@ bash scripts/run_arducopter_gazebo.sh
 ONBOARD_AUTONOMY_INTERACTIVE=1 bash scripts/run_onboard_autonomy_gazebo_vision.sh
 ```
 
-On Windows, `StartOnboardAutonomyGazeboDemo.cmd` starts the weather camera
-profile, console, and browser preview. `StopOnboardAutonomyGazeboDemo.cmd`
+On Windows, `run.cmd gazebo` starts the weather camera
+profile, console, and browser preview. `run.cmd stop`
 terminates the demo processes.
 The Windows launcher tags its children with this checkout's path. The stop
 script signals only tagged processes owned by the current Linux user; other
@@ -38,8 +38,8 @@ the browser shows one camera panel. To also enable the downward observation feed
 ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1 bash scripts/run_onboard_autonomy_gazebo_vision.sh
 ```
 
-On Windows, set `ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1` before running the demo
-launcher. Disabled cameras have no receiver or browser polling loop.
+On Windows, set `ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1` before running
+`run.cmd gazebo`. Disabled cameras have no receiver or browser polling loop.
 
 ## Streams and scenes
 
@@ -101,3 +101,18 @@ telemetry, SITL, and preview endpoints before it starts. It asks you to close an
 existing session instead of terminating other simulations. Set
 `ONBOARD_AUTONOMY_BUILD_DIR` to the Linux build directory to select the console
 binary; an unset value uses the development runbook's default build directory.
+
+## Local Windows settings
+
+Use `run.cmd gazebo showcase` for the optional showcase scene. The launcher
+loads ignored `.local/windows/gazebo.cmd` when present. Create that file with
+only your machine settings, for example:
+
+```bat
+set "ONBOARD_AUTONOMY_BUILD_DIR=/home/your-user/build/onboard_autonomy"
+set "ONBOARD_AUTONOMY_DOWNWARD_CAMERA=0"
+```
+
+`ONBOARD_AUTONOMY_WEATHER_PROFILE` and `ONBOARD_AUTONOMY_GAZEBO_WORLD` override
+the default profile and scene. Relative paths are resolved from the checkout
+root, even when `run.cmd` is called from another working directory.

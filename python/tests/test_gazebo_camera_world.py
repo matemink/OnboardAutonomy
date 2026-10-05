@@ -229,10 +229,10 @@ class GazeboCameraWorldTests(unittest.TestCase):
         )
 
         demo_launcher = (
-            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+            PROJECT_ROOT / "scripts/windows/gazebo.cmd"
         ).read_text(encoding="utf-8")
         showcase_launcher = (
-            PROJECT_ROOT / "StartOnboardAutonomyGazeboShowcase.cmd"
+            PROJECT_ROOT / "run.cmd"
         ).read_text(encoding="utf-8")
         self.assertIn(
             "simulation/worlds/camera_observation.sdf",
@@ -243,9 +243,10 @@ class GazeboCameraWorldTests(unittest.TestCase):
             demo_launcher,
         )
         self.assertIn(
-            "simulation/worlds/camera_showcase.sdf",
+            'if /i "%~1"=="gazebo" goto gazebo',
             showcase_launcher,
         )
+        self.assertIn("simulation/worlds/camera_showcase.sdf", demo_launcher)
 
 
     def test_gazebo_launchers_reject_software_rendering(self) -> None:
@@ -298,7 +299,7 @@ class GazeboCameraWorldTests(unittest.TestCase):
 
     def test_windows_launcher_checks_conflicts_without_stopping_other_sessions(self) -> None:
         demo_launcher = (
-            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+            PROJECT_ROOT / "scripts/windows/gazebo.cmd"
         ).read_text(encoding="utf-8")
         self.assertIn("python3 scripts/check_camera_demo_environment.py", demo_launcher)
         self.assertNotIn("stop_onboard_autonomy_gazebo.sh", demo_launcher)
@@ -422,10 +423,10 @@ class GazeboCameraWorldTests(unittest.TestCase):
         )
 
         windows_launcher = (
-            PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd"
+            PROJECT_ROOT / "scripts/windows/gazebo.cmd"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'if not "%~1"=="" set "WEATHER_PROFILE=%~1"',
+            'if defined ONBOARD_AUTONOMY_WEATHER_PROFILE set "WEATHER_PROFILE=%ONBOARD_AUTONOMY_WEATHER_PROFILE%"',
             windows_launcher,
         )
         self.assertEqual(

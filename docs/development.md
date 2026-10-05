@@ -158,7 +158,7 @@ ArduCopter and OnboardAutonomy exchange MAVLink through
 broadcasts an onboard-controller heartbeat as component `191`, and
 requests its required message rates.
 
-On Windows, `StartOnboardAutonomyDemo.cmd` opens both processes in
+On Windows, `run.cmd sitl` opens both processes in
 separate WSL terminals.
 
 ## Automated integration checks

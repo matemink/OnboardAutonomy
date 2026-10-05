@@ -72,7 +72,7 @@ class CameraDemoEnvironmentTests(unittest.TestCase):
             self.assertEqual(MODULE.check_environment(), [])
 
     def test_launcher_checks_environment_before_starting(self) -> None:
-        launcher = (PROJECT_ROOT / "StartOnboardAutonomyGazeboDemo.cmd").read_text(
+        launcher = (PROJECT_ROOT / "scripts/windows/gazebo.cmd").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("stop_onboard_autonomy_gazebo.sh", launcher)

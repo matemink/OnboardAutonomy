@@ -307,10 +307,9 @@ Camera Module 3 intrinsics as if they belonged to the physical camera.
 
 ## Windows launcher
 
-`StartOnboardAutonomyPixhawk.cmd` opens the Raspberry Pi runtime over SSH
+`run.cmd pi` opens the Raspberry Pi runtime over SSH
 and then opens the local camera-preview page. Machine-specific values
-belong in the ignored `OnboardAutonomyPiLocal.cmd` file at the repository
-root:
+belong in the ignored `.local/windows/pi.cmd` file:
 
 ```bat
 set "ONBOARD_AUTONOMY_PI_HOST=companionpi.local"
@@ -323,7 +322,7 @@ set "ONBOARD_AUTONOMY_SERIAL=/dev/serial/by-id/<your-pixhawk-device>"
 The launcher lets the Pi auto-detect one serial device when
 `ONBOARD_AUTONOMY_SERIAL` is unset. Deploy a current package in the configured
 remote root; the launcher no longer falls back to CompanionLab scripts or
-directories. `OnboardAutonomyLocal.cmd` remains separate for the Gazebo shortcut.
+directories. Gazebo settings are separate in `.local/windows/gazebo.cmd`.
 
 ## Verified Pixhawk 6C TELEM2 UART
 
