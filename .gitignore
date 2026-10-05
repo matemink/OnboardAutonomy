@@ -20,3 +20,6 @@ OnboardAutonomyPiLocal.cmd
 CompanionLabLocal.cmd
 config/local-*.parm
 /docs/learning/
+
+# Archify delivery receipts contain local paths.
+docs/diagrams/*.delivery.json

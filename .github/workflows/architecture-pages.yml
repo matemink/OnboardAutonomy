@@ -1,0 +1,43 @@
+name: Architecture Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/diagrams/**
+      - .github/workflows/architecture-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - name: Stage public diagram assets
+        run: |
+          mkdir -p "$RUNNER_TEMP/architecture-site"
+          cp docs/diagrams/overview.html "$RUNNER_TEMP/architecture-site/index.html"
+          cp docs/diagrams/overview-{light,dark}.svg "$RUNNER_TEMP/architecture-site/"
+          cp docs/diagrams/overview.architecture.json "$RUNNER_TEMP/architecture-site/"
+          cp docs/diagrams/LICENSE.archify.txt "$RUNNER_TEMP/architecture-site/"
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/architecture-site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
