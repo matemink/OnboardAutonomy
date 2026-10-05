@@ -14,6 +14,39 @@ SPEC.loader.exec_module(RUNTIME_PROFILE)
 
 
 class RuntimeProfileTests(unittest.TestCase):
+    def test_sixty_second_profile_cannot_pass_at_fifty_four_seconds(self) -> None:
+        summary = RUNTIME_PROFILE.build_summary(
+            samples=[RUNTIME_PROFILE.RuntimeSample(0, 0, 1024, 1, 40, 0),
+                     RUNTIME_PROFILE.RuntimeSample(54000, 100, 1024, 1, 40, 0)],
+            requested_duration_seconds=60, runtime_status=0,
+            clock_ticks_per_second=100, architecture="aarch64", kernel="test",
+        )
+        self.assertFalse(summary["checks"]["sample_window_complete"])
+        self.assertEqual(summary["result"], "FAIL")
+
+    def test_completion_allows_only_bounded_sampling_jitter(self) -> None:
+        for last_ms, expected in ((59900, True), (59000, False)):
+            with self.subTest(last_ms=last_ms):
+                summary = RUNTIME_PROFILE.build_summary(
+                    samples=[RUNTIME_PROFILE.RuntimeSample(0, 0, 1024, 1, 40, 0),
+                             RUNTIME_PROFILE.RuntimeSample(last_ms, 100, 1024, 1, 40, 0)],
+                    requested_duration_seconds=60, runtime_status=0,
+                    clock_ticks_per_second=100, architecture="aarch64", kernel="test",
+                )
+                self.assertEqual(summary["checks"]["sample_window_complete"], expected)
+
+    def test_delayed_exit_observation_does_not_prove_the_process_survived_the_window(self) -> None:
+        for complete in (False, True):
+            summary = RUNTIME_PROFILE.build_summary(
+                samples=[RUNTIME_PROFILE.RuntimeSample(0, 0, 1024, 1, 40, 0),
+                         RUNTIME_PROFILE.RuntimeSample(55000, 100, 1024, 1, 40, 0)],
+                requested_duration_seconds=60, runtime_status=0,
+                clock_ticks_per_second=100, architecture="aarch64", kernel="test",
+                sample_interval_seconds=5, observed_duration_seconds=60.1,
+                window_complete_at_stop=complete,
+            )
+            self.assertEqual(summary["checks"]["sample_window_complete"], complete)
+
     def test_complete_arm_profile_reports_process_group_resources(self) -> None:
         samples = [
             RUNTIME_PROFILE.RuntimeSample(0.0, 0, 20 * 1024, 3, 45.0, 0),

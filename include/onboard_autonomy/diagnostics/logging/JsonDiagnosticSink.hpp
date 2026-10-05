@@ -20,6 +20,12 @@ class JsonDiagnosticSink final : public mission::ports::RuntimeSnapshotSink {
 
     void consume(const mission::AppSnapshot& snapshot,
         std::chrono::system_clock::time_point recorded_at) override;
+    void consume_link_event(const mission::LinkEvent& event,
+        std::chrono::system_clock::time_point recorded_at) override;
+    void consume_failsafe_transition(mission::CompanionLinkFailsafePhase previous,
+        const mission::CompanionLinkFailsafeSnapshot& current,
+        std::chrono::milliseconds elapsed,
+        std::chrono::system_clock::time_point recorded_at) override;
 
   private:
     class Impl;

@@ -217,7 +217,6 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
             if (read_result != ReadResult::complete) {
                 break;
             }
-            frame.sequence = ++next_sequence_;
             frame.received_at = std::chrono::system_clock::now();
 
             const auto capture_timestamp = wait_for_metadata(stop_token);
@@ -231,6 +230,7 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
             frame.captured_at = std::chrono::system_clock::time_point{
                 std::chrono::nanoseconds(*capture_timestamp),
             };
+            frame.sequence = ++next_sequence_;
             publish(std::move(frame));
         }
 

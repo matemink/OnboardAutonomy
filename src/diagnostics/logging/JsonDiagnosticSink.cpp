@@ -56,6 +56,22 @@ class JsonDiagnosticSink::Impl {
         previous_ = snapshot;
     }
 
+    void consume_link_event(const mission::LinkEvent& link_event,
+        const std::chrono::system_clock::time_point recorded_at) {
+        event("mavlink_command_event", unix_milliseconds(recorded_at),
+            link_event.elapsed, link_event.detail, link_event_json(link_event));
+    }
+
+    void consume_failsafe_transition(const mission::CompanionLinkFailsafePhase previous,
+        const mission::CompanionLinkFailsafeSnapshot& current,
+        const std::chrono::milliseconds elapsed,
+        const std::chrono::system_clock::time_point recorded_at) {
+        event("companion_link_failsafe_phase_changed", unix_milliseconds(recorded_at),
+            elapsed, current.detail,
+            {{"from", mission::companion_link_failsafe_phase_name(previous)},
+             {"to", mission::companion_link_failsafe_phase_name(current.phase)}});
+    }
+
   private:
     void write(const Json& record) {
         *output_ << record.dump() << '\n' << std::flush;
@@ -63,13 +79,13 @@ class JsonDiagnosticSink::Impl {
 
     void event(const std::string_view name,
         const std::int64_t recorded_at_ms,
-        const mission::AppSnapshot& snapshot,
+        const std::chrono::milliseconds elapsed,
         const std::string_view detail,
         Json context = Json::object()) {
         write({
             {"record_type", "event"},
             {"recorded_at_unix_ms", recorded_at_ms},
-            {"elapsed_ms", snapshot.elapsed.count()},
+            {"elapsed_ms", elapsed.count()},
             {"event", name},
             {"detail", detail},
             {"context", std::move(context)},
@@ -80,7 +96,7 @@ class JsonDiagnosticSink::Impl {
         const std::int64_t recorded_at_ms) {
         event("runtime_observation_started",
             recorded_at_ms,
-            snapshot,
+            snapshot.elapsed,
             "diagnostic sink attached",
             {{"vehicle_connected", snapshot.vehicle.connected},
                 {"camera_streaming", camera_streaming(snapshot)}});
@@ -93,7 +109,7 @@ class JsonDiagnosticSink::Impl {
             event(snapshot.vehicle.connected ? "flight_controller_recovered"
                                              : "flight_controller_lost",
                 recorded_at_ms,
-                snapshot,
+                snapshot.elapsed,
                 snapshot.vehicle.connected ? "heartbeat recovered"
                                            : "heartbeat timed out");
         }
@@ -107,42 +123,8 @@ class JsonDiagnosticSink::Impl {
             event(is_streaming ? "camera_stream_recovered"
                                : "camera_stream_stalled",
                 recorded_at_ms,
-                snapshot,
+                snapshot.elapsed,
                 detail);
-        }
-    }
-
-    void write_phase_events(const mission::AppSnapshot& previous,
-        const mission::AppSnapshot& snapshot,
-        const std::int64_t recorded_at_ms) {
-        if (previous.companion_link_failsafe.phase !=
-            snapshot.companion_link_failsafe.phase) {
-            event("companion_link_failsafe_phase_changed",
-                recorded_at_ms,
-                snapshot,
-                snapshot.companion_link_failsafe.detail,
-                {{"from",
-                     mission::companion_link_failsafe_phase_name(
-                         previous.companion_link_failsafe.phase)},
-                    {"to",
-                        mission::companion_link_failsafe_phase_name(
-                            snapshot.companion_link_failsafe.phase)}});
-        }
-
-    }
-
-    void write_link_events(const mission::AppSnapshot& snapshot,
-        const std::int64_t recorded_at_ms) {
-        for (const auto& link_event : snapshot.link_events) {
-            if (link_event.sequence <= last_link_event_sequence_) {
-                continue;
-            }
-            event("mavlink_command_event",
-                recorded_at_ms,
-                snapshot,
-                link_event.detail,
-                link_event_json(link_event));
-            last_link_event_sequence_ = link_event.sequence;
         }
     }
 
@@ -153,15 +135,12 @@ class JsonDiagnosticSink::Impl {
         } else {
             const auto& previous = previous_.value();
             write_connection_events(previous, snapshot, recorded_at_ms);
-            write_phase_events(previous, snapshot, recorded_at_ms);
         }
-        write_link_events(snapshot, recorded_at_ms);
     }
 
     std::ofstream owned_output_;
     std::ostream* output_;
     std::optional<mission::AppSnapshot> previous_;
-    std::uint64_t last_link_event_sequence_{0};
 };
 
 JsonDiagnosticSink::JsonDiagnosticSink(std::ostream& output)
@@ -175,6 +154,19 @@ JsonDiagnosticSink::~JsonDiagnosticSink() = default;
 void JsonDiagnosticSink::consume(const mission::AppSnapshot& snapshot,
     const std::chrono::system_clock::time_point recorded_at) {
     impl_->consume(snapshot, recorded_at);
+}
+
+void JsonDiagnosticSink::consume_link_event(const mission::LinkEvent& event,
+    const std::chrono::system_clock::time_point recorded_at) {
+    impl_->consume_link_event(event, recorded_at);
+}
+
+void JsonDiagnosticSink::consume_failsafe_transition(
+    const mission::CompanionLinkFailsafePhase previous,
+    const mission::CompanionLinkFailsafeSnapshot& current,
+    const std::chrono::milliseconds elapsed,
+    const std::chrono::system_clock::time_point recorded_at) {
+    impl_->consume_failsafe_transition(previous, current, elapsed, recorded_at);
 }
 
 } // namespace onboard_autonomy::diagnostics::logging

@@ -2,8 +2,10 @@
 
 #include "onboard_autonomy/mission/CompanionApplication.hpp"
 #include "onboard_autonomy/hardware/mavlink/MavlinkEncoder.hpp"
+#include "onboard_autonomy/diagnostics/logging/JsonDiagnosticSink.hpp"
 
 #include <ardupilotmega/mavlink.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -12,6 +14,7 @@
 #include <deque>
 #include <iterator>
 #include <span>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -309,9 +312,60 @@ void quiet_transport_does_not_stall_runtime_scheduling() {
         "quiet transport must not stop scheduled companion heartbeat");
 }
 
+void diagnostic_events_survive_sparse_snapshots_and_phase_round_trips() {
+    using namespace std::chrono_literals;
+    FakeTransport transport;
+    std::ostringstream output;
+    onboard_autonomy::diagnostics::logging::JsonDiagnosticSink sink{output};
+    onboard_autonomy::mission::CompanionApplication application{transport};
+    application.set_observation_sinks({&sink});
+    const onboard_autonomy::mission::TimePoint start{};
+    transport.enqueue(autopilot_heartbeat());
+    application.poll(start);
+    for (int index = 0; index < 20; ++index) {
+        transport.enqueue(accepted_interval_ack());
+        application.poll(start + 10ms);
+    }
+    const auto parameter = [&](const char* name, const float value) {
+        mavlink_message_t message{};
+        mavlink_msg_param_value_pack(1, MAV_COMP_ID_AUTOPILOT1, &message,
+            name, value, MAV_PARAM_TYPE_REAL32, 4, 0);
+        transport.enqueue(serialize(message));
+        application.poll(start + 20ms);
+    };
+    parameter("FS_GCS_ENABLE", 5);
+    parameter("FS_GCS_TIMEOUT", 3);
+    parameter("FS_OPTIONS", 0);
+    parameter("SYSID_MYGCS", 1);
+    parameter("FS_GCS_ENABLE", 0);
+    parameter("FS_GCS_ENABLE", 5);
+    const auto snapshot = application.snapshot(start + 1000ms);
+    require(snapshot.link_events.size() == 8,
+        "console history must remain bounded separately from event delivery");
+    sink.consume(snapshot, std::chrono::system_clock::time_point{});
+    std::uint64_t last_sequence = 0;
+    std::vector<std::string> phases;
+    std::istringstream records{output.str()};
+    for (std::string line; std::getline(records, line);) {
+        const auto record = nlohmann::json::parse(line);
+        if (record.value("event", "") == "mavlink_command_event") {
+            require(record.at("context").at("sequence") == ++last_sequence,
+                "every command event must arrive exactly once and in order");
+        }
+        if (record.value("event", "") == "companion_link_failsafe_phase_changed") {
+            phases.push_back(record.at("context").at("to").get<std::string>());
+        }
+    }
+    require(last_sequence == snapshot.link_events.back().sequence && last_sequence > 8,
+        "sparse snapshots must not truncate diagnostic event delivery");
+    require(phases == std::vector<std::string>{"reading_parameters", "accepted", "rejected", "accepted"},
+        "phase round trips between snapshots must preserve all intermediate states");
+}
+
 } // namespace
 
 void run_companion_application_tests() {
     application_orchestrates_the_complete_telemetry_setup();
     quiet_transport_does_not_stall_runtime_scheduling();
+    diagnostic_events_survive_sparse_snapshots_and_phase_round_trips();
 }

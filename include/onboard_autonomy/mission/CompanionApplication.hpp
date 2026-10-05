@@ -1,6 +1,7 @@
 #pragma once
 
 #include "onboard_autonomy/mission/AppSnapshot.hpp"
+#include "onboard_autonomy/mission/SnapshotSink.hpp"
 #include "onboard_autonomy/mission/cv/CameraMonitor.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 
@@ -8,6 +9,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace onboard_autonomy::mission {
 
@@ -33,6 +35,8 @@ class CompanionApplication {
     // deterministic.
     void poll();
     void poll(mission::TimePoint now);
+    // Non-owning observers must outlive polling. Attach before the first poll.
+    void set_observation_sinks(std::vector<ports::RuntimeSnapshotSink*> sinks);
     [[nodiscard]] AppSnapshot snapshot(mission::TimePoint now);
     [[nodiscard]] std::optional<ProcessedCameraFrame>
     take_latest_processed_camera_frame();

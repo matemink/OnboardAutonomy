@@ -80,13 +80,31 @@ def build_summary(
     clock_ticks_per_second: int,
     architecture: str,
     kernel: str,
+    sample_interval_seconds: float = 0.2,
+    observed_duration_seconds: float | None = None,
+    window_complete_at_stop: bool = False,
 ) -> dict[str, Any]:
     if requested_duration_seconds <= 0.0:
         raise ValueError("requested_duration_seconds must be positive")
     if clock_ticks_per_second <= 0:
         raise ValueError("clock_ticks_per_second must be positive")
+    if not math.isfinite(sample_interval_seconds) or sample_interval_seconds <= 0:
+        raise ValueError("sample_interval_seconds must be finite and positive")
+    if observed_duration_seconds is not None and (
+        not math.isfinite(observed_duration_seconds) or observed_duration_seconds < 0
+    ):
+        raise ValueError("observed_duration_seconds must be finite and non-negative")
 
     duration_seconds = samples[-1].elapsed_ms / 1000.0 if samples else 0.0
+    tolerance_seconds = min(sample_interval_seconds + 0.05, requested_duration_seconds * 0.01)
+    window_complete = duration_seconds >= requested_duration_seconds - tolerance_seconds
+    if observed_duration_seconds is not None:
+        # The launcher records this before sending its intentional stop signal.
+        window_complete = (
+            window_complete_at_stop
+            and observed_duration_seconds >= requested_duration_seconds
+            and duration_seconds >= requested_duration_seconds - sample_interval_seconds - 0.05
+        )
     average_cpu_percent = None
     if duration_seconds > 0.0:
         average_cpu_percent = (
@@ -128,8 +146,7 @@ def build_summary(
 
     checks = {
         "architecture_is_aarch64": architecture in {"aarch64", "arm64"},
-        "sample_window_complete":
-            duration_seconds >= requested_duration_seconds * 0.9,
+        "sample_window_complete": window_complete,
         "process_samples_available": len(samples) >= 2,
         "runtime_exit_expected": runtime_status in {0, 130, 143},
         "throttling_data_available": throttled_union is not None,
@@ -146,6 +163,8 @@ def build_summary(
         "run": {
             "requested_duration_seconds": requested_duration_seconds,
             "sampled_duration_seconds": duration_seconds,
+            "observed_duration_seconds": observed_duration_seconds,
+            "sampling_interval_seconds": sample_interval_seconds,
             "runtime_exit_status": runtime_status,
             "sample_count": len(samples),
         },
@@ -240,6 +259,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=Path, required=True)
     parser.add_argument("--duration", type=float, required=True)
+    parser.add_argument("--sample-interval", type=float, default=0.2)
+    parser.add_argument("--observed-duration", type=float)
+    parser.add_argument("--window-complete", action="store_true")
     parser.add_argument("--runtime-status", type=int, required=True)
     parser.add_argument("--clock-ticks", type=int, required=True)
     parser.add_argument("--architecture", required=True)
@@ -258,6 +280,9 @@ def main() -> int:
         clock_ticks_per_second=args.clock_ticks,
         architecture=args.architecture,
         kernel=args.kernel,
+        sample_interval_seconds=args.sample_interval,
+        observed_duration_seconds=args.observed_duration,
+        window_complete_at_stop=args.window_complete,
     )
     args.report_json.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",

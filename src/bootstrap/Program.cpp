@@ -375,6 +375,7 @@ int run_program(const int argc, char** argv) {
     auto forward_camera_monitor =
         make_forward_camera_monitor(forward_preview_camera.get());
     ConsoleCommandSource operator_commands{operator_interface.interactive};
+    mission.application().set_observation_sinks(sink_pointers(snapshot_sinks));
 
     std::cerr << "OnboardAutonomy listening on "
               << mission.transport().description() << '\n';
