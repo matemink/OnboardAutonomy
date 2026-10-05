@@ -6,6 +6,7 @@ readonly width="${ONBOARD_AUTONOMY_CAMERA_WIDTH:-640}"
 readonly height="${ONBOARD_AUTONOMY_CAMERA_HEIGHT:-480}"
 readonly view_count="${ONBOARD_AUTONOMY_CALIBRATION_VIEWS:-24}"
 readonly capture_fps="${ONBOARD_AUTONOMY_CALIBRATION_FPS:-1}"
+readonly sensor_mode="${ONBOARD_AUTONOMY_CAMERA_SENSOR_MODE:-2304:1296:10:P}"
 readonly pattern="${ONBOARD_AUTONOMY_CALIBRATION_PATTERN:-9x6}"
 readonly square_size_mm="${ONBOARD_AUTONOMY_CALIBRATION_SQUARE_MM:-25}"
 readonly lens_position="${ONBOARD_AUTONOMY_CAMERA_LENS_POSITION:-default}"
@@ -36,6 +37,10 @@ require_positive_integer ONBOARD_AUTONOMY_CAMERA_WIDTH "${width}"
 require_positive_integer ONBOARD_AUTONOMY_CAMERA_HEIGHT "${height}"
 require_positive_integer ONBOARD_AUTONOMY_CALIBRATION_VIEWS "${view_count}"
 require_positive_integer ONBOARD_AUTONOMY_CALIBRATION_FPS "${capture_fps}"
+if [[ ! "${sensor_mode}" =~ ^[1-9][0-9]*:[1-9][0-9]*:(8|10|12|14|16):[PU]$ ]]; then
+    printf 'ONBOARD_AUTONOMY_CAMERA_SENSOR_MODE must be WIDTH:HEIGHT:DEPTH:P or :U.\n' >&2
+    exit 2
+fi
 
 if [[ ! "${lens_position}" =~ ^(default|[0-9]+([.][0-9]+)?)$ ]]; then
     printf 'ONBOARD_AUTONOMY_CAMERA_LENS_POSITION must be default or a non-negative number.\n' >&2
@@ -70,6 +75,7 @@ mkdir -p "${image_dir}"
 printf 'OnboardAutonomy Camera Module 3 calibration capture\n'
 printf '  Camera: %s\n' "${camera_model}"
 printf '  Resolution: %sx%s\n' "${width}" "${height}"
+printf '  Sensor mode: %s\n' "${sensor_mode}"
 printf '  Focus: manual, lens position %s\n' "${lens_position}"
 printf '  Checkerboard: %s inner corners, %s mm squares\n' \
     "${pattern}" "${square_size_mm}"
@@ -87,6 +93,7 @@ rpicam-vid \
     --height "${height}" \
     --frames "${view_count}" \
     --framerate "${capture_fps}" \
+    --mode "${sensor_mode}" \
     --codec mjpeg \
     --quality 100 \
     --segment 1 \
@@ -110,6 +117,7 @@ fi
     --pattern "${pattern}" \
     --square-size-mm "${square_size_mm}" \
     --camera-model "${camera_model}" \
+    --sensor-mode "${sensor_mode}" \
     --focus-mode manual \
     --lens-position "${lens_position}" \
     --output "${run_dir}/calibration.json"

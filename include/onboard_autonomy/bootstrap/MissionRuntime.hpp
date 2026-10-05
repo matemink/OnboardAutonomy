@@ -33,6 +33,7 @@ using MissionConnection =
 
 struct RpicamMissionSource {
     std::uint32_t frames_per_second{};
+    std::string sensor_mode{"2304:1296:10:P"};
 };
 
 struct GStreamerMissionSource {

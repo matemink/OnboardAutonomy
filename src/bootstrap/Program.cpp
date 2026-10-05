@@ -101,6 +101,7 @@ MissionCameraSource make_mission_camera_source(
                               operator_interface::cli::RpicamOptions>) {
                 return RpicamMissionSource{
                     .frames_per_second = configured.frames_per_second,
+                    .sensor_mode = configured.sensor_mode,
                 };
             } else {
                 return GStreamerMissionSource{

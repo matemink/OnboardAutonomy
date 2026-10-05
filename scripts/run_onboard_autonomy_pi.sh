@@ -69,6 +69,7 @@ camera_enabled="${ONBOARD_AUTONOMY_CAMERA_ENABLED:-1}"
 camera_width="${ONBOARD_AUTONOMY_CAMERA_WIDTH:-640}"
 camera_height="${ONBOARD_AUTONOMY_CAMERA_HEIGHT:-480}"
 camera_fps="${ONBOARD_AUTONOMY_CAMERA_FPS:-30}"
+camera_sensor_mode="${ONBOARD_AUTONOMY_CAMERA_SENSOR_MODE:-2304:1296:10:P}"
 preview_enabled="${ONBOARD_AUTONOMY_CAMERA_PREVIEW_ENABLED:-1}"
 preview_port="${ONBOARD_AUTONOMY_CAMERA_PREVIEW_PORT:-8080}"
 log_dir="${ONBOARD_AUTONOMY_LOG_DIR:-${HOME}/.local/state/onboard_autonomy}"
@@ -102,6 +103,7 @@ if [[ "${camera_enabled}" == "1" ]]; then
         --camera-width "${camera_width}"
         --camera-height "${camera_height}"
         --camera-fps "${camera_fps}"
+        --camera-sensor-mode "${camera_sensor_mode}"
     )
     if [[ "${preview_enabled}" == "1" ]]; then
         camera_arguments+=(

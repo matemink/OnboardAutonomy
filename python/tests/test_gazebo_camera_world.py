@@ -111,7 +111,7 @@ class GazeboCameraWorldTests(unittest.TestCase):
 
         parent_link = next(
             link
-            for link in model.findall(".//model/link")
+            for link in model.findall(".//model/link") + model.findall(".//model/frame")
             if sensor in list(link)
         )
         visual_names = {
@@ -312,7 +312,7 @@ class GazeboCameraWorldTests(unittest.TestCase):
         model = element_tree.parse(CAMERA_MODEL).getroot()
         component_links = {
             link.attrib["name"]
-            for link in model.findall(".//model/link")
+            for link in model.findall(".//model/link") + model.findall(".//model/frame")
         }
 
         self.assertTrue(
@@ -323,6 +323,18 @@ class GazeboCameraWorldTests(unittest.TestCase):
                 "Raspberry_Pi_Camera_Module_3_Wide_Forward",
             }.issubset(component_links)
         )
+
+    def test_identity_frames_add_no_physical_components(self) -> None:
+        model = element_tree.parse(CAMERA_MODEL).getroot().find("model")
+        assert model is not None
+        for name in ("Pixhawk_6C", "Raspberry_Pi_5"):
+            self.assertIsNone(model.find(f"link[@name='{name}']"))
+            self.assertIsNone(model.find(f"joint[@name='{name}_mount']"))
+            frame = model.find(f"frame[@name='{name}']")
+            self.assertIsNotNone(frame)
+            assert frame is not None
+            self.assertEqual(frame.attrib["attached_to"],
+                             "vehicle::iris_with_standoffs::base_link")
 
     def test_weather_system_is_opt_in_and_gust_capable(self) -> None:
         world = element_tree.parse(WORLD).getroot().find("world")

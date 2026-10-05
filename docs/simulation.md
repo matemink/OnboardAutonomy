@@ -65,7 +65,12 @@ bash scripts/run_arducopter_gazebo_weather.sh
 ONBOARD_AUTONOMY_INTERACTIVE=1 bash scripts/run_onboard_autonomy_gazebo_weather_vision.sh
 ```
 
-`config/onboard_autonomy-gazebo-weather.parm` supplies the shared wind profile.
+`config/onboard_autonomy-gazebo-weather.parm` supplies the shared wind speed
+and direction seed. Its turbulence value controls SITL only; Gazebo gusts
+and noise remain configured separately in the world SDF. The GUI labels
+this value as SITL turbulence, so it does not imply matching turbulence models.
+The Pixhawk/Pi identity frames carry no physical mass; camera links retain
+their sensor mounts, and the barometer keeps its existing topic and pose.
 The GUI wind indicator shows configured values, not instantaneous noisy sensor
 measurements. Gazebo's server and GUI are separate so capture does not depend
 on the GUI lifecycle. WSL launchers check the configured GPU renderer before

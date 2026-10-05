@@ -278,8 +278,25 @@ ONBOARD_AUTONOMY_PYTHON=.venv/bin/python \
   bash scripts/capture_camera_calibration.sh
 ```
 
-In the extracted ARM64 package, use its root-level `requirements.txt`
-instead of `python/requirements.txt`.
+From the root of the extracted ARM64 package, print
+`share/onboard_autonomy/checkerboard-9x6-25mm-a4.svg` and run:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+ONBOARD_AUTONOMY_PYTHON=.venv/bin/python \
+  bash bin/capture_camera_calibration.sh
+```
+
+Capture and runtime both request sensor mode `2304:1296:10:P` through
+`ONBOARD_AUTONOMY_CAMERA_SENSOR_MODE` (or runtime `--camera-sensor-mode`).
+Confirm it is listed by `rpicam-hello --list-cameras` for the installed sensor.
+[rpicam selects the closest available mode](https://www.raspberrypi.com/documentation/computers/camera_software.html#mode),
+so use a supported mode rather than assuming an arbitrary request is exact.
+The calibration JSON records this requested mode. Keep the sensor mode,
+output size, and focus identical when using measured intrinsics; repeat
+calibration after changing any of them. Existing calibrations without mode
+metadata must not be relabeled as newly measured results.
 
 The capture uses `640x480` and the same fixed `manual/default` hyperfocal
 lens policy as the runtime. The analyzer accepts only complete

@@ -20,6 +20,7 @@ struct RpicamCameraConfig {
     std::uint32_t width{kDefaultWidth};
     std::uint32_t height{kDefaultHeight};
     std::uint32_t frames_per_second{kDefaultFramesPerSecond};
+    std::string sensor_mode{"2304:1296:10:P"};
     std::uint32_t camera_index{0};
     std::uint32_t frame_timeout_ms{kDefaultFrameTimeoutMs};
     std::uint32_t restart_delay_ms{kDefaultRestartDelayMs};

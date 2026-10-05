@@ -15,6 +15,26 @@ DOWNWARD = "/world/camera_observation/model/Holybro_S500/link/Raspberry_Pi_Camer
 
 @unittest.skipUnless(shutil.which("bash"), "Bash launchers require Linux/WSL")
 class CameraLauncherTests(unittest.TestCase):
+    def test_non_executable_weather_sitl_child_preserves_profile_and_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            scripts = Path(temporary) / "scripts"
+            scripts.mkdir()
+            for name in ("run_arducopter_gazebo_weather.sh", "weather_profile.sh"):
+                shutil.copy(PROJECT_ROOT / "scripts" / name, scripts / name)
+                (scripts / name).chmod(0o644)
+            child = scripts / "run_arducopter_gazebo.sh"
+            child.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\\n" "$ONBOARD_AUTONOMY_SITL_WEATHER_DEFAULTS" "$@"\n'
+            )
+            child.chmod(0o644)
+            profile = PROJECT_ROOT / "config/onboard_autonomy-gazebo-weather.parm"
+            result = subprocess.run(
+                ["bash", str(scripts / "run_arducopter_gazebo_weather.sh"), "--fixture-argument"],
+                env=os.environ | {"ONBOARD_AUTONOMY_WEATHER_PROFILE": str(profile)},
+                capture_output=True, text=True, check=True, timeout=5,
+            )
+            self.assertEqual(result.stdout.splitlines()[-2:], [str(profile.resolve()), "--fixture-argument"])
+
     def test_non_executable_nested_camera_launchers_run_through_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

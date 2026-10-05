@@ -29,7 +29,8 @@ gazebo_pid=$!
 wind_ready=0
 for _ in {1..100}; do
     if ! kill -0 "${gazebo_pid}" 2>/dev/null; then
-        wait "${gazebo_pid}"
+        printf 'Gazebo gusts and noise use the world SDF settings; SITL turbulence does not set them.\n'
+wait "${gazebo_pid}"
         exit $?
     fi
 
@@ -46,9 +47,10 @@ if [[ "${wind_ready}" != "1" ]]; then
 fi
 
 gz topic -t "${wind_topic}" -m gz.msgs.Wind -p "${wind_message}"
-printf 'OnboardAutonomy Gazebo weather: %s m/s from %s deg, turbulence %s m/s\n' \
+printf 'OnboardAutonomy wind seed: %s m/s from %s deg; SITL turbulence: %s m/s\n' \
     "${ONBOARD_AUTONOMY_WIND_SPEED_M_S}" \
     "${ONBOARD_AUTONOMY_WIND_FROM_DEG}" \
     "${ONBOARD_AUTONOMY_WIND_TURBULENCE_M_S}"
 
+printf 'Gazebo gusts and noise use the world SDF settings; SITL turbulence does not set them.\n'
 wait "${gazebo_pid}"

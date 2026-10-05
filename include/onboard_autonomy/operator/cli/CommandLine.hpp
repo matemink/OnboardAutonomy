@@ -27,6 +27,7 @@ using MavlinkConnectionOptions =
 
 struct RpicamOptions {
     std::uint32_t frames_per_second{defaults::kCameraFramesPerSecond};
+    std::string sensor_mode{defaults::kCameraSensorMode};
 };
 
 struct GStreamerCameraOptions {

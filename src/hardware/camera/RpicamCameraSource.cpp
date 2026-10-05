@@ -282,6 +282,8 @@ class RpicamCameraSource final : public mission::ports::CameraSource {
             "0",
             "--framerate",
             std::to_string(config_.frames_per_second),
+            "--mode",
+            config_.sensor_mode,
             "--width",
             std::to_string(config_.width),
             "--height",

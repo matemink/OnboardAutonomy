@@ -1,5 +1,7 @@
 #include "onboard_autonomy/operator/cli/CommandLine.hpp"
 
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <stdexcept>
@@ -26,6 +28,7 @@ Connection:
 Camera:
   --camera                     Enable the primary camera
   --camera-source rpicam|gstreamer
+  --camera-sensor-mode WIDTH:HEIGHT:DEPTH:P|U  (rpicam; default 2304:1296:10:P)
   --camera-udp-port PORT        GStreamer receiver port
   --camera-width WIDTH         Frame width (default: 640)
   --camera-height HEIGHT       Frame height (default: 480)
@@ -73,6 +76,7 @@ struct LaunchArgumentsDraft {
     std::uint32_t camera_width{defaults::kCameraFrameWidth};
     std::uint32_t camera_height{defaults::kCameraFrameHeight};
     std::uint32_t camera_fps{defaults::kCameraFramesPerSecond};
+    std::string camera_sensor_mode{defaults::kCameraSensorMode};
     std::uint16_t udp_port{defaults::kMavlinkUdpPort};
     std::uint16_t camera_udp_port{defaults::kCameraUdpPort};
     std::uint16_t camera_preview_port{defaults::kCameraPreviewPort};
@@ -93,6 +97,7 @@ struct ExplicitOptions {
     bool camera_width{false};
     bool camera_height{false};
     bool camera_fps{false};
+    bool camera_sensor_mode{false};
     bool camera_preview_port{false};
     bool diagnostic_log_file{false};
 };
@@ -142,11 +147,34 @@ void validate_transport(const LaunchArgumentsDraft& options,
     }
 }
 
+void validate_sensor_mode(std::string_view mode) {
+    constexpr std::array supported_bit_depths{8U, 10U, 12U, 14U, 16U};
+    for (int part = 0; part < 3; ++part) {
+        const auto separator = mode.find(':');
+        if (separator == std::string_view::npos) {
+            throw std::invalid_argument(
+                "--camera-sensor-mode must be WIDTH:HEIGHT:DEPTH:P or :U");
+        }
+        const auto value = parse_number<std::uint32_t>(mode.substr(0, separator),
+            "--camera-sensor-mode");
+        if (value == 0 || (part == 2 && std::ranges::find(supported_bit_depths, value) ==
+                                      supported_bit_depths.end())) {
+            throw std::invalid_argument(
+                "Invalid dimensions or depth for --camera-sensor-mode");
+        }
+        mode.remove_prefix(separator + 1);
+    }
+    if (mode != "P" && mode != "U") {
+        throw std::invalid_argument("--camera-sensor-mode packing must be P or U");
+    }
+}
+
 void validate_camera(const LaunchArgumentsDraft& options,
     const ExplicitOptions& explicit_options) {
     const bool primary_setting_used = explicit_options.camera_source ||
                                       explicit_options.camera_udp_port ||
-                                      explicit_options.camera_fps;
+                                      explicit_options.camera_fps ||
+                                      explicit_options.camera_sensor_mode;
     if (primary_setting_used && !options.camera_enabled) {
         throw std::invalid_argument(
             "camera source, UDP port, and FPS options require --camera");
@@ -167,6 +195,14 @@ void validate_camera(const LaunchArgumentsDraft& options,
             "camera width and height must be positive even values");
     }
     if (options.camera_enabled) {
+        if (explicit_options.camera_sensor_mode &&
+            options.camera_backend != CameraBackend::rpicam) {
+            throw std::invalid_argument(
+                "--camera-sensor-mode requires --camera-source rpicam");
+        }
+        if (options.camera_backend == CameraBackend::rpicam) {
+            validate_sensor_mode(options.camera_sensor_mode);
+        }
         if (options.camera_backend == CameraBackend::rpicam &&
             explicit_options.camera_udp_port) {
             throw std::invalid_argument(
@@ -268,6 +304,7 @@ CameraSourceOptions make_camera_source_options(
     if (draft.camera_backend == CameraBackend::rpicam) {
         return RpicamOptions{
             .frames_per_second = draft.camera_fps,
+            .sensor_mode = draft.camera_sensor_mode,
         };
     }
     return GStreamerCameraOptions{
@@ -422,6 +459,9 @@ class ArgumentParser {
             draft_.camera_fps =
                 parse_number<std::uint32_t>(value_after(argument), argument);
             explicit_.camera_fps = true;
+        } else if (argument == "--camera-sensor-mode") {
+            draft_.camera_sensor_mode = value_after(argument);
+            explicit_.camera_sensor_mode = true;
         } else if (argument == "--camera-preview") {
             draft_.camera_preview_enabled = true;
         } else if (argument == "--camera-preview-port") {

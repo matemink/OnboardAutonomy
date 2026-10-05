@@ -213,6 +213,7 @@ def build_document(
     maximum_view_error_px: float,
     views: CalibrationViews,
     solution: CalibrationSolution,
+    sensor_mode: str | None = None,
 ) -> dict[str, Any]:
     if len(views.accepted) != len(solution.per_view_rms_error_px):
         raise ValueError("accepted views and reprojection errors are not aligned")
@@ -250,6 +251,7 @@ def build_document(
             "height": views.image_size[1],
             "focus_mode": focus_mode,
             "lens_position": lens_position,
+            "sensor_mode": sensor_mode,
         },
         "model": "opencv_pinhole_brown_conrady_5",
         "pattern": {
@@ -302,6 +304,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pattern", default="9x6")
     parser.add_argument("--square-size-mm", type=float, default=25.0)
     parser.add_argument("--camera-model", default="imx708_wide")
+    parser.add_argument("--sensor-mode")
     parser.add_argument("--focus-mode", default="manual")
     parser.add_argument("--lens-position", default="default")
     parser.add_argument("--minimum-views", type=int, default=10)
@@ -332,6 +335,7 @@ def main() -> int:
         )
         document = build_document(
             camera_model=args.camera_model,
+            sensor_mode=args.sensor_mode,
             focus_mode=args.focus_mode,
             lens_position=args.lens_position,
             pattern_size=pattern_size,

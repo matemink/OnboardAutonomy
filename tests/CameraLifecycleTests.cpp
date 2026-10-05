@@ -87,7 +87,8 @@ int main(const int argc, char* argv[]) {
             require(::setenv("ONBOARD_AUTONOMY_FIXTURE_SKIP_METADATA_ONCE", marker.c_str(), 1) == 0,
                 "failed to configure metadata fixture");
             auto source = onboard_autonomy::hardware::camera::make_rpicam_camera_source({
-                .width = 8, .height = 2, .frame_timeout_ms = 100,
+                .width = 8, .height = 2, .sensor_mode = "4608:2592:10:U",
+                .frame_timeout_ms = 100,
                 .restart_delay_ms = 25, .command = command});
             wait_for([&source] { return source->status().produced_frames > 0; },
                 "source must recover from missing metadata");
@@ -105,7 +106,8 @@ int main(const int argc, char* argv[]) {
         });
         check_lifecycle([&command](const std::uint32_t timeout) {
             return onboard_autonomy::hardware::camera::make_rpicam_camera_source({
-                .width = 8, .height = 2, .frame_timeout_ms = timeout,
+                .width = 8, .height = 2, .sensor_mode = "4608:2592:10:U",
+                .frame_timeout_ms = timeout,
                 .restart_delay_ms = 25, .command = command});
         });
         std::cout << "Camera process lifecycle tests passed\n";
