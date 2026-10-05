@@ -74,6 +74,8 @@ jobs:
           --output-junit "$PWD/artifacts/ci/cpp-tests.xml"
           2>&1 | tee artifacts/ci/cpp-tests.log
       - name: Test Python scenarios
+        env:
+          PYTHONPATH: python
         run: >-
           python -m unittest discover -s python/tests -v
           2>&1 | tee artifacts/ci/python-tests.log

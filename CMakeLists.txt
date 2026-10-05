@@ -321,6 +321,7 @@ add_executable(
     src/main.cpp
     src/bootstrap/CompanionRunner.cpp
     src/bootstrap/Program.cpp
+    src/bootstrap/TerminationSignals.cpp
 )
 target_link_libraries(
     onboard_autonomy
@@ -382,6 +383,11 @@ install(
 include(CTest)
 
 if(BUILD_TESTING)
+    add_test(NAME cli_help COMMAND onboard_autonomy --help)
+    add_test(NAME cli_help_short COMMAND onboard_autonomy -h)
+    set_tests_properties(cli_help cli_help_short PROPERTIES
+        PASS_REGULAR_EXPRESSION "Q quits"
+        TIMEOUT 5)
     add_executable(
         onboard_autonomy_tests
         tests/CompanionApplicationTests.cpp
@@ -451,7 +457,8 @@ if(BUILD_TESTING)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_executable(onboard_autonomy_camera_fixture tests/CameraProcessFixture.cpp)
-        add_executable(onboard_autonomy_camera_lifecycle_tests tests/CameraLifecycleTests.cpp)
+        add_executable(onboard_autonomy_camera_lifecycle_tests
+            tests/CameraLifecycleTests.cpp src/bootstrap/TerminationSignals.cpp)
         target_link_libraries(
             onboard_autonomy_camera_lifecycle_tests
             PRIVATE onboard_autonomy_hardware_camera Threads::Threads

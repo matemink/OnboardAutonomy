@@ -18,7 +18,8 @@ class PiServiceAssetTests(unittest.TestCase):
             "TimeoutStopSec=15s",
             "NoNewPrivileges=true",
             "ProtectSystem=strict",
-            "ReadWritePaths=/home/%i/.local/state/onboard_autonomy",
+            "StateDirectory=onboard-autonomy/%i",
+            "Environment=ONBOARD_AUTONOMY_LOG_DIR=/var/lib/onboard-autonomy/%i",
         ):
             self.assertIn(contract, unit)
         self.assertNotIn("User=root", unit)

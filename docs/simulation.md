@@ -23,7 +23,14 @@ ONBOARD_AUTONOMY_INTERACTIVE=1 bash scripts/run_onboard_autonomy_gazebo_vision.s
 
 On Windows, `StartOnboardAutonomyGazeboDemo.cmd` starts the weather camera
 profile, console, and browser preview. `StopOnboardAutonomyGazeboDemo.cmd`
-terminates the demo processes. The default demo supplies camera observations;
+terminates the demo processes.
+The Windows launcher tags its children with this checkout's path. The stop
+script signals only tagged processes owned by the current Linux user; other
+Gazebo sessions are left running. For terminals that should share this cleanup,
+prefix a launch command with `python3 scripts/demo_process.py run --`.
+Untagged sessions started by older launchers must be stopped in their own terminals.
+
+The default demo supplies camera observations;
 no flight starts automatically. Only the forward stream starts by default;
 the browser shows one camera panel. To also enable the downward observation feed:
 

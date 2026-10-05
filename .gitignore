@@ -16,6 +16,7 @@ tools/gh/
 tools/provisioning/*.log
 tools/provisioning/*-status.json
 OnboardAutonomyLocal.cmd
+OnboardAutonomyPiLocal.cmd
 CompanionLabLocal.cmd
 config/local-*.parm
 /docs/learning/

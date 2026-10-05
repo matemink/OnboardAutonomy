@@ -15,6 +15,33 @@ DOWNWARD = "/world/camera_observation/model/Holybro_S500/link/Raspberry_Pi_Camer
 
 @unittest.skipUnless(shutil.which("bash"), "Bash launchers require Linux/WSL")
 class CameraLauncherTests(unittest.TestCase):
+    def test_non_executable_nested_camera_launchers_run_through_bash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            for name in ("run_gazebo_camera.sh", "run_gazebo_iris.sh", "require_gazebo_gpu.sh"):
+                shutil.copy(PROJECT_ROOT / "scripts" / name, scripts / name)
+                (scripts / name).chmod(0o644)
+            (root / "libArduPilotPlugin.so").touch()
+            world = root / "world.sdf"
+            world.touch()
+            (root / "gz").write_text("#!/usr/bin/env bash\nprintf 'nested camera reached Gazebo\\n'\n")
+            (root / "glxinfo").write_text(
+                "#!/usr/bin/env bash\nprintf 'Accelerated: yes\\nOpenGL renderer string: D3D12 (NVIDIA)\\n'\n"
+            )
+            (root / "gz").chmod(0o755)
+            (root / "glxinfo").chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(scripts / "run_gazebo_camera.sh")],
+                env=os.environ | {
+                    "PATH": str(root) + os.pathsep + os.environ["PATH"],
+                    "ARDUPILOT_GAZEBO_BUILD_DIR": str(root),
+                    "ONBOARD_AUTONOMY_GAZEBO_WORLD": str(world),
+                }, capture_output=True, text=True, check=True, timeout=5,
+            )
+            self.assertIn("nested camera reached Gazebo", result.stdout)
+
     def run_launcher(self, downward: bool) -> tuple[list[str], list[list[str]]]:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

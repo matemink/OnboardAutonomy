@@ -140,7 +140,9 @@ ONBOARD_AUTONOMY_SERIAL=/dev/serial/by-id/usb-... \
 
 The packaged installer copies the release to `/opt/onboard-autonomy`,
 installs a hardened non-root `systemd` unit, and preserves an existing
-configuration during upgrades:
+configuration during upgrades.
+The installer stops an existing unit before replacing its files and restarts
+it after a successful upgrade if it was active.
 
 ```bash
 sudo bin/install_onboard_autonomy_service.sh
@@ -160,8 +162,10 @@ candidate exists at boot, `systemd` retries the launcher every three seconds,
 so connecting the Pixhawk later does not require a manual restart. Camera
 process and stream recovery happens inside the runtime.
 
-Telemetry JSONL files remain under
-`~/.local/state/onboard_autonomy`. The default policy keeps at most 20 files,
+Service telemetry JSONL files use the systemd-managed state directory
+`/var/lib/onboard-autonomy/<user>`, regardless of the account's home directory.
+Manual launcher runs use `~/.local/state/onboard_autonomy` by default.
+The default policy keeps at most 20 files,
 10 MiB per file, and 100 MiB in total. Each JSON line is flushed immediately
 and mirrored to `journald`; these limits can be changed in the environment
 file through `ONBOARD_AUTONOMY_LOG_MAX_FILES`,
@@ -284,7 +288,7 @@ Camera Module 3 intrinsics as if they belonged to the physical camera.
 
 `StartOnboardAutonomyPixhawk.cmd` opens the Raspberry Pi runtime over SSH
 and then opens the local camera-preview page. Machine-specific values
-belong in the ignored `OnboardAutonomyLocal.cmd` file at the repository
+belong in the ignored `OnboardAutonomyPiLocal.cmd` file at the repository
 root:
 
 ```bat
@@ -296,10 +300,9 @@ set "ONBOARD_AUTONOMY_SERIAL=/dev/serial/by-id/<your-pixhawk-device>"
 ```
 
 The launcher lets the Pi auto-detect one serial device when
-`ONBOARD_AUTONOMY_SERIAL` is unset. It also reads an existing ignored
-`CompanionLabLocal.cmd` and maps its legacy variables during the rename
-transition; this compatibility path is not part of the public runtime
-configuration.
+`ONBOARD_AUTONOMY_SERIAL` is unset. Deploy a current package in the configured
+remote root; the launcher no longer falls back to CompanionLab scripts or
+directories. `OnboardAutonomyLocal.cmd` remains separate for the Gazebo shortcut.
 
 ## Verified Pixhawk 6C TELEM2 UART
 

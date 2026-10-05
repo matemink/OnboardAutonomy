@@ -349,8 +349,15 @@ class ConsoleCommandSource final : public RuntimeCommandSource {
 } // namespace
 
 int run_program(const int argc, char** argv) {
+    const auto arguments = command_line_arguments(argc, argv);
+    if (arguments.size() == 1 &&
+        (arguments.front() == "--help" || arguments.front() == "-h")) {
+        std::cout << operator_interface::cli::command_line_help();
+        return 0;
+    }
+    const TerminationSignals termination_signals;
     const auto options = operator_interface::cli::parse_command_line(
-        command_line_arguments(argc, argv));
+        arguments);
     const auto& operator_interface = operator_options(options);
     const auto& diagnostics = diagnostics_options(options);
     const std::filesystem::path executable{argv[0]};

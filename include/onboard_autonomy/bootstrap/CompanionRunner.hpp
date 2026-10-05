@@ -23,6 +23,23 @@ class CameraPreviewSink;
 
 namespace onboard_autonomy::bootstrap {
 
+// Construct before any adapter starts a worker or child process.
+class TerminationSignals {
+  public:
+    TerminationSignals();
+    ~TerminationSignals();
+    TerminationSignals(const TerminationSignals&) = delete;
+    TerminationSignals& operator=(const TerminationSignals&) = delete;
+
+    [[nodiscard]] static bool stop_requested() noexcept;
+    static void request_shutdown() noexcept;
+
+  private:
+    using Handler = void (*)(int);
+    Handler previous_interrupt_;
+    Handler previous_terminate_;
+};
+
 enum class RuntimeCommand {
     shutdown,
 };

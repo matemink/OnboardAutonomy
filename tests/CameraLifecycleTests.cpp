@@ -1,8 +1,10 @@
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/hardware/camera/RpicamCameraSource.hpp"
+#include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
 
 #include <cerrno>
 #include <chrono>
+#include <csignal>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -60,6 +62,21 @@ int main(const int argc, char* argv[]) {
     try {
         require(argc == 2, "expected camera fixture executable path");
         const std::string command{argv[1]};
+        {
+            const onboard_autonomy::bootstrap::TerminationSignals signals;
+            auto source = onboard_autonomy::hardware::camera::make_gstreamer_camera_source({
+                .width = 8, .height = 2, .frame_timeout_ms = 5000,
+                .command = command});
+            wait_for([&source] { return source->status().produced_frames > 0; },
+                "startup fixture must produce a frame");
+            std::raise(SIGTERM);
+            require(onboard_autonomy::bootstrap::TerminationSignals::stop_requested(),
+                "termination during startup must survive until the runner starts");
+            source.reset();
+            int status = 0;
+            require(::waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD,
+                "startup termination must reap camera children");
+        }
         check_lifecycle([&command](const std::uint32_t timeout) {
             return onboard_autonomy::hardware::camera::make_gstreamer_camera_source({
                 .width = 8, .height = 2, .frame_timeout_ms = timeout,
