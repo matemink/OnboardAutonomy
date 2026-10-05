@@ -12,7 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 @unittest.skipUnless(shutil.which("bash"), "Requires Bash")
 class ServiceUpgradeTests(unittest.TestCase):
-    def run_installer(self, active: bool, copy_fails: bool = False) -> tuple[int, list[str]]:
+    def run_installer(self, active: bool, copy_fails: bool = False,
+                      state: str | None = None) -> tuple[int, list[str]]:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             package = root / "package"
@@ -44,7 +45,8 @@ class ServiceUpgradeTests(unittest.TestCase):
                 "printf '%s\\n' \"$*\" >> \"$TEST_LOG\"\n"
                 "case \"$1\" in\n"
                 "is-active) [[ \"$TEST_ACTIVE\" == 1 ]];;\n"
-                "show) if [[ \"$TEST_ACTIVE\" == 1 ]]; then echo loaded; else echo not-found; fi;;\n"
+                "show) if [[ \"$*\" == *ActiveState* ]]; then echo \"$TEST_STATE\"; "
+                "elif [[ \"$TEST_ACTIVE\" == 1 ]]; then echo loaded; else echo not-found; fi;;\n"
                 "stop) touch \"$TEST_STOPPED\";;\n"
                 "esac\n"
             )
@@ -65,6 +67,7 @@ class ServiceUpgradeTests(unittest.TestCase):
                     "ONBOARD_AUTONOMY_SERVICE_USER": os.environ["USER"],
                     "TEST_LOG": str(log), "TEST_STOPPED": str(root / "stopped"),
                     "TEST_ACTIVE": "1" if active else "0",
+                    "TEST_STATE": state or ("active" if active else "inactive"),
                     "TEST_COPY_FAILS": "1" if copy_fails else "0",
                 },
             )
@@ -81,6 +84,11 @@ class ServiceUpgradeTests(unittest.TestCase):
         status, calls = self.run_installer(active=False)
         self.assertEqual(status, 0)
         self.assertFalse(any(call.startswith(("stop ", "start ")) for call in calls))
+
+    def test_upgrade_preserves_the_activating_retry_loop(self) -> None:
+        status, calls = self.run_installer(active=True, state="activating")
+        self.assertEqual(status, 0)
+        self.assertTrue(calls[-1].startswith("start onboard-autonomy@"))
 
     def test_failed_copy_keeps_the_unit_stopped(self) -> None:
         status, calls = self.run_installer(active=True, copy_fails=True)

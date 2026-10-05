@@ -43,9 +43,10 @@ fi
 install -d -m 0755 "${install_root}"
 instance="onboard-autonomy@${service_user}.service"
 was_active=false
-if systemctl is-active --quiet "${instance}"; then
-    was_active=true
-fi
+prior_state="$(systemctl show "${instance}" --property=ActiveState --value)"
+case "${prior_state}" in
+    active|reloading|activating) was_active=true ;;
+esac
 # Also stop an activating/restarting unit before replacing its executable.
 if [[ "$(systemctl show "${instance}" --property=LoadState --value)" != "not-found" ]]; then
     systemctl stop "${instance}"
