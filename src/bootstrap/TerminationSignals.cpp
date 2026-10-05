@@ -14,13 +14,17 @@ void handle_signal(int) {
     keep_running = 0;
 }
 
+auto install_interrupt_handler() {
+    // Reset before installing either handler so an early stop is never erased.
+    keep_running = 1;
+    return std::signal(SIGINT, handle_signal);
+}
+
 } // namespace
 
 TerminationSignals::TerminationSignals()
-    : previous_interrupt_(SIG_DFL), previous_terminate_(SIG_DFL) {
-    keep_running = 1;
-    previous_interrupt_ = std::signal(SIGINT, handle_signal);
-    previous_terminate_ = std::signal(SIGTERM, handle_signal);
+    : previous_interrupt_(install_interrupt_handler()),
+      previous_terminate_(std::signal(SIGTERM, handle_signal)) {
     if (previous_interrupt_ == SIG_ERR || previous_terminate_ == SIG_ERR) {
         if (previous_interrupt_ != SIG_ERR) {
             std::signal(SIGINT, previous_interrupt_);
