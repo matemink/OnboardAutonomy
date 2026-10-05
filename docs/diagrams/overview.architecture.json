@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "OnboardAutonomy · Current prototype structure",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/overview.html",
+    "repository": {
+      "url": "https://github.com/matemink/OnboardAutonomy.git",
+      "revision": "b98210088eda158cc4c2bd19a80ae30e77ab41d1",
+      "provider": "github",
+      "link_mode": "web"
+    }
+  },
+  "components": [
+    {
+      "id": "autopilot",
+      "type": "external",
+      "label": "ArduPilot / SITL",
+      "sublabel": "UDP or USB / UART",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        190,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/bootstrap/MissionRuntime.cpp",
+          "line": 17,
+          "end_line": 26
+        },
+        {
+          "path": "src/mission/CompanionApplication.cpp",
+          "line": 371,
+          "end_line": 412
+        }
+      ]
+    },
+    {
+      "id": "runtime",
+      "type": "backend",
+      "label": "Companion runtime",
+      "sublabel": "MAVLink state + camera health",
+      "pos": [
+        410,
+        120
+      ],
+      "size": [
+        260,
+        88
+      ],
+      "sources": [
+        {
+          "path": "src/bootstrap/Program.cpp",
+          "line": 353,
+          "end_line": 400
+        },
+        {
+          "path": "src/bootstrap/CompanionRunner.cpp",
+          "line": 43,
+          "end_line": 124
+        },
+        {
+          "path": "src/mission/CompanionApplication.cpp",
+          "line": 224,
+          "end_line": 258
+        }
+      ]
+    },
+    {
+      "id": "stdout",
+      "type": "frontend",
+      "label": "Console / JSON stdout",
+      "sublabel": "Status or --json",
+      "pos": [
+        820,
+        120
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/bootstrap/Program.cpp",
+          "line": 281,
+          "end_line": 309
+        }
+      ]
+    },
+    {
+      "id": "camera",
+      "type": "external",
+      "label": "Camera producers",
+      "sublabel": "GStreamer / rpicam-vid",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        190,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/bootstrap/MissionRuntime.cpp",
+          "line": 34,
+          "end_line": 51
+        },
+        {
+          "path": "src/bootstrap/Program.cpp",
+          "line": 229,
+          "end_line": 246
+        },
+        {
+          "path": "src/hardware/camera/RpicamCameraSource.cpp",
+          "line": 277,
+          "end_line": 305
+        }
+      ]
+    },
+    {
+      "id": "preview",
+      "type": "backend",
+      "label": "HTTP camera preview",
+      "sublabel": "Frames published by Runner",
+      "pos": [
+        820,
+        380
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "sources": [
+        {
+          "path": "src/bootstrap/Program.cpp",
+          "line": 206,
+          "end_line": 227
+        },
+        {
+          "path": "src/bootstrap/CompanionRunner.cpp",
+          "line": 78,
+          "end_line": 115
+        },
+        {
+          "path": "src/diagnostics/preview/HttpCameraPreviewServer.cpp",
+          "line": 238,
+          "end_line": 270
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Browser",
+      "sublabel": "Independent camera panels",
+      "pos": [
+        820,
+        650
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "assets/camera-preview/index.html",
+          "line": 326,
+          "end_line": 327
+        },
+        {
+          "path": "assets/camera-preview/index.html",
+          "line": 412,
+          "end_line": 417
+        }
+      ]
+    },
+    {
+      "id": "logfile",
+      "type": "external",
+      "label": "JSONL file",
+      "sublabel": "Snapshots + diagnostic events",
+      "pos": [
+        410,
+        650
+      ],
+      "size": [
+        260,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/diagnostics/logging/JsonDiagnosticSink.cpp",
+          "line": 43,
+          "end_line": 78
+        },
+        {
+          "path": "src/mission/CompanionApplication.cpp",
+          "line": 424,
+          "end_line": 459
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "onboard_autonomy · C++20 process",
+      "wraps": [
+        "runtime",
+        "stdout",
+        "preview"
+      ],
+      "pad": 32
+    }
+  ],
+  "connections": [
+    {
+      "id": "telemetry",
+      "from": "autopilot",
+      "to": "runtime",
+      "label": "MAVLink 2",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-requests",
+      "from": "runtime",
+      "to": "autopilot",
+      "label": "Heartbeat / read requests",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "camera-frames",
+      "from": "camera",
+      "to": "runtime",
+      "label": "Camera enabled",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "status",
+      "from": "runtime",
+      "to": "stdout",
+      "label": "Snapshots"
+    },
+    {
+      "id": "preview-frames",
+      "from": "runtime",
+      "to": "preview",
+      "label": "--camera-preview",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "file-output",
+      "from": "runtime",
+      "to": "logfile",
+      "label": "--diagnostic-log",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "browser-frames",
+      "from": "preview",
+      "to": "browser",
+      "label": "HTTP frames"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Observation prototype",
+      "items": [
+        "ArduPilot owns flight control.",
+        "Companion observes telemetry and camera frames."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Optional outputs",
+      "items": [
+        "Console or JSON on stdout; JSONL file when enabled.",
+        "Browser preview requires --camera-preview and a camera."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Scope",
+      "items": [
+        "Forward camera by default in the Gazebo demo.",
+        "Standalone DNN utilities are outside this runtime."
+      ]
+    }
+  ]
+}

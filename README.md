@@ -9,6 +9,22 @@ ArduPilot, with a Raspberry Pi 5 / Pixhawk 6C hardware bench and Gazebo + SITL
 simulation. It provides console status, browser camera preview, JSONL diagnostics,
 and connection/camera recovery. ArduPilot owns flight control.
 
+## Current prototype structure
+
+<a href="https://matemink.github.io/OnboardAutonomy/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/overview-dark.svg">
+    <img alt="MAVLink and camera inputs feed the companion runtime, which publishes console status, optional HTTP preview and JSONL diagnostics." src="docs/diagrams/overview-light.svg" width="960">
+  </picture>
+</a>
+
+[Explore the interactive map](https://matemink.github.io/OnboardAutonomy/) ·
+[Package responsibilities](docs/architecture.md) ·
+[Diagram source and refresh guide](docs/diagrams/README.md)
+
+The map follows the current observation runtime; source links identify the
+inspected revision. Optional outputs are labeled with their enabling flags.
+
 ## Runtime
 
 - MAVLink 2 over UDP or Linux USB/UART, with controller identity filtering,
