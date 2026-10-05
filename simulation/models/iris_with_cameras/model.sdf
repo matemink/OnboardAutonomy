@@ -8,70 +8,17 @@
       <name>vehicle</name>
     </include>
 
-    <link name="Pixhawk_6C">
+    <frame name="Pixhawk_6C" attached_to="vehicle::iris_with_standoffs::base_link">
       <pose relative_to="vehicle::iris_with_standoffs::base_link">
         0 0 0.055 0 0 0
       </pose>
-      <inertial>
-        <mass>0.05</mass>
-        <inertia>
-          <ixx>0.00002</ixx>
-          <iyy>0.00003</iyy>
-          <izz>0.00004</izz>
-        </inertia>
-      </inertial>
-      <visual name="Pixhawk_6C_body">
-        <geometry>
-          <box>
-            <size>0.084 0.044 0.012</size>
-          </box>
-        </geometry>
-        <material>
-          <ambient>0.08 0.08 0.08 1</ambient>
-          <diffuse>0.12 0.12 0.12 1</diffuse>
-        </material>
-      </visual>
+    </frame>
 
-      <sensor name="Pixhawk_6C_barometer" type="air_pressure">
-        <always_on>true</always_on>
-        <update_rate>50</update_rate>
-        <topic>/onboard_autonomy/sensors/pixhawk_6c/air_pressure</topic>
-        <air_pressure>
-          <reference_altitude>584</reference_altitude>
-          <pressure>
-            <noise type="gaussian">
-              <mean>0</mean>
-              <stddev>2.3</stddev>
-            </noise>
-          </pressure>
-        </air_pressure>
-      </sensor>
-    </link>
-
-    <link name="Raspberry_Pi_5">
+    <frame name="Raspberry_Pi_5" attached_to="vehicle::iris_with_standoffs::base_link">
       <pose relative_to="vehicle::iris_with_standoffs::base_link">
         0.095 0 0.055 0 0 0
       </pose>
-      <inertial>
-        <mass>0.05</mass>
-        <inertia>
-          <ixx>0.00002</ixx>
-          <iyy>0.00003</iyy>
-          <izz>0.00004</izz>
-        </inertia>
-      </inertial>
-      <visual name="Raspberry_Pi_5_board">
-        <geometry>
-          <box>
-            <size>0.085 0.056 0.012</size>
-          </box>
-        </geometry>
-        <material>
-          <ambient>0.05 0.25 0.12 1</ambient>
-          <diffuse>0.07 0.42 0.20 1</diffuse>
-        </material>
-      </visual>
-    </link>
+    </frame>
 
     <link name="Raspberry_Pi_Camera_Module_3_Wide">
       <pose relative_to="vehicle::iris_with_standoffs::base_link">
@@ -96,6 +43,22 @@
           <diffuse>0.05 0.12 0.14 1</diffuse>
         </material>
       </visual>
+
+      <sensor name="Pixhawk_6C_barometer" type="air_pressure">
+        <pose relative_to="Pixhawk_6C">0 0 0 0 0 0</pose>
+        <always_on>true</always_on>
+        <update_rate>50</update_rate>
+        <topic>/onboard_autonomy/sensors/pixhawk_6c/air_pressure</topic>
+        <air_pressure>
+          <reference_altitude>584</reference_altitude>
+          <pressure>
+            <noise type="gaussian">
+              <mean>0</mean>
+              <stddev>2.3</stddev>
+            </noise>
+          </pressure>
+        </air_pressure>
+      </sensor>
 
       <!-- Gazebo cameras look along sensor +X; +90 deg pitch points it down. -->
       <sensor name="Raspberry_Pi_Camera_Module_3_Wide" type="camera">
@@ -186,16 +149,6 @@
         </plugin>
       </sensor>
     </link>
-
-    <joint name="Pixhawk_6C_mount" type="fixed">
-      <parent>vehicle::iris_with_standoffs::base_link</parent>
-      <child>Pixhawk_6C</child>
-    </joint>
-
-    <joint name="Raspberry_Pi_5_mount" type="fixed">
-      <parent>vehicle::iris_with_standoffs::base_link</parent>
-      <child>Raspberry_Pi_5</child>
-    </joint>
 
     <joint name="Raspberry_Pi_Camera_Module_3_Wide_mount" type="fixed">
       <parent>vehicle::iris_with_standoffs::base_link</parent>

@@ -124,7 +124,7 @@ Rectangle {
           font.bold: true
         }
         Text {
-          text: "turbulence " +
+          text: "SITL turbulence " +
                 WindIndicator.turbulenceMetersPerSecond.toFixed(1) +
                 " m/s"
           color: "#b7c1c9"

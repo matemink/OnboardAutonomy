@@ -132,6 +132,7 @@ class CameraCalibrationTests(unittest.TestCase):
             )
             document = CALIBRATE_CAMERA.build_document(
                 camera_model="imx708_wide",
+                sensor_mode="2304:1296:10:P",
                 focus_mode="manual",
                 lens_position="default",
                 pattern_size=(9, 6),
@@ -145,6 +146,7 @@ class CameraCalibrationTests(unittest.TestCase):
 
             self.assertEqual(document["schema_version"], 1)
             self.assertEqual(document["result"], "PASS")
+            self.assertEqual(document["camera"]["sensor_mode"], "2304:1296:10:P")
             self.assertEqual(document["camera"]["width"], 640)
             self.assertEqual(document["camera"]["focus_mode"], "manual")
             self.assertEqual(document["camera"]["lens_position"], "default")

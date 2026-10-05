@@ -1,5 +1,7 @@
 #include "onboard_autonomy/operator/cli/CommandLine.hpp"
 
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <stdexcept>
@@ -26,6 +28,7 @@ Connection:
 Camera:
   --camera                     Enable the primary camera
   --camera-source rpicam|gstreamer
+  --camera-sensor-mode WIDTH:HEIGHT:DEPTH:P|U  (rpicam; default 2304:1296:10:P)
   --camera-udp-port PORT        GStreamer receiver port
   --camera-width WIDTH         Frame width (default: 640)
   --camera-height HEIGHT       Frame height (default: 480)
@@ -145,6 +148,7 @@ void validate_transport(const LaunchArgumentsDraft& options,
 }
 
 void validate_sensor_mode(std::string_view mode) {
+    constexpr std::array supported_bit_depths{8U, 10U, 12U, 14U, 16U};
     for (int part = 0; part < 3; ++part) {
         const auto separator = mode.find(':');
         if (separator == std::string_view::npos) {
@@ -152,8 +156,8 @@ void validate_sensor_mode(std::string_view mode) {
         }
         const auto value = parse_number<std::uint32_t>(mode.substr(0, separator),
             "--camera-sensor-mode");
-        if (value == 0 || (part == 2 && value != 8 && value != 10 &&
-                             value != 12 && value != 14 && value != 16)) {
+        if (value == 0 || (part == 2 && std::ranges::find(supported_bit_depths, value) ==
+                                      supported_bit_depths.end())) {
             throw std::invalid_argument("Invalid dimensions or depth for --camera-sensor-mode");
         }
         mode.remove_prefix(separator + 1);
