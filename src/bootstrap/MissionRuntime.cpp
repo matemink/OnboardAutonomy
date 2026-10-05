@@ -42,6 +42,7 @@ std::unique_ptr<mission::ports::CameraSource> make_camera_source(
             .width = camera.frame_width,
             .height = camera.frame_height,
             .frames_per_second = rpicam->frames_per_second,
+            .sensor_mode = rpicam->sensor_mode,
         });
     }
     const auto& gstreamer = std::get<GStreamerMissionSource>(camera.source);
