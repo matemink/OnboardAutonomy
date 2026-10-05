@@ -181,6 +181,11 @@ void transition_events_reconstruct_runtime_failures() {
         .detail = "COMMAND_ACK ACCEPTED",
     });
     sink.consume(active, std::chrono::system_clock::time_point{2s});
+    sink.consume_link_event(active.link_events.back(),
+        std::chrono::system_clock::time_point{2s});
+    sink.consume_failsafe_transition(waiting.companion_link_failsafe.phase,
+        active.companion_link_failsafe, active.elapsed,
+        std::chrono::system_clock::time_point{2s});
 
     AppSnapshot failed = active;
     failed.elapsed = 300ms;
@@ -200,6 +205,11 @@ void transition_events_reconstruct_runtime_failures() {
         .detail = "COMMAND_ACK DENIED",
     });
     sink.consume(failed, std::chrono::system_clock::time_point{3s});
+    sink.consume_link_event(failed.link_events.back(),
+        std::chrono::system_clock::time_point{3s});
+    sink.consume_failsafe_transition(active.companion_link_failsafe.phase,
+        failed.companion_link_failsafe, failed.elapsed,
+        std::chrono::system_clock::time_point{3s});
 
     const auto records = parse_records(output.str());
     std::vector<std::string> events;

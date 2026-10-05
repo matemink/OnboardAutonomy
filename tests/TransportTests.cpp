@@ -12,8 +12,28 @@
 #include <thread>
 
 #ifndef _WIN32
+#include <arpa/inet.h>
+#include <cerrno>
 #include <fcntl.h>
+#include <sys/socket.h>
 #include <unistd.h>
+#endif
+
+#ifdef __linux__
+namespace {
+thread_local int injected_send_error = 0;
+}
+extern "C" ssize_t __real_sendto(int, const void*, size_t, int,
+    const struct sockaddr*, socklen_t);
+extern "C" ssize_t __wrap_sendto(const int socket, const void* buffer,
+    const size_t length, const int flags, const struct sockaddr* address,
+    const socklen_t address_length) {
+    if (injected_send_error != 0) {
+        errno = injected_send_error;
+        return -1;
+    }
+    return __real_sendto(socket, buffer, length, flags, address, address_length);
+}
 #endif
 
 namespace {
@@ -40,6 +60,47 @@ void quiet_udp_reads_return_immediately() {
     require(elapsed < std::chrono::milliseconds(500),
         "quiet UDP reads must not inherit a receive timeout");
 }
+
+#ifdef __linux__
+void transient_udp_send_errors_do_not_close_the_transport() {
+    const int peer = ::socket(AF_INET, SOCK_DGRAM, 0);
+    require(peer >= 0, "failed to create UDP test peer");
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    require(::bind(peer, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0,
+        "failed to reserve a UDP port");
+    socklen_t length = sizeof(address);
+    require(::getsockname(peer, reinterpret_cast<sockaddr*>(&address), &length) == 0,
+        "failed to resolve the UDP port");
+    const auto port = ntohs(address.sin_port);
+    ::close(peer);
+    auto transport = onboard_autonomy::hardware::transport::make_udp_transport("127.0.0.1", port);
+    const int sender = ::socket(AF_INET, SOCK_DGRAM, 0);
+    require(sender >= 0, "failed to create UDP sender");
+    const std::array<std::uint8_t, 2> message{1, 2};
+    require(::sendto(sender, message.data(), message.size(), 0,
+                reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 2,
+        "failed to introduce the UDP peer");
+    std::array<std::uint8_t, 8> incoming{};
+    require(transport->read(incoming) == message.size(), "UDP peer must be learned");
+    for (const int error : {EAGAIN, EWOULDBLOCK, EINTR}) {
+        injected_send_error = error;
+        require(transport->write(message) == 0, "temporary UDP failure must be retriable");
+    }
+    injected_send_error = EMSGSIZE;
+    bool rejected = false;
+    try {
+        static_cast<void>(transport->write(message));
+    } catch (const std::runtime_error&) {
+        rejected = true;
+    }
+    injected_send_error = 0;
+    require(rejected, "permanent UDP errors must still be reported");
+    require(transport->write(message) == message.size(), "transport must recover after backpressure");
+    ::close(sender);
+}
+#endif
 
 #ifndef _WIN32
 
@@ -125,6 +186,9 @@ void serial_transport_reopens_a_stable_device_path() {
 
 void run_transport_tests() {
     quiet_udp_reads_return_immediately();
+#ifdef __linux__
+    transient_udp_send_errors_do_not_close_the_transport();
+#endif
 #ifndef _WIN32
     serial_transport_reopens_a_stable_device_path();
 #endif

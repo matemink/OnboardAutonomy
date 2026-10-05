@@ -168,6 +168,10 @@ class UdpTransport final : public mission::ports::Transport {
             reinterpret_cast<const sockaddr*>(&peer_),
             peer_length_);
         if (sent == SOCKET_ERROR) {
+            const int error = WSAGetLastError();
+            if (error == WSAEWOULDBLOCK || error == WSAEINTR) {
+                return 0;
+            }
             throw std::runtime_error("UDP send failed");
         }
 #else
@@ -178,6 +182,9 @@ class UdpTransport final : public mission::ports::Transport {
             reinterpret_cast<const sockaddr*>(&peer_),
             peer_length_);
         if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                return 0;
+            }
             throw std::runtime_error(
                 std::string("UDP send failed: ") + posix_error_message(errno));
         }

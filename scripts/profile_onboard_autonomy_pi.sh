@@ -75,11 +75,13 @@ start_ns="$(date +%s%N)"
 duration_ns="$((duration_seconds * 1000000000))"
 declare -A previous_ticks=()
 cumulative_cpu_ticks=0
+window_complete=0
 
 while kill -0 "${profile_pid}" 2>/dev/null; do
     now_ns="$(date +%s%N)"
     elapsed_ns="$((now_ns - start_ns))"
     if (( elapsed_ns > duration_ns )); then
+        window_complete=1
         break
     fi
 
@@ -142,6 +144,13 @@ while kill -0 "${profile_pid}" 2>/dev/null; do
     sleep "${sample_seconds}"
 done
 
+observed_ns="$(( $(date +%s%N) - start_ns ))"
+observed_seconds="$(awk -v ns="${observed_ns}" 'BEGIN { printf "%.9f", ns / 1000000000 }')"
+declare -a window_arguments=()
+if [[ "${window_complete}" == "1" ]]; then
+    window_arguments=(--window-complete)
+fi
+
 if kill -0 "${profile_pid}" 2>/dev/null; then
     kill -INT -- "-${profile_pid}" 2>/dev/null || true
     for _ in {1..50}; do
@@ -174,6 +183,9 @@ set +e
 python3 "${analyzer}" \
     --samples "${samples_file}" \
     --duration "${duration_seconds}" \
+    --sample-interval "${sample_seconds}" \
+    --observed-duration "${observed_seconds}" \
+    "${window_arguments[@]}" \
     --runtime-status "${runtime_status}" \
     --clock-ticks "$(getconf CLK_TCK)" \
     --architecture "$(uname -m)" \

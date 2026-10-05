@@ -5,6 +5,7 @@
 #include "onboard_autonomy/diagnostics/preview/CameraPreviewSink.hpp"
 #include "onboard_autonomy/hardware/camera/GStreamerCameraSource.hpp"
 #include "onboard_autonomy/mission/SnapshotSink.hpp"
+#include "onboard_autonomy/mission/CompanionApplication.hpp"
 #include "onboard_autonomy/mission/flight/Transport.hpp"
 #include "onboard_autonomy/mission/cv/AsyncCameraMonitor.hpp"
 #include "onboard_autonomy/bootstrap/CompanionRunner.hpp"
@@ -375,6 +376,7 @@ int run_program(const int argc, char** argv) {
     auto forward_camera_monitor =
         make_forward_camera_monitor(forward_preview_camera.get());
     ConsoleCommandSource operator_commands{operator_interface.interactive};
+    mission.application().set_observation_sinks(sink_pointers(snapshot_sinks));
 
     std::cerr << "OnboardAutonomy listening on "
               << mission.transport().description() << '\n';

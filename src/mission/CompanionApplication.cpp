@@ -191,6 +191,7 @@ class CompanionApplication::Impl {
                       parameter.source_component,
                       parameter.id,
                       parameter.value);
+                  observe_failsafe_phase(now);
                   for (const auto expected :
                       CompanionLinkFailsafe::parameter_names) {
                       if (parameter.id == expected) {
@@ -214,6 +215,10 @@ class CompanionApplication::Impl {
     void poll() { poll(std::nullopt); }
 
     void poll(const mission::TimePoint now) { poll(std::optional{now}); }
+
+    void set_observation_sinks(std::vector<ports::RuntimeSnapshotSink*> sinks) {
+        observation_sinks_ = std::move(sinks);
+    }
 
   private:
     mission::TimePoint poll_inputs(
@@ -241,6 +246,7 @@ class CompanionApplication::Impl {
             vehicle.connected && !vehicle_was_connected_;
         companion_link_failsafe_.observe_vehicle(vehicle.connected,
             vehicle.system_id);
+        observe_failsafe_phase(now);
         if (newly_connected) {
             failsafe_parameter_index_ = 0;
             next_failsafe_parameter_request_ = now;
@@ -415,6 +421,20 @@ class CompanionApplication::Impl {
     }
 
   private:
+    void observe_failsafe_phase(const mission::TimePoint now) {
+        const auto current = companion_link_failsafe_.snapshot();
+        if (current.phase == previous_failsafe_phase_) {
+            return;
+        }
+        for (auto* sink : observation_sinks_) {
+            if (sink != nullptr) {
+                sink->consume_failsafe_transition(previous_failsafe_phase_,
+                    current, elapsed_at(now), std::chrono::system_clock::now());
+            }
+        }
+        previous_failsafe_phase_ = current.phase;
+    }
+
     void record_event(const LinkEventDirection direction,
         const LinkEventStatus status,
         std::string label,
@@ -428,6 +448,12 @@ class CompanionApplication::Impl {
             .label = std::move(label),
             .detail = std::move(detail),
         });
+        for (auto* sink : observation_sinks_) {
+            if (sink != nullptr) {
+                sink->consume_link_event(link_events_.back(),
+                    std::chrono::system_clock::now());
+            }
+        }
         if (link_events_.size() > kMaximumLinkEvents) {
             link_events_.pop_front();
         }
@@ -576,6 +602,9 @@ class CompanionApplication::Impl {
     mission::TimePoint next_autopilot_version_request_{};
     std::optional<mission::TimePoint> started_at_;
     std::deque<LinkEvent> link_events_;
+    std::vector<ports::RuntimeSnapshotSink*> observation_sinks_;
+    CompanionLinkFailsafePhase previous_failsafe_phase_{
+        CompanionLinkFailsafePhase::waiting_for_vehicle};
     std::uint64_t next_event_sequence_{0};
     std::uint64_t next_activity_sequence_{0};
     std::optional<LinkActivity> tx_activity_;
@@ -599,6 +628,11 @@ void CompanionApplication::poll(const mission::TimePoint now) {
 }
 
 void CompanionApplication::poll() { impl_->poll(); }
+
+void CompanionApplication::set_observation_sinks(
+    std::vector<ports::RuntimeSnapshotSink*> sinks) {
+    impl_->set_observation_sinks(std::move(sinks));
+}
 
 AppSnapshot CompanionApplication::snapshot(const mission::TimePoint now) {
     return impl_->snapshot(now);
