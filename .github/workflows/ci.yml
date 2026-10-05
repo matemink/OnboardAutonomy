@@ -7,6 +7,17 @@ on:
   pull_request:
 
 jobs:
+  windows-launcher:
+    name: "Windows Launcher"
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Test command dispatch
+        run: python -m unittest discover -s python/tests -p test_windows_launcher.py -v
+
   static-analysis:
     name: "C++ Static Analysis"
     runs-on: ubuntu-24.04

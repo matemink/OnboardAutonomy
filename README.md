@@ -4,10 +4,10 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg)](https://isocpp.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20ARM64-FCC624.svg)](https://www.raspberrypi.com/)
 
-OnboardAutonomy is a C++20 companion-computer runtime for ArduPilot UAVs.
-It brings together MAVLink telemetry, camera capture, operator diagnostics,
-and fault recovery. Both the physical Raspberry Pi 5 / Pixhawk 6C bench and SITL run in
-observation mode. The runtime has no flight-command or pursuit controller.
+OnboardAutonomy is a C++20 telemetry and camera observation prototype for
+ArduPilot, with a Raspberry Pi 5 / Pixhawk 6C hardware bench and Gazebo + SITL
+simulation. It provides console status, browser camera preview, JSONL diagnostics,
+and connection/camera recovery. ArduPilot owns flight control.
 
 ## Runtime
 
@@ -21,21 +21,34 @@ observation mode. The runtime has no flight-command or pursuit controller.
 - ArduPilot-owned companion-link failsafe validation and explicit separation
   between simulation and physical endpoints.
 
-ArduPilot owns stabilization, navigation, and flight control. The companion
-runtime observes its telemetry and camera frames. Its outbound protocol is
-limited to companion heartbeat, telemetry setup, and read-only information
-requests. Interactive input provides `Q` to quit.
+The companion sends heartbeat, telemetry setup, and read-only information
+requests. The demo observes the vehicle and camera frames; it does not start a
+flight or run a pursuit/landing controller. Interactive input provides `Q` to quit.
 
-```mermaid
-flowchart LR
-    Cameras --> Runtime[OnboardAutonomy]
-    Pixhawk[Pixhawk / ArduPilot] <--> Runtime
-    SITL[ArduPilot SITL] <--> Runtime
-    Gazebo --> Cameras
-    Gazebo <--> SITL
-    Runtime --> Console
-    Runtime --> Diagnostics[JSONL / camera preview]
+## Run on Windows
+
+After installing the simulator and building the runtime as described in the
+[development](docs/development.md) and [simulation](docs/simulation.md) guides:
+
+```bat
+run.cmd gazebo
 ```
+
+This opens Gazebo, ArduPilot SITL, the telemetry console and the browser preview
+at `http://localhost:8080/`. Expect one forward camera panel by default. Set
+`ONBOARD_AUTONOMY_DOWNWARD_CAMERA=1` to also enable the downward observation feed.
+
+| Command | Purpose |
+| --- | --- |
+| `run.cmd gazebo` | Camera simulation, telemetry console and browser preview |
+| `run.cmd gazebo showcase` | The same demo with the optional showcase scene |
+| `run.cmd sitl` | SITL telemetry without Gazebo |
+| `run.cmd pi` | Connect to the Raspberry Pi bench over SSH |
+| `run.cmd stop` | Stop this checkout's tagged Gazebo demo processes |
+
+Machine settings belong in ignored `.local/windows/gazebo.cmd` or `pi.cmd`;
+see the respective simulation and hardware guides. Linux uses the Bash launchers
+in `scripts/` directly. Windows implementations live in `scripts/windows/`.
 
 ## Build and check
 
@@ -62,8 +75,21 @@ library and is never linked into the companion executable.
 - [Architecture and package responsibilities](docs/architecture.md)
 - [Gazebo camera simulation](docs/simulation.md)
 - [Raspberry Pi 5 hardware bench](docs/raspberry-pi-5-bench.md)
-- [Release status and evidence boundaries](docs/release-status.md)
 
-Historical hardware measurements identify their tested binary and workload;
-they do not automatically describe the current revision. CI covers C++ tests,
-Python integration and fault injection, static analysis, and native ARM64 builds.
+## Status and evidence
+
+CI covers C++ tests, Python integration/fault injection, Windows command dispatch,
+static analysis and native ARM64 builds. Generated UDP telemetry and synthetic video check the
+runtime independently of a complete Gazebo session. A passing build or unit suite
+alone does not prove the full simulator or physical bench scenario.
+
+Hardware evidence identifies the binary and workload actually measured:
+
+- [Serial recovery](docs/evidence/serial-recovery.md)
+- [Pixhawk TELEM2 UART](docs/evidence/uart-hardware.md)
+- [Camera recovery](docs/evidence/camera-recovery.md)
+- [Historical Raspberry Pi runtime profile](docs/evidence/raspberry-pi-runtime-profile.md)
+
+Historical logs may refer to features removed from the current prototype;
+they are not current performance claims. The build version is recorded in
+`CMakeLists.txt`.

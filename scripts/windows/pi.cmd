@@ -1,7 +1,8 @@
 @echo off
 setlocal
+for %%I in ("%~dp0..\..") do set "PROJECT_ROOT=%%~fI"
 
-if exist "%~dp0OnboardAutonomyPiLocal.cmd" call "%~dp0OnboardAutonomyPiLocal.cmd"
+if exist "%PROJECT_ROOT%\.local\windows\pi.cmd" call "%PROJECT_ROOT%\.local\windows\pi.cmd"
 
 if not defined ONBOARD_AUTONOMY_PI_HOST set "ONBOARD_AUTONOMY_PI_HOST=companionpi.local"
 if not defined ONBOARD_AUTONOMY_PI_USER set "ONBOARD_AUTONOMY_PI_USER=companion"
