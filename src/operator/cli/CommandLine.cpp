@@ -152,13 +152,15 @@ void validate_sensor_mode(std::string_view mode) {
     for (int part = 0; part < 3; ++part) {
         const auto separator = mode.find(':');
         if (separator == std::string_view::npos) {
-            throw std::invalid_argument("--camera-sensor-mode must be WIDTH:HEIGHT:DEPTH:P or :U");
+            throw std::invalid_argument(
+                "--camera-sensor-mode must be WIDTH:HEIGHT:DEPTH:P or :U");
         }
         const auto value = parse_number<std::uint32_t>(mode.substr(0, separator),
             "--camera-sensor-mode");
         if (value == 0 || (part == 2 && std::ranges::find(supported_bit_depths, value) ==
                                       supported_bit_depths.end())) {
-            throw std::invalid_argument("Invalid dimensions or depth for --camera-sensor-mode");
+            throw std::invalid_argument(
+                "Invalid dimensions or depth for --camera-sensor-mode");
         }
         mode.remove_prefix(separator + 1);
     }
@@ -195,7 +197,8 @@ void validate_camera(const LaunchArgumentsDraft& options,
     if (options.camera_enabled) {
         if (explicit_options.camera_sensor_mode &&
             options.camera_backend != CameraBackend::rpicam) {
-            throw std::invalid_argument("--camera-sensor-mode requires --camera-source rpicam");
+            throw std::invalid_argument(
+                "--camera-sensor-mode requires --camera-source rpicam");
         }
         if (options.camera_backend == CameraBackend::rpicam) {
             validate_sensor_mode(options.camera_sensor_mode);

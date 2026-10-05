@@ -136,16 +136,24 @@ void camera_dependencies_are_validated() {
 }
 
 void rpicam_sensor_mode_is_preserved_and_validated() {
-    const auto options = parse({"--camera", "--camera-sensor-mode", "4608:2592:10:U"});
+    const auto options = parse(
+        {"--camera", "--camera-sensor-mode", "4608:2592:10:U"});
     const auto& hardware = std::get<HardwareLaunchOptions>(options);
-    const auto& source = std::get<onboard_autonomy::operator_interface::cli::RpicamOptions>(hardware.camera->source);
+    const auto& source =
+        std::get<onboard_autonomy::operator_interface::cli::RpicamOptions>(
+            hardware.camera->source);
     require(source.sensor_mode == "4608:2592:10:U",
         "custom sensor geometry must survive CLI parsing");
-    for (const auto mode : {"0:1296:10:P", "2304:1296:9:P", "2304:1296:10:X", "2304"}) {
-        require_rejected({"--camera", "--camera-sensor-mode", mode}, "--camera-sensor-mode");
+    for (const auto mode : {"0:1296:10:P", "2304:1296:9:P",
+             "2304:1296:10:X", "2304"}) {
+        require_rejected({"--camera", "--camera-sensor-mode", mode},
+            "--camera-sensor-mode");
     }
-    require_rejected({"--camera-sensor-mode", "2304:1296:10:P"}, "require --camera");
-    require_rejected({"--camera", "--camera-source", "gstreamer", "--camera-sensor-mode", "2304:1296:10:P"}, "requires --camera-source rpicam");
+    require_rejected({"--camera-sensor-mode", "2304:1296:10:P"},
+        "require --camera");
+    require_rejected({"--camera", "--camera-source", "gstreamer",
+                         "--camera-sensor-mode", "2304:1296:10:P"},
+        "requires --camera-source rpicam");
 }
 
 void forward_preview_does_not_require_a_downward_camera() {
