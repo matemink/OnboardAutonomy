@@ -30,7 +30,7 @@ class ServiceUpgradeTests(unittest.TestCase):
                 shutil.copy(PROJECT_ROOT / "deployment/systemd" / name, assets / name)
             installer = (PROJECT_ROOT / "scripts/install_onboard_autonomy_service.sh").read_text()
             # Only the root permission gate and destination roots are substituted.
-            # All installer control flow and external command ordering run unchanged.
+            # The account lookup is stubbed; installer control flow and ordering are unchanged.
             installer = installer.replace('if [[ "${EUID}" -ne 0 ]]; then', "if false; then")
             for original, destination in (
                 ("/opt/onboard-autonomy", root / "installation"),
@@ -50,6 +50,9 @@ class ServiceUpgradeTests(unittest.TestCase):
                 "stop) touch \"$TEST_STOPPED\";;\n"
                 "esac\n"
             )
+            (commands / "id").write_text(
+                '#!/usr/bin/env bash\n[[ "$1" == "fixture-user" ]]\n'
+            )
             (commands / "cp").write_text(
                 "#!/usr/bin/env bash\n"
                 "echo copy >> \"$TEST_LOG\"\n"
@@ -64,7 +67,7 @@ class ServiceUpgradeTests(unittest.TestCase):
                 ["bash", str(path)], capture_output=True, text=True, timeout=5,
                 env=os.environ | {
                     "PATH": str(commands) + os.pathsep + os.environ["PATH"],
-                    "ONBOARD_AUTONOMY_SERVICE_USER": os.environ["USER"],
+                    "ONBOARD_AUTONOMY_SERVICE_USER": "fixture-user",
                     "TEST_LOG": str(log), "TEST_STOPPED": str(root / "stopped"),
                     "TEST_ACTIVE": "1" if active else "0",
                     "TEST_STATE": state or ("active" if active else "inactive"),
@@ -76,7 +79,7 @@ class ServiceUpgradeTests(unittest.TestCase):
     def test_active_upgrade_stops_before_copy_and_restarts_after_reload(self) -> None:
         status, calls = self.run_installer(active=True)
         self.assertEqual(status, 0)
-        self.assertLess(calls.index("stop onboard-autonomy@" + os.environ["USER"] + ".service"), calls.index("copy"))
+        self.assertLess(calls.index("stop onboard-autonomy@" + "fixture-user" + ".service"), calls.index("copy"))
         self.assertLess(calls.index("copy"), calls.index("daemon-reload"))
         self.assertTrue(calls[-1].startswith("start onboard-autonomy@"))
 
