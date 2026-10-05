@@ -85,4 +85,6 @@ using CommandLineOptions =
 [[nodiscard]] CommandLineOptions parse_command_line(
     const std::vector<std::string_view>& arguments);
 
+[[nodiscard]] std::string_view command_line_help();
+
 } // namespace onboard_autonomy::operator_interface::cli

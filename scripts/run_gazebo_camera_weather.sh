@@ -23,7 +23,7 @@ stop_gazebo() {
 
 trap stop_gazebo EXIT INT TERM
 
-"${script_dir}/run_gazebo_camera.sh" "$@" &
+bash "${script_dir}/run_gazebo_camera.sh" "$@" &
 gazebo_pid=$!
 
 wind_ready=0

@@ -7,4 +7,4 @@ readonly project_dir="$(cd -- "${script_dir}/.." && pwd)"
 readonly default_world="${project_dir}/simulation/worlds/camera_observation.sdf"
 
 export ONBOARD_AUTONOMY_GAZEBO_WORLD="${ONBOARD_AUTONOMY_GAZEBO_WORLD:-${default_world}}"
-exec "${script_dir}/run_gazebo_iris.sh" "$@"
+exec bash "${script_dir}/run_gazebo_iris.sh" "$@"

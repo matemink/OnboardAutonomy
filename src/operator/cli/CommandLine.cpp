@@ -8,6 +8,44 @@
 #include <utility>
 
 namespace onboard_autonomy::operator_interface::cli {
+
+std::string_view command_line_help() {
+    return R"(Usage: onboard_autonomy [options]
+       onboard_autonomy --help | -h
+
+Observe MAVLink telemetry and camera frames.
+
+Connection:
+  --transport udp|serial       Transport backend (default: udp)
+  --udp-bind ADDRESS           UDP bind address (default: 0.0.0.0)
+  --udp-port PORT              MAVLink UDP port (default: 14550)
+  --serial-device DEVICE       Required for serial transport
+  --baud RATE                  Serial baud rate (default: 115200)
+  --sitl                       Observe a simulation over UDP
+
+Camera:
+  --camera                     Enable the primary camera
+  --camera-source rpicam|gstreamer
+  --camera-udp-port PORT        GStreamer receiver port
+  --camera-width WIDTH         Frame width (default: 640)
+  --camera-height HEIGHT       Frame height (default: 480)
+  --camera-fps FPS             Rpicam frame rate (default: 30)
+  --forward-camera-udp-port PORT
+                               Enable the independent forward receiver
+  --camera-preview             Enable the HTTP camera preview
+  --camera-preview-port PORT    HTTP port (default: 8080)
+
+Output:
+  --json                       Emit JSONL instead of the console
+  --snapshot-ms MILLISECONDS    Snapshot interval (default: 1000)
+  --diagnostic-log FILE         Also write JSONL diagnostics to a file
+  --board-types FILE           ArduPilot board-type lookup table
+  --sim-wind SPEED FROM TURB    Simulation profile for diagnostics
+  --interactive                Read terminal input: Q quits
+  --help, -h                   Show this help and exit
+)";
+}
+
 namespace {
 
 enum class TransportBackend {

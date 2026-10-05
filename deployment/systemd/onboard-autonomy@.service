@@ -9,6 +9,7 @@ StartLimitIntervalSec=0
 Type=simple
 User=%i
 Environment=ONBOARD_AUTONOMY_BINARY=/opt/onboard-autonomy/bin/onboard_autonomy
+Environment=ONBOARD_AUTONOMY_LOG_DIR=/var/lib/onboard-autonomy/%i
 EnvironmentFile=-/etc/onboard-autonomy/onboard-autonomy.env
 ExecStart=/opt/onboard-autonomy/bin/run_onboard_autonomy_pi.sh
 Restart=on-failure
@@ -20,7 +21,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/%i/.local/state/onboard_autonomy
+StateDirectory=onboard-autonomy/%i
+StateDirectoryMode=0750
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

@@ -8,7 +8,6 @@
 #include "onboard_autonomy/mission/SnapshotSink.hpp"
 
 #include <chrono>
-#include <csignal>
 #include <iostream>
 #include <span>
 #include <stdexcept>
@@ -18,15 +17,7 @@
 namespace onboard_autonomy::bootstrap {
 namespace {
 
-// std::signal requires process-lifetime state accessible to the handler.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-volatile std::sig_atomic_t keep_running = 1;
 constexpr auto kEventLoopSleep = std::chrono::milliseconds{5};
-
-void handle_signal(int) {
-    // Keep signal handling minimal; normal control flow owns all cleanup.
-    keep_running = 0;
-}
 
 } // namespace
 
@@ -50,12 +41,9 @@ CompanionRunner::CompanionRunner(CompanionRunnerOptions options,
 }
 
 int CompanionRunner::run() {
-    keep_running = 1;
-    std::signal(SIGINT, handle_signal);
-    std::signal(SIGTERM, handle_signal);
-    while (keep_running != 0) {
+    while (!TerminationSignals::stop_requested()) {
         handle_runtime_commands();
-        if (keep_running == 0) {
+        if (TerminationSignals::stop_requested()) {
             break;
         }
 
@@ -82,7 +70,7 @@ void CompanionRunner::handle_runtime_commands() {
     }
     while (const auto command = command_source_->poll()) {
         if (*command == RuntimeCommand::shutdown) {
-            keep_running = 0;
+            TerminationSignals::request_shutdown();
         }
     }
 }
