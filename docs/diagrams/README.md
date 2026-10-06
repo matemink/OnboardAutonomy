@@ -25,7 +25,7 @@ node /path/to/archify/skills/archify/bin/archify.mjs finalize architecture \
 Require passing validation, artifact and browser checks. Open the HTML and
 export **SVG · Light** and **SVG · Dark** as `overview-light.svg` and
 `overview-dark.svg`. Inspect both exports and update them in the same commit
-as the JSON and HTML. Both READMEs use these shared images.
+as the JSON and HTML. The project README uses these images.
 
 The Pages workflow publishes the checked HTML and these assets from `main`;
 it does not regenerate the map or publish runtime logs.
